@@ -6,8 +6,8 @@ gstack 한글화 fork를 새 PC에 설치하는 방법.
 
 ```bash
 git --version    # 2.x 이상
-node --version   # 18 이상
-bun --version    # 1.x 이상
+node --version   # 18 이상 (browse 스킬용)
+bun --version    # 1.x 이상 (browse 스킬용)
 ```
 
 없으면 설치:
@@ -20,22 +20,26 @@ bun --version    # 1.x 이상
 ## 설치
 
 ```bash
-# 1. clone (반드시 이 경로에)
+# 1. clone
 git clone -b ko https://github.com/KimYoungHwan8750/gstack-ko.git ~/.claude/skills/gstack
 
 # 2. upstream 등록 (업그레이드용)
 cd ~/.claude/skills/gstack
 git remote add upstream https://github.com/garrytan/gstack.git
+```
 
-# 3. 빌드 + 전역 설치
+Claude Code를 재시작하면 `/office-hours`, `/review`, `/ship` 등 텍스트 스킬이 바로 활성화됩니다.
+
+### browse 스킬 활성화 (선택)
+
+`/browse`, `/qa`, `/design-review`, `/benchmark`, `/canary` 등 헤드리스 브라우저 기반 스킬을 사용하려면 빌드가 필요합니다:
+
+```bash
+cd ~/.claude/skills/gstack
 bun install
 bun run build
 ./setup
 ```
-
-`./setup`이 `~/.claude/skills/` 안에서 실행되면 자동으로 각 스킬의 심볼릭 링크를 전역에 생성합니다.
-
-Claude Code를 재시작하면 `/office-hours`, `/qa`, `/ship` 등 한글 스킬이 활성화됩니다.
 
 ## 업그레이드
 
