@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-plan-eng-review"
-  short_description: "Eng manager-mode plan review. Lock in the execution plan — architecture, data flow, diagrams, edge cases, test..."
+  short_description: "엔지니어링 매니저 모드 플랜 리뷰. 실행 계획을 확정합니다 — 아키텍처, 데이터 흐름, 다이어그램, 엣지 케이스, 테스트 커버리지, 성능. 의견이 담긴 추천과 함께 이슈를 인터랙티브하게 검토합니다. \"아키텍처..."
   default_prompt: "Use gstack-plan-eng-review for this task."
 policy:
   allow_implicit_invocation: true

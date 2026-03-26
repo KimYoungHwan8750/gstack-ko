@@ -3,12 +3,12 @@ name: investigate
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Systematic debugging with root cause investigation. Four phases: investigate,
-  analyze, hypothesize, implement. Iron Law: no fixes without root cause.
-  Use when asked to "debug this", "fix this bug", "why is this broken",
-  "investigate this error", or "root cause analysis".
-  Proactively suggest when the user reports errors, unexpected behavior, or
-  is troubleshooting why something stopped working.
+  근본 원인 조사를 통한 체계적 디버깅. 네 단계: 조사, 분석, 가설 수립, 구현.
+  철칙: 근본 원인 없이 수정하지 않는다.
+  다음 요청 시 사용: "debug this", "fix this bug", "why is this broken",
+  "investigate this error", "root cause analysis".
+  사용자가 에러, 예상치 못한 동작을 보고하거나 무언가가 작동하지 않는 이유를
+  해결하려 할 때 사전에 제안합니다.
 allowed-tools:
   - Bash
   - Read
@@ -55,6 +55,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -275,45 +281,45 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# Systematic Debugging
+# 체계적 디버깅
 
-## Iron Law
+## 철칙
 
-**NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.**
+**근본 원인 조사 없이 수정하지 않는다.**
 
-Fixing symptoms creates whack-a-mole debugging. Every fix that doesn't address root cause makes the next bug harder to find. Find the root cause, then fix it.
+증상만 고치면 두더지 잡기식 디버깅이 됩니다. 근본 원인을 해결하지 않는 모든 수정은 다음 버그를 찾기 더 어렵게 만듭니다. 근본 원인을 찾고 나서 수정하세요.
 
 ---
 
-## Phase 1: Root Cause Investigation
+## 1단계: 근본 원인 조사
 
-Gather context before forming any hypothesis.
+가설을 세우기 전에 맥락을 수집합니다.
 
-1. **Collect symptoms:** Read the error messages, stack traces, and reproduction steps. If the user hasn't provided enough context, ask ONE question at a time via AskUserQuestion.
+1. **증상 수집:** 에러 메시지, 스택 트레이스, 재현 단계를 읽습니다. 사용자가 충분한 맥락을 제공하지 않았다면 AskUserQuestion을 통해 한 번에 하나씩 질문합니다.
 
-2. **Read the code:** Trace the code path from the symptom back to potential causes. Use Grep to find all references, Read to understand the logic.
+2. **코드 읽기:** 증상에서 잠재적 원인까지 코드 경로를 추적합니다. Grep으로 모든 참조를 찾고, Read로 로직을 이해합니다.
 
-3. **Check recent changes:**
+3. **최근 변경 확인:**
    ```bash
    git log --oneline -20 -- <affected-files>
    ```
-   Was this working before? What changed? A regression means the root cause is in the diff.
+   이전에는 작동했나요? 무엇이 변경되었나요? 회귀라면 근본 원인은 diff에 있습니다.
 
-4. **Reproduce:** Can you trigger the bug deterministically? If not, gather more evidence before proceeding.
+4. **재현:** 버그를 결정적으로 트리거할 수 있나요? 그렇지 않다면 진행하기 전에 더 많은 증거를 수집하세요.
 
-Output: **"Root cause hypothesis: ..."** — a specific, testable claim about what is wrong and why.
+출력: **"근본 원인 가설: ..."** — 무엇이 잘못되었고 왜 그런지에 대한 구체적이고 검증 가능한 주장.
 
 ---
 
-## Scope Lock
+## 범위 잠금
 
-After forming your root cause hypothesis, lock edits to the affected module to prevent scope creep.
+근본 원인 가설을 세운 후, 범위 확산을 방지하기 위해 영향받는 모듈에 편집을 잠급니다.
 
 ```bash
 [ -x "${CLAUDE_SKILL_DIR}/../freeze/bin/check-freeze.sh" ] && echo "FREEZE_AVAILABLE" || echo "FREEZE_UNAVAILABLE"
 ```
 
-**If FREEZE_AVAILABLE:** Identify the narrowest directory containing the affected files. Write it to the freeze state file:
+**FREEZE_AVAILABLE인 경우:** 영향받는 파일을 포함하는 가장 좁은 디렉토리를 식별합니다. freeze 상태 파일에 기록합니다:
 
 ```bash
 STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.gstack}"
@@ -322,48 +328,48 @@ echo "<detected-directory>/" > "$STATE_DIR/freeze-dir.txt"
 echo "Debug scope locked to: <detected-directory>/"
 ```
 
-Substitute `<detected-directory>` with the actual directory path (e.g., `src/auth/`). Tell the user: "Edits restricted to `<dir>/` for this debug session. This prevents changes to unrelated code. Run `/unfreeze` to remove the restriction."
+`<detected-directory>`를 실제 디렉토리 경로로 대체합니다 (예: `src/auth/`). 사용자에게 알립니다: "이 디버그 세션 동안 편집이 `<dir>/`로 제한됩니다. 관련 없는 코드 변경을 방지합니다. 제한을 해제하려면 `/unfreeze`를 실행하세요."
 
-If the bug spans the entire repo or the scope is genuinely unclear, skip the lock and note why.
+버그가 전체 저장소에 걸쳐 있거나 범위가 진정으로 불명확한 경우 잠금을 건너뛰고 이유를 기록합니다.
 
-**If FREEZE_UNAVAILABLE:** Skip scope lock. Edits are unrestricted.
+**FREEZE_UNAVAILABLE인 경우:** 범위 잠금을 건너뜁니다. 편집이 제한되지 않습니다.
 
 ---
 
-## Phase 2: Pattern Analysis
+## 2단계: 패턴 분석
 
-Check if this bug matches a known pattern:
+이 버그가 알려진 패턴과 일치하는지 확인합니다:
 
-| Pattern | Signature | Where to look |
+| 패턴 | 시그니처 | 확인 위치 |
 |---------|-----------|---------------|
-| Race condition | Intermittent, timing-dependent | Concurrent access to shared state |
-| Nil/null propagation | NoMethodError, TypeError | Missing guards on optional values |
-| State corruption | Inconsistent data, partial updates | Transactions, callbacks, hooks |
-| Integration failure | Timeout, unexpected response | External API calls, service boundaries |
-| Configuration drift | Works locally, fails in staging/prod | Env vars, feature flags, DB state |
-| Stale cache | Shows old data, fixes on cache clear | Redis, CDN, browser cache, Turbo |
+| 레이스 컨디션 | 간헐적, 타이밍 의존적 | 공유 상태에 대한 동시 접근 |
+| Nil/null 전파 | NoMethodError, TypeError | 옵셔널 값에 대한 누락된 가드 |
+| 상태 손상 | 일관성 없는 데이터, 부분 업데이트 | 트랜잭션, 콜백, 훅 |
+| 통합 실패 | 타임아웃, 예상치 못한 응답 | 외부 API 호출, 서비스 경계 |
+| 설정 불일치 | 로컬에서 작동, 스테이징/프로덕션에서 실패 | 환경 변수, 피처 플래그, DB 상태 |
+| 오래된 캐시 | 이전 데이터 표시, 캐시 삭제 시 해결 | Redis, CDN, 브라우저 캐시, Turbo |
 
-Also check:
-- `TODOS.md` for related known issues
-- `git log` for prior fixes in the same area — **recurring bugs in the same files are an architectural smell**, not a coincidence
+추가 확인:
+- `TODOS.md`에서 관련 알려진 이슈
+- `git log`에서 같은 영역의 이전 수정 — **같은 파일에서 반복되는 버그는 아키텍처 냄새**이지 우연이 아닙니다
 
-**External pattern search:** If the bug doesn't match a known pattern above, WebSearch for:
-- "{framework} {generic error type}" — **sanitize first:** strip hostnames, IPs, file paths, SQL, customer data. Search the error category, not the raw message.
-- "{library} {component} known issues"
+**외부 패턴 검색:** 버그가 위의 알려진 패턴과 일치하지 않으면 WebSearch로 검색합니다:
+- "{프레임워크} {일반 에러 유형}" — **먼저 정제:** 호스트명, IP, 파일 경로, SQL, 고객 데이터를 제거합니다. 원본 메시지가 아닌 에러 카테고리를 검색합니다.
+- "{라이브러리} {컴포넌트} known issues"
 
-If WebSearch is unavailable, skip this search and proceed with hypothesis testing. If a documented solution or known dependency bug surfaces, present it as a candidate hypothesis in Phase 3.
+WebSearch를 사용할 수 없으면 이 검색을 건너뛰고 가설 검증을 진행합니다. 문서화된 해결책이나 알려진 의존성 버그가 발견되면 3단계에서 후보 가설로 제시합니다.
 
 ---
 
-## Phase 3: Hypothesis Testing
+## 3단계: 가설 검증
 
-Before writing ANY fix, verify your hypothesis.
+수정을 작성하기 전에 가설을 검증합니다.
 
-1. **Confirm the hypothesis:** Add a temporary log statement, assertion, or debug output at the suspected root cause. Run the reproduction. Does the evidence match?
+1. **가설 확인:** 의심되는 근본 원인에 임시 로그 문, 어설션 또는 디버그 출력을 추가합니다. 재현을 실행합니다. 증거가 일치합니까?
 
-2. **If the hypothesis is wrong:** Before forming the next hypothesis, consider searching for the error. **Sanitize first** — strip hostnames, IPs, file paths, SQL fragments, customer identifiers, and any internal/proprietary data from the error message. Search only the generic error type and framework context: "{component} {sanitized error type} {framework version}". If the error message is too specific to sanitize safely, skip the search. If WebSearch is unavailable, skip and proceed. Then return to Phase 1. Gather more evidence. Do not guess.
+2. **가설이 틀린 경우:** 다음 가설을 세우기 전에 에러를 검색하는 것을 고려합니다. **먼저 정제** — 에러 메시지에서 호스트명, IP, 파일 경로, SQL 조각, 고객 식별자 및 내부/독점 데이터를 제거합니다. 일반 에러 유형과 프레임워크 맥락만 검색합니다: "{컴포넌트} {정제된 에러 유형} {프레임워크 버전}". 에러 메시지가 안전하게 정제하기에 너무 구체적이면 검색을 건너뜁니다. WebSearch를 사용할 수 없으면 건너뛰고 진행합니다. 그런 다음 1단계로 돌아갑니다. 더 많은 증거를 수집합니다. 추측하지 마세요.
 
-3. **3-strike rule:** If 3 hypotheses fail, **STOP**. Use AskUserQuestion:
+3. **3회 실패 규칙:** 3개의 가설이 실패하면, **중단합니다**. AskUserQuestion을 사용합니다:
    ```
    3 hypotheses tested, none match. This may be an architectural issue
    rather than a simple bug.
@@ -373,28 +379,28 @@ Before writing ANY fix, verify your hypothesis.
    C) Add logging and wait — instrument the area and catch it next time
    ```
 
-**Red flags** — if you see any of these, slow down:
-- "Quick fix for now" — there is no "for now." Fix it right or escalate.
-- Proposing a fix before tracing data flow — you're guessing.
-- Each fix reveals a new problem elsewhere — wrong layer, not wrong code.
+**위험 신호** — 다음 중 하나라도 보이면 속도를 늦추세요:
+- "일단 임시 수정" — "일단"이란 없습니다. 제대로 수정하거나 에스컬레이션하세요.
+- 데이터 흐름을 추적하기 전에 수정을 제안 — 추측하고 있습니다.
+- 각 수정이 다른 곳에서 새로운 문제를 드러냄 — 잘못된 코드가 아니라 잘못된 레이어입니다.
 
 ---
 
-## Phase 4: Implementation
+## 4단계: 구현
 
-Once root cause is confirmed:
+근본 원인이 확인되면:
 
-1. **Fix the root cause, not the symptom.** The smallest change that eliminates the actual problem.
+1. **증상이 아닌 근본 원인을 수정합니다.** 실제 문제를 제거하는 최소한의 변경.
 
-2. **Minimal diff:** Fewest files touched, fewest lines changed. Resist the urge to refactor adjacent code.
+2. **최소 diff:** 가장 적은 파일, 가장 적은 라인 변경. 인접한 코드를 리팩토링하려는 충동을 참으세요.
 
-3. **Write a regression test** that:
-   - **Fails** without the fix (proves the test is meaningful)
-   - **Passes** with the fix (proves the fix works)
+3. **회귀 테스트 작성:**
+   - 수정 없이 **실패** (테스트가 의미 있음을 증명)
+   - 수정 후 **통과** (수정이 작동함을 증명)
 
-4. **Run the full test suite.** Paste the output. No regressions allowed.
+4. **전체 테스트 스위트를 실행합니다.** 출력을 붙여넣으세요. 회귀는 허용되지 않습니다.
 
-5. **If the fix touches >5 files:** Use AskUserQuestion to flag the blast radius:
+5. **수정이 5개 이상의 파일에 영향을 미치는 경우:** AskUserQuestion으로 영향 범위를 알립니다:
    ```
    This fix touches N files. That's a large blast radius for a bug fix.
    A) Proceed — the root cause genuinely spans these files
@@ -404,35 +410,35 @@ Once root cause is confirmed:
 
 ---
 
-## Phase 5: Verification & Report
+## 5단계: 검증 및 리포트
 
-**Fresh verification:** Reproduce the original bug scenario and confirm it's fixed. This is not optional.
+**새로운 검증:** 원래 버그 시나리오를 재현하고 수정되었는지 확인합니다. 이것은 선택 사항이 아닙니다.
 
-Run the test suite and paste the output.
+테스트 스위트를 실행하고 출력을 붙여넣으세요.
 
-Output a structured debug report:
+구조화된 디버그 리포트를 출력합니다:
 ```
 DEBUG REPORT
 ════════════════════════════════════════
-Symptom:         [what the user observed]
-Root cause:      [what was actually wrong]
-Fix:             [what was changed, with file:line references]
-Evidence:        [test output, reproduction attempt showing fix works]
-Regression test: [file:line of the new test]
-Related:         [TODOS.md items, prior bugs in same area, architectural notes]
+Symptom:         [사용자가 관찰한 것]
+Root cause:      [실제로 잘못된 것]
+Fix:             [변경된 내용, file:line 참조 포함]
+Evidence:        [테스트 출력, 수정이 작동함을 보여주는 재현 시도]
+Regression test: [새 테스트의 file:line]
+Related:         [TODOS.md 항목, 같은 영역의 이전 버그, 아키텍처 노트]
 Status:          DONE | DONE_WITH_CONCERNS | BLOCKED
 ════════════════════════════════════════
 ```
 
 ---
 
-## Important Rules
+## 중요 규칙
 
-- **3+ failed fix attempts → STOP and question the architecture.** Wrong architecture, not failed hypothesis.
-- **Never apply a fix you cannot verify.** If you can't reproduce and confirm, don't ship it.
-- **Never say "this should fix it."** Verify and prove it. Run the tests.
-- **If fix touches >5 files → AskUserQuestion** about blast radius before proceeding.
-- **Completion status:**
-  - DONE — root cause found, fix applied, regression test written, all tests pass
-  - DONE_WITH_CONCERNS — fixed but cannot fully verify (e.g., intermittent bug, requires staging)
-  - BLOCKED — root cause unclear after investigation, escalated
+- **3회 이상 수정 실패 시 중단하고 아키텍처를 의심하세요.** 가설 실패가 아니라 잘못된 아키텍처입니다.
+- **검증할 수 없는 수정은 절대 적용하지 마세요.** 재현하고 확인할 수 없으면 배포하지 마세요.
+- **"이걸로 해결될 겁니다"라고 절대 말하지 마세요.** 검증하고 증명하세요. 테스트를 실행하세요.
+- **수정이 5개 이상의 파일에 영향 시 AskUserQuestion으로** 영향 범위를 확인한 후 진행하세요.
+- **완료 상태:**
+  - DONE — 근본 원인 발견, 수정 적용, 회귀 테스트 작성, 모든 테스트 통과
+  - DONE_WITH_CONCERNS — 수정되었지만 완전히 검증할 수 없음 (예: 간헐적 버그, 스테이징 필요)
+  - BLOCKED — 조사 후에도 근본 원인 불명확, 에스컬레이션됨

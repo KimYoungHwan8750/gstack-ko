@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-land-and-deploy"
-  short_description: "Land and deploy workflow. Merges the PR, waits for CI and deploy, verifies production health via canary checks...."
+  short_description: "랜딩 및 배포 워크플로우. PR을 머지하고, CI와 배포를 기다린 후, 카나리 체크를 통해 프로덕션 상태를 확인합니다. /ship이 PR을 생성한 후 이어받습니다. 사용 시기: \"merge\", \"land\",..."
   default_prompt: "Use gstack-land-and-deploy for this task."
 policy:
   allow_implicit_invocation: true

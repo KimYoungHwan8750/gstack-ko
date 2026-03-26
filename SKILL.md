@@ -3,10 +3,10 @@ name: gstack
 preamble-tier: 1
 version: 1.1.0
 description: |
-  Fast headless browser for QA testing and site dogfooding. Navigate pages, interact with
-  elements, verify state, diff before/after, take annotated screenshots, test responsive
-  layouts, forms, uploads, dialogs, and capture bug evidence. Use when asked to open or
-  test a site, verify a deployment, dogfood a user flow, or file a bug with screenshots.
+  QA 테스트 및 사이트 점검을 위한 고속 헤드리스 브라우저. 페이지 탐색, 요소 상호작용,
+  상태 검증, 전후 비교, 주석 스크린샷 촬영, 반응형 레이아웃 테스트, 폼/업로드/다이얼로그
+  테스트, 버그 증거 캡처. 사이트 열기/테스트, 배포 확인, 사용자 흐름 점검, 스크린샷으로
+  버그 보고 시 사용.
 allowed-tools:
   - Bash
   - Read
@@ -37,6 +37,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -230,36 +236,36 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-If `PROACTIVE` is `false`: do NOT proactively suggest other gstack skills during this session.
-Only run skills the user explicitly invokes. This preference persists across sessions via
-`gstack-config`.
+`PROACTIVE`가 `false`인 경우: 이 세션에서 다른 gstack 스킬을 자동 추천하지 마세요.
+사용자가 명시적으로 호출한 스킬만 실행하세요. 이 설정은 `gstack-config`를 통해
+세션 간 유지됩니다.
 
-If `PROACTIVE` is `true` (default): suggest adjacent gstack skills when relevant to the
-user's workflow stage:
-- Brainstorming → /office-hours
-- Strategy → /plan-ceo-review
-- Architecture → /plan-eng-review
-- Design → /plan-design-review or /design-consultation
-- Auto-review → /autoplan
-- Debugging → /investigate
+`PROACTIVE`가 `true`인 경우 (기본값): 사용자의 작업 단계에 맞는 gstack 스킬을
+추천하세요:
+- 브레인스토밍 → /office-hours
+- 전략 → /plan-ceo-review
+- 아키텍처 → /plan-eng-review
+- 디자인 → /plan-design-review 또는 /design-consultation
+- 자동 리뷰 → /autoplan
+- 디버깅 → /investigate
 - QA → /qa
-- Code review → /review
-- Visual audit → /design-review
-- Shipping → /ship
-- Docs → /document-release
-- Retro → /retro
-- Second opinion → /codex
-- Prod safety → /careful or /guard
-- Scoped edits → /freeze or /unfreeze
-- Upgrades → /gstack-upgrade
+- 코드 리뷰 → /review
+- 시각 감사 → /design-review
+- 배포 → /ship
+- 문서 → /document-release
+- 회고 → /retro
+- 세컨드 오피니언 → /codex
+- 운영 안전 → /careful 또는 /guard
+- 범위 제한 편집 → /freeze 또는 /unfreeze
+- 업그레이드 → /gstack-upgrade
 
-If the user opts out of suggestions, run `gstack-config set proactive false`.
-If they opt back in, run `gstack-config set proactive true`.
+사용자가 추천을 거부하면 `gstack-config set proactive false`를 실행하세요.
+다시 켜려면 `gstack-config set proactive true`를 실행하세요.
 
-# gstack browse: QA Testing & Dogfooding
+# gstack browse: QA 테스트 & 독푸딩
 
-Persistent headless Chromium. First call auto-starts (~3s), then ~100-200ms per command.
-Auto-shuts down after 30 min idle. State persists between calls (cookies, tabs, sessions).
+영구 헤드리스 Chromium. 첫 호출 시 자동 시작(~3초), 이후 명령당 ~100-200ms.
+30분 유휴 시 자동 종료. 호출 간 상태 유지(쿠키, 탭, 세션).
 
 ## SETUP (run this check BEFORE any browse command)
 
@@ -280,100 +286,100 @@ If `NEEDS_SETUP`:
 2. Run: `cd <SKILL_DIR> && ./setup`
 3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
 
-## IMPORTANT
+## 중요 사항
 
-- Use the compiled binary via Bash: `$B <command>`
-- NEVER use `mcp__claude-in-chrome__*` tools. They are slow and unreliable.
-- Browser persists between calls — cookies, login sessions, and tabs carry over.
-- Dialogs (alert/confirm/prompt) are auto-accepted by default — no browser lockup.
-- **Show screenshots:** After `$B screenshot`, `$B snapshot -a -o`, or `$B responsive`, always use the Read tool on the output PNG(s) so the user can see them. Without this, screenshots are invisible.
+- 컴파일된 바이너리를 Bash로 사용: `$B <command>`
+- `mcp__claude-in-chrome__*` 도구를 **절대 사용하지 마세요**. 느리고 불안정합니다.
+- 브라우저는 호출 간 유지됩니다 — 쿠키, 로그인 세션, 탭이 그대로 유지됩니다.
+- 다이얼로그(alert/confirm/prompt)는 기본적으로 자동 수락됩니다 — 브라우저 잠김 없음.
+- **스크린샷 표시:** `$B screenshot`, `$B snapshot -a -o`, 또는 `$B responsive` 후 항상 Read 도구로 출력 PNG를 열어 사용자에게 보여주세요. 이 없이는 스크린샷이 보이지 않습니다.
 
-## QA Workflows
+## QA 워크플로우
 
-### Test a user flow (login, signup, checkout, etc.)
+### 사용자 흐름 테스트 (로그인, 회원가입, 결제 등)
 
 ```bash
-# 1. Go to the page
+# 1. 페이지로 이동
 $B goto https://app.example.com/login
 
-# 2. See what's interactive
+# 2. 인터랙티브 요소 확인
 $B snapshot -i
 
-# 3. Fill the form using refs
+# 3. ref를 사용해 폼 작성
 $B fill @e3 "test@example.com"
 $B fill @e4 "password123"
 $B click @e5
 
-# 4. Verify it worked
-$B snapshot -D              # diff shows what changed after clicking
-$B is visible ".dashboard"  # assert the dashboard appeared
+# 4. 결과 검증
+$B snapshot -D              # diff로 클릭 후 변경 사항 표시
+$B is visible ".dashboard"  # 대시보드가 나타났는지 확인
 $B screenshot /tmp/after-login.png
 ```
 
-### Verify a deployment / check prod
+### 배포 확인 / 운영 환경 점검
 
 ```bash
 $B goto https://yourapp.com
-$B text                          # read the page — does it load?
-$B console                       # any JS errors?
-$B network                       # any failed requests?
-$B js "document.title"           # correct title?
-$B is visible ".hero-section"    # key elements present?
+$B text                          # 페이지 읽기 — 로딩되는가?
+$B console                       # JS 에러 확인
+$B network                       # 실패한 요청 확인
+$B js "document.title"           # 올바른 타이틀인가?
+$B is visible ".hero-section"    # 핵심 요소가 있는가?
 $B screenshot /tmp/prod-check.png
 ```
 
-### Dogfood a feature end-to-end
+### 기능 엔드투엔드 독푸딩
 
 ```bash
-# Navigate to the feature
+# 기능 페이지로 이동
 $B goto https://app.example.com/new-feature
 
-# Take annotated screenshot — shows every interactive element with labels
+# 주석 스크린샷 — 모든 인터랙티브 요소에 라벨 표시
 $B snapshot -i -a -o /tmp/feature-annotated.png
 
-# Find ALL clickable things (including divs with cursor:pointer)
+# cursor:pointer가 있는 div 포함 모든 클릭 가능 요소 찾기
 $B snapshot -C
 
-# Walk through the flow
-$B snapshot -i          # baseline
-$B click @e3            # interact
-$B snapshot -D          # what changed? (unified diff)
+# 흐름 진행
+$B snapshot -i          # 기준선
+$B click @e3            # 상호작용
+$B snapshot -D          # 무엇이 변경되었는가? (통합 diff)
 
-# Check element states
+# 요소 상태 확인
 $B is visible ".success-toast"
 $B is enabled "#next-step-btn"
 $B is checked "#agree-checkbox"
 
-# Check console for errors after interactions
+# 상호작용 후 콘솔 에러 확인
 $B console
 ```
 
-### Test responsive layouts
+### 반응형 레이아웃 테스트
 
 ```bash
-# Quick: 3 screenshots at mobile/tablet/desktop
+# 빠른 방법: 모바일/태블릿/데스크톱 3장 스크린샷
 $B goto https://yourapp.com
 $B responsive /tmp/layout
 
-# Manual: specific viewport
+# 수동: 특정 뷰포트
 $B viewport 375x812     # iPhone
 $B screenshot /tmp/mobile.png
-$B viewport 1440x900    # Desktop
+$B viewport 1440x900    # 데스크톱
 $B screenshot /tmp/desktop.png
 
-# Element screenshot (crop to specific element)
+# 요소 스크린샷 (특정 요소만 잘라내기)
 $B screenshot "#hero-banner" /tmp/hero.png
 $B snapshot -i
 $B screenshot @e3 /tmp/button.png
 
-# Region crop
+# 영역 잘라내기
 $B screenshot --clip 0,0,800,600 /tmp/above-fold.png
 
-# Viewport only (no scroll)
+# 뷰포트만 (스크롤 없음)
 $B screenshot --viewport /tmp/viewport.png
 ```
 
-### Test file upload
+### 파일 업로드 테스트
 
 ```bash
 $B goto https://app.example.com/upload
@@ -383,59 +389,59 @@ $B is visible ".upload-success"
 $B screenshot /tmp/upload-result.png
 ```
 
-### Test forms with validation
+### 유효성 검증이 있는 폼 테스트
 
 ```bash
 $B goto https://app.example.com/form
 $B snapshot -i
 
-# Submit empty — check validation errors appear
-$B click @e10                        # submit button
-$B snapshot -D                       # diff shows error messages appeared
+# 빈 상태로 제출 — 유효성 에러 표시 확인
+$B click @e10                        # 제출 버튼
+$B snapshot -D                       # diff로 에러 메시지 표시 확인
 $B is visible ".error-message"
 
-# Fill and resubmit
+# 입력 후 재제출
 $B fill @e3 "valid input"
 $B click @e10
-$B snapshot -D                       # diff shows errors gone, success state
+$B snapshot -D                       # diff로 에러 사라짐, 성공 상태 확인
 ```
 
-### Test dialogs (delete confirmations, prompts)
+### 다이얼로그 테스트 (삭제 확인, 프롬프트)
 
 ```bash
-# Set up dialog handling BEFORE triggering
-$B dialog-accept              # will auto-accept next alert/confirm
-$B click "#delete-button"     # triggers confirmation dialog
-$B dialog                     # see what dialog appeared
-$B snapshot -D                # verify the item was deleted
+# 트리거 전에 다이얼로그 핸들링 설정
+$B dialog-accept              # 다음 alert/confirm 자동 수락
+$B click "#delete-button"     # 확인 다이얼로그 트리거
+$B dialog                     # 어떤 다이얼로그가 나타났는지 확인
+$B snapshot -D                # 항목이 삭제되었는지 검증
 
-# For prompts that need input
-$B dialog-accept "my answer"  # accept with text
-$B click "#rename-button"     # triggers prompt
+# 입력이 필요한 프롬프트
+$B dialog-accept "my answer"  # 텍스트와 함께 수락
+$B click "#rename-button"     # 프롬프트 트리거
 ```
 
-### Test authenticated pages (import real browser cookies)
+### 인증된 페이지 테스트 (실제 브라우저 쿠키 가져오기)
 
 ```bash
-# Import cookies from your real browser (opens interactive picker)
+# 실제 브라우저에서 쿠키 가져오기 (인터랙티브 선택기 열림)
 $B cookie-import-browser
 
-# Or import a specific domain directly
+# 특정 도메인 직접 가져오기
 $B cookie-import-browser comet --domain .github.com
 
-# Now test authenticated pages
+# 인증된 페이지 테스트
 $B goto https://github.com/settings/profile
 $B snapshot -i
 $B screenshot /tmp/github-profile.png
 ```
 
-### Compare two pages / environments
+### 두 페이지 / 환경 비교
 
 ```bash
 $B diff https://staging.app.com https://prod.app.com
 ```
 
-### Multi-step chain (efficient for long flows)
+### 다단계 체인 (긴 흐름에 효율적)
 
 ```bash
 echo '[
@@ -449,39 +455,39 @@ echo '[
 ]' | $B chain
 ```
 
-## Quick Assertion Patterns
+## 빠른 어설션 패턴
 
 ```bash
-# Element exists and is visible
+# 요소가 존재하고 보이는지
 $B is visible ".modal"
 
-# Button is enabled/disabled
+# 버튼 활성화/비활성화 여부
 $B is enabled "#submit-btn"
 $B is disabled "#submit-btn"
 
-# Checkbox state
+# 체크박스 상태
 $B is checked "#agree"
 
-# Input is editable
+# 입력 필드 편집 가능 여부
 $B is editable "#name-field"
 
-# Element has focus
+# 요소에 포커스가 있는지
 $B is focused "#search-input"
 
-# Page contains text
+# 페이지에 텍스트 포함 여부
 $B js "document.body.textContent.includes('Success')"
 
-# Element count
+# 요소 개수
 $B js "document.querySelectorAll('.list-item').length"
 
-# Specific attribute value
-$B attrs "#logo"    # returns all attributes as JSON
+# 특정 속성 값
+$B attrs "#logo"    # 모든 속성을 JSON으로 반환
 
-# CSS property
+# CSS 속성
 $B css ".button" "background-color"
 ```
 
-## Snapshot System
+## 스냅샷 시스템
 
 The snapshot is your primary tool for understanding and interacting with pages.
 
@@ -518,7 +524,7 @@ $B click @c1       # cursor-interactive ref (from -C)
 
 Refs are invalidated on navigation — run `snapshot` again after `goto`.
 
-## Command Reference
+## 명령어 레퍼런스
 
 ### Navigation
 | Command | Description |
@@ -609,13 +615,13 @@ Refs are invalidated on navigation — run `snapshot` again after `goto`.
 | `status` | Health check |
 | `stop` | Shutdown server |
 
-## Tips
+## 팁
 
-1. **Navigate once, query many times.** `goto` loads the page; then `text`, `js`, `screenshot` all hit the loaded page instantly.
-2. **Use `snapshot -i` first.** See all interactive elements, then click/fill by ref. No CSS selector guessing.
-3. **Use `snapshot -D` to verify.** Baseline → action → diff. See exactly what changed.
-4. **Use `is` for assertions.** `is visible .modal` is faster and more reliable than parsing page text.
-5. **Use `snapshot -a` for evidence.** Annotated screenshots are great for bug reports.
-6. **Use `snapshot -C` for tricky UIs.** Finds clickable divs that the accessibility tree misses.
-7. **Check `console` after actions.** Catch JS errors that don't surface visually.
-8. **Use `chain` for long flows.** Single command, no per-step CLI overhead.
+1. **한 번 탐색, 여러 번 조회.** `goto`로 페이지를 로드하면 `text`, `js`, `screenshot` 모두 즉시 실행됩니다.
+2. **먼저 `snapshot -i` 사용.** 모든 인터랙티브 요소를 확인한 후 ref로 클릭/입력. CSS 선택자 추측 불필요.
+3. **검증에 `snapshot -D` 사용.** 기준선 → 동작 → diff. 정확히 무엇이 변경되었는지 확인.
+4. **어설션에 `is` 사용.** `is visible .modal`이 페이지 텍스트 파싱보다 빠르고 안정적.
+5. **증거에 `snapshot -a` 사용.** 주석 스크린샷은 버그 보고에 유용합니다.
+6. **까다로운 UI에 `snapshot -C` 사용.** 접근성 트리가 놓치는 클릭 가능 div를 찾습니다.
+7. **동작 후 `console` 확인.** 시각적으로 나타나지 않는 JS 에러를 잡습니다.
+8. **긴 흐름에 `chain` 사용.** 단일 명령, 단계별 CLI 오버헤드 없음.

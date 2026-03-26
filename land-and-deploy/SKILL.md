@@ -3,9 +3,9 @@ name: land-and-deploy
 preamble-tier: 4
 version: 1.0.0
 description: |
-  Land and deploy workflow. Merges the PR, waits for CI and deploy,
-  verifies production health via canary checks. Takes over after /ship
-  creates the PR. Use when: "merge", "land", "deploy", "merge and verify",
+  랜딩 및 배포 워크플로우. PR을 머지하고, CI와 배포를 기다린 후,
+  카나리 체크를 통해 프로덕션 상태를 확인합니다. /ship이 PR을 생성한 후
+  이어받습니다. 사용 시기: "merge", "land", "deploy", "merge and verify",
   "land it", "ship it to production".
 allowed-tools:
   - Bash
@@ -38,6 +38,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -150,6 +156,35 @@ AI makes completeness near-free. Always recommend the complete option over short
 | Bug fix | 4 hours | 15 min | ~20x |
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
+
+## yhlib 모노레포 통합
+
+`YHLIB`이 `true`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
+
+**확정 기술 스택 (프레임워크 선택 건너뛰기):**
+- Web: Next.js / App: Expo (React Native) / Backend: Supabase
+- 상태관리: Zustand / 데이터 패칭: Tanstack Query
+- 폼/검증: Zod + React Hook Form
+- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
+- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
+
+**아키텍처 참조 문서:**
+- `.claude/CLAUDE.md` — 전체 아키텍처 + DI 전략
+- `.claude/web.md` — Next.js 규칙
+- `.claude/app.md` — Expo/React Native 규칙
+- `.claude/supabase.md` — DB/Auth/Storage
+- `.claude/form.md` — 폼/입력/검증 패턴
+- `.claude/theme.md` — 테마/디자인 시스템
+- `.claude/components.md` — UI 컴포넌트 아키텍처
+- `.claude/i18n.md` — 다국어 구현
+
+**필수 동작:**
+- 프레임워크/기술 스택 질문을 건너뛰세요
+- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
+- 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
+- `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
+
+`YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
 
 ## Repo Ownership — See Something, Say Something
 
@@ -334,218 +369,209 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-**If the platform detected above is GitLab or unknown:** STOP with: "GitLab support for /land-and-deploy is not yet implemented. Run `/ship` to create the MR, then merge manually via the GitLab web UI." Do not proceed.
+**위에서 감지된 플랫폼이 GitLab이거나 알 수 없는 경우:** 다음 메시지와 함께 중지합니다: "GitLab의 /land-and-deploy 지원은 아직 구현되지 않았습니다. `/ship`을 실행하여 MR을 생성한 후, GitLab 웹 UI에서 수동으로 머지하세요." 계속 진행하지 않습니다.
 
-# /land-and-deploy — Merge, Deploy, Verify
+# /land-and-deploy — 머지, 배포, 검증
 
-You are a **Release Engineer** who has deployed to production thousands of times. You know the two worst feelings in software: the merge that breaks prod, and the merge that sits in queue for 45 minutes while you stare at the screen. Your job is to handle both gracefully — merge efficiently, wait intelligently, verify thoroughly, and give the user a clear verdict.
+당신은 프로덕션에 수천 번 배포한 경험이 있는 **릴리스 엔지니어**입니다. 소프트웨어에서 가장 최악의 두 가지 상황을 잘 알고 있습니다: 프로덕션을 깨뜨리는 머지와, 화면을 45분 동안 바라보며 대기열에서 기다리는 머지. 두 상황 모두 능숙하게 처리합니다 — 효율적으로 머지하고, 지능적으로 대기하고, 철저하게 검증하고, 사용자에게 명확한 판정을 제공합니다.
 
-This skill picks up where `/ship` left off. `/ship` creates the PR. You merge it, wait for deploy, and verify production.
+이 스킬은 `/ship`이 끝난 지점에서 시작합니다. `/ship`이 PR을 생성합니다. 당신은 그것을 머지하고, 배포를 기다리고, 프로덕션을 검증합니다.
 
-## User-invocable
-When the user types `/land-and-deploy`, run this skill.
+## 사용자 호출 가능
+사용자가 `/land-and-deploy`를 입력하면 이 스킬을 실행합니다.
 
-## Arguments
-- `/land-and-deploy` — auto-detect PR from current branch, no post-deploy URL
-- `/land-and-deploy <url>` — auto-detect PR, verify deploy at this URL
-- `/land-and-deploy #123` — specific PR number
-- `/land-and-deploy #123 <url>` — specific PR + verification URL
+## 인자
+- `/land-and-deploy` — 현재 브랜치에서 PR 자동 감지, 배포 후 URL 없음
+- `/land-and-deploy <url>` — PR 자동 감지, 이 URL에서 배포 검증
+- `/land-and-deploy #123` — 특정 PR 번호
+- `/land-and-deploy #123 <url>` — 특정 PR + 검증 URL
 
-## Non-interactive philosophy (like /ship) — with one critical gate
+## 비대화형 철학 (/ship과 동일) — 하나의 중요한 게이트만 존재
 
-This is a **mostly automated** workflow. Do NOT ask for confirmation at any step except
-the ones listed below. The user said `/land-and-deploy` which means DO IT — but verify
-readiness first.
+이것은 **대부분 자동화된** 워크플로우입니다. 아래 나열된 경우를 제외하고는 어떤 단계에서도 확인을 요청하지 마세요. 사용자가 `/land-and-deploy`라고 말한 것은 실행하라는 의미입니다 — 단, 먼저 준비 상태를 확인합니다.
 
-**Always stop for:**
-- **Pre-merge readiness gate (Step 3.5)** — this is the ONE confirmation before merge
-- GitHub CLI not authenticated
-- No PR found for this branch
-- CI failures or merge conflicts
-- Permission denied on merge
-- Deploy workflow failure (offer revert)
-- Production health issues detected by canary (offer revert)
+**항상 중지하는 경우:**
+- **머지 전 준비 상태 게이트 (Step 3.5)** — 머지 전 유일한 확인 단계
+- GitHub CLI가 인증되지 않은 경우
+- 이 브랜치에 대한 PR이 없는 경우
+- CI 실패 또는 머지 충돌
+- 머지 권한 거부
+- 배포 워크플로우 실패 (되돌리기 제안)
+- 카나리가 감지한 프로덕션 상태 이상 (되돌리기 제안)
 
-**Never stop for:**
-- Choosing merge method (auto-detect from repo settings)
-- Timeout warnings (warn and continue gracefully)
+**절대 중지하지 않는 경우:**
+- 머지 방법 선택 (저장소 설정에서 자동 감지)
+- 타임아웃 경고 (경고 후 정상적으로 계속 진행)
 
 ---
 
-## Step 1: Pre-flight
+## Step 1: 사전 점검
 
-1. Check GitHub CLI authentication:
+1. GitHub CLI 인증 확인:
 ```bash
 gh auth status
 ```
-If not authenticated, **STOP**: "GitHub CLI is not authenticated. Run `gh auth login` first."
+인증되지 않은 경우, **중지**: "GitHub CLI가 인증되지 않았습니다. 먼저 `gh auth login`을 실행하세요."
 
-2. Parse arguments. If the user specified `#NNN`, use that PR number. If a URL was provided, save it for canary verification in Step 7.
+2. 인자를 파싱합니다. 사용자가 `#NNN`을 지정한 경우 해당 PR 번호를 사용합니다. URL이 제공된 경우 Step 7의 카나리 검증을 위해 저장합니다.
 
-3. If no PR number specified, detect from current branch:
+3. PR 번호가 지정되지 않은 경우, 현재 브랜치에서 감지합니다:
 ```bash
 gh pr view --json number,state,title,url,mergeStateStatus,mergeable,baseRefName,headRefName
 ```
 
-4. Validate the PR state:
-   - If no PR exists: **STOP.** "No PR found for this branch. Run `/ship` first to create one."
-   - If `state` is `MERGED`: "PR is already merged. Nothing to do."
-   - If `state` is `CLOSED`: "PR is closed (not merged). Reopen it first."
-   - If `state` is `OPEN`: continue.
+4. PR 상태를 검증합니다:
+   - PR이 존재하지 않는 경우: **중지.** "이 브랜치에 대한 PR이 없습니다. 먼저 `/ship`을 실행하여 PR을 생성하세요."
+   - `state`가 `MERGED`인 경우: "PR이 이미 머지되었습니다. 할 일이 없습니다."
+   - `state`가 `CLOSED`인 경우: "PR이 닫혔습니다 (머지되지 않음). 먼저 다시 여세요."
+   - `state`가 `OPEN`인 경우: 계속 진행합니다.
 
 ---
 
-## Step 2: Pre-merge checks
+## Step 2: 머지 전 점검
 
-Check CI status and merge readiness:
+CI 상태와 머지 준비 상태를 확인합니다:
 
 ```bash
 gh pr checks --json name,state,status,conclusion
 ```
 
-Parse the output:
-1. If any required checks are **FAILING**: **STOP.** Show the failing checks.
-2. If required checks are **PENDING**: proceed to Step 3.
-3. If all checks pass (or no required checks): skip Step 3, go to Step 4.
+출력을 파싱합니다:
+1. 필수 체크가 **실패** 중인 경우: **중지.** 실패한 체크를 표시합니다.
+2. 필수 체크가 **대기 중**인 경우: Step 3으로 진행합니다.
+3. 모든 체크가 통과한 경우 (또는 필수 체크가 없는 경우): Step 3을 건너뛰고 Step 4로 이동합니다.
 
-Also check for merge conflicts:
+머지 충돌도 확인합니다:
 ```bash
 gh pr view --json mergeable -q .mergeable
 ```
-If `CONFLICTING`: **STOP.** "PR has merge conflicts. Resolve them and push before landing."
+`CONFLICTING`인 경우: **중지.** "PR에 머지 충돌이 있습니다. 충돌을 해결하고 push한 후 랜딩하세요."
 
 ---
 
-## Step 3: Wait for CI (if pending)
+## Step 3: CI 대기 (대기 중인 경우)
 
-If required checks are still pending, wait for them to complete. Use a timeout of 15 minutes:
+필수 체크가 아직 대기 중이면, 완료될 때까지 기다립니다. 타임아웃은 15분입니다:
 
 ```bash
 gh pr checks --watch --fail-fast
 ```
 
-Record the CI wait time for the deploy report.
+배포 보고서를 위해 CI 대기 시간을 기록합니다.
 
-If CI passes within the timeout: continue to Step 4.
-If CI fails: **STOP.** Show failures.
-If timeout (15 min): **STOP.** "CI has been running for 15 minutes. Investigate manually."
+CI가 타임아웃 내에 통과하면: Step 4로 계속 진행합니다.
+CI가 실패하면: **중지.** 실패 항목을 표시합니다.
+타임아웃 (15분)인 경우: **중지.** "CI가 15분 동안 실행 중입니다. 수동으로 조사하세요."
 
 ---
 
-## Step 3.5: Pre-merge readiness gate
+## Step 3.5: 머지 전 준비 상태 게이트
 
-**This is the critical safety check before an irreversible merge.** The merge cannot
-be undone without a revert commit. Gather ALL evidence, build a readiness report,
-and get explicit user confirmation before proceeding.
+**이것은 되돌릴 수 없는 머지 전 중요한 안전 검사입니다.** 머지는 되돌리기 커밋 없이는 취소할 수 없습니다. 모든 증거를 수집하고, 준비 상태 보고서를 작성한 후, 진행하기 전에 명시적인 사용자 확인을 받습니다.
 
-Collect evidence for each check below. Track warnings (yellow) and blockers (red).
+아래 각 검사의 증거를 수집합니다. 경고(노란색)와 차단(빨간색)을 추적합니다.
 
-### 3.5a: Review staleness check
+### 3.5a: 리뷰 최신성 검사
 
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-read 2>/dev/null
 ```
 
-Parse the output. For each review skill (plan-eng-review, plan-ceo-review,
+출력을 파싱합니다. 각 리뷰 스킬(plan-eng-review, plan-ceo-review,
 plan-design-review, design-review-lite, codex-review, review, adversarial-review,
-codex-plan-review):
+codex-plan-review)에 대해:
 
-1. Find the most recent entry within the last 7 days.
-2. Extract its `commit` field.
-3. Compare against current HEAD: `git rev-list --count STORED_COMMIT..HEAD`
+1. 최근 7일 이내의 가장 최근 항목을 찾습니다.
+2. `commit` 필드를 추출합니다.
+3. 현재 HEAD와 비교합니다: `git rev-list --count STORED_COMMIT..HEAD`
 
-**Staleness rules:**
-- 0 commits since review → CURRENT
-- 1-3 commits since review → RECENT (yellow if those commits touch code, not just docs)
-- 4+ commits since review → STALE (red — review may not reflect current code)
-- No review found → NOT RUN
+**최신성 규칙:**
+- 리뷰 이후 0 커밋 → CURRENT
+- 리뷰 이후 1-3 커밋 → RECENT (해당 커밋이 문서가 아닌 코드를 수정한 경우 노란색)
+- 리뷰 이후 4개 이상 커밋 → STALE (빨간색 — 리뷰가 현재 코드를 반영하지 않을 수 있음)
+- 리뷰를 찾을 수 없음 → NOT RUN
 
-**Critical check:** Look at what changed AFTER the last review. Run:
+**중요 검사:** 마지막 리뷰 이후 변경된 사항을 확인합니다. 다음을 실행합니다:
 ```bash
 git log --oneline STORED_COMMIT..HEAD
 ```
-If any commits after the review contain words like "fix", "refactor", "rewrite",
-"overhaul", or touch more than 5 files — flag as **STALE (significant changes
-since review)**. The review was done on different code than what's about to merge.
+리뷰 이후의 커밋에 "fix", "refactor", "rewrite", "overhaul"과 같은 단어가 포함되거나 5개 이상의 파일을 수정한 경우 — **STALE (리뷰 이후 중대한 변경 발생)**으로 표시합니다. 리뷰는 머지하려는 코드와 다른 코드에서 수행되었습니다.
 
-### 3.5b: Test results
+### 3.5b: 테스트 결과
 
-**Free tests — run them now:**
+**무료 테스트 — 지금 실행합니다:**
 
-Read CLAUDE.md to find the project's test command. If not specified, use `bun test`.
-Run the test command and capture the exit code and output.
+CLAUDE.md를 읽어 프로젝트의 테스트 명령을 찾습니다. 지정되지 않은 경우 `bun test`를 사용합니다.
+테스트 명령을 실행하고 종료 코드와 출력을 캡처합니다.
 
 ```bash
 bun test 2>&1 | tail -10
 ```
 
-If tests fail: **BLOCKER.** Cannot merge with failing tests.
+테스트가 실패하면: **차단.** 실패하는 테스트가 있는 상태에서는 머지할 수 없습니다.
 
-**E2E tests — check recent results:**
+**E2E 테스트 — 최근 결과 확인:**
 
 ```bash
 ls -t ~/.gstack-dev/evals/*-e2e-*-$(date +%Y-%m-%d)*.json 2>/dev/null | head -20
 ```
 
-For each eval file from today, parse pass/fail counts. Show:
-- Total tests, pass count, fail count
-- How long ago the run finished (from file timestamp)
-- Total cost
-- Names of any failing tests
+오늘의 각 eval 파일에서 통과/실패 수를 파싱합니다. 표시할 내용:
+- 총 테스트 수, 통과 수, 실패 수
+- 실행이 완료된 시간 (파일 타임스탬프 기준)
+- 총 비용
+- 실패한 테스트 이름
 
-If no E2E results from today: **WARNING — no E2E tests run today.**
-If E2E results exist but have failures: **WARNING — N tests failed.** List them.
+오늘의 E2E 결과가 없는 경우: **경고 — 오늘 E2E 테스트가 실행되지 않았습니다.**
+E2E 결과가 있지만 실패가 있는 경우: **경고 — N개 테스트 실패.** 목록을 표시합니다.
 
-**LLM judge evals — check recent results:**
+**LLM 판정 평가 — 최근 결과 확인:**
 
 ```bash
 ls -t ~/.gstack-dev/evals/*-llm-judge-*-$(date +%Y-%m-%d)*.json 2>/dev/null | head -5
 ```
 
-If found, parse and show pass/fail. If not found, note "No LLM evals run today."
+발견되면 통과/실패를 파싱하여 표시합니다. 발견되지 않으면 "오늘 LLM 평가가 실행되지 않았습니다."로 표시합니다.
 
-### 3.5c: PR body accuracy check
+### 3.5c: PR 본문 정확성 검사
 
-Read the current PR body:
+현재 PR 본문을 읽습니다:
 ```bash
 gh pr view --json body -q .body
 ```
 
-Read the current diff summary:
+현재 diff 요약을 읽습니다:
 ```bash
 git log --oneline $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)..HEAD | head -20
 ```
 
-Compare the PR body against the actual commits. Check for:
-1. **Missing features** — commits that add significant functionality not mentioned in the PR
-2. **Stale descriptions** — PR body mentions things that were later changed or reverted
-3. **Wrong version** — PR title or body references a version that doesn't match VERSION file
+PR 본문을 실제 커밋과 비교합니다. 확인할 사항:
+1. **누락된 기능** — PR에 언급되지 않은 중요한 기능을 추가하는 커밋
+2. **오래된 설명** — PR 본문에 이후 변경되거나 되돌려진 내용이 언급됨
+3. **잘못된 버전** — PR 제목이나 본문에 VERSION 파일과 일치하지 않는 버전이 참조됨
 
-If the PR body looks stale or incomplete: **WARNING — PR body may not reflect current
-changes.** List what's missing or stale.
+PR 본문이 오래되었거나 불완전한 경우: **경고 — PR 본문이 현재 변경 사항을 반영하지 않을 수 있습니다.** 누락되거나 오래된 항목을 나열합니다.
 
-### 3.5d: Document-release check
+### 3.5d: 문서 릴리스 검사
 
-Check if documentation was updated on this branch:
+이 브랜치에서 문서가 업데이트되었는지 확인합니다:
 
 ```bash
 git log --oneline --all-match --grep="docs:" $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)..HEAD | head -5
 ```
 
-Also check if key doc files were modified:
+주요 문서 파일이 수정되었는지도 확인합니다:
 ```bash
 git diff --name-only $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)...HEAD -- README.md CHANGELOG.md ARCHITECTURE.md CONTRIBUTING.md CLAUDE.md VERSION
 ```
 
-If CHANGELOG.md and VERSION were NOT modified on this branch and the diff includes
-new features (new files, new commands, new skills): **WARNING — /document-release
-likely not run. CHANGELOG and VERSION not updated despite new features.**
+CHANGELOG.md와 VERSION이 이 브랜치에서 수정되지 않았고 diff에 새로운 기능(새 파일, 새 명령, 새 스킬)이 포함된 경우: **경고 — /document-release가 실행되지 않은 것으로 보입니다. 새 기능이 있음에도 CHANGELOG와 VERSION이 업데이트되지 않았습니다.**
 
-If only docs changed (no code): skip this check.
+문서만 변경된 경우 (코드 변경 없음): 이 검사를 건너뜁니다.
 
-### 3.5e: Readiness report and confirmation
+### 3.5e: 준비 상태 보고서 및 확인
 
-Build the full readiness report:
+전체 준비 상태 보고서를 작성합니다:
 
 ```
 ╔══════════════════════════════════════════════════════════╗
@@ -578,71 +604,68 @@ Build the full readiness report:
 ╚══════════════════════════════════════════════════════════╝
 ```
 
-If there are BLOCKERS (failing free tests): list them and recommend B.
-If there are WARNINGS but no blockers: list each warning and recommend A if
-warnings are minor, or B if warnings are significant.
-If everything is green: recommend A.
+차단 항목이 있는 경우 (무료 테스트 실패): 나열하고 B를 권장합니다.
+경고는 있지만 차단 항목이 없는 경우: 각 경고를 나열하고, 경고가 경미하면 A를, 중대하면 B를 권장합니다.
+모든 항목이 정상인 경우: A를 권장합니다.
 
-Use AskUserQuestion:
+AskUserQuestion을 사용합니다:
 
-- **Re-ground:** "About to merge PR #NNN (title) from branch X to Y. Here's the
-  readiness report." Show the report above.
-- List each warning and blocker explicitly.
-- **RECOMMENDATION:** Choose A if green. Choose B if there are significant warnings.
-  Choose C only if the user understands the risks.
-- A) Merge — readiness checks passed (Completeness: 10/10)
-- B) Don't merge yet — address the warnings first (Completeness: 10/10)
-- C) Merge anyway — I understand the risks (Completeness: 3/10)
+- **재확인:** "PR #NNN (title)을 브랜치 X에서 Y로 머지하려 합니다. 준비 상태 보고서입니다." 위 보고서를 표시합니다.
+- 각 경고와 차단 항목을 명시적으로 나열합니다.
+- **권장:** 정상이면 A를 선택합니다. 중대한 경고가 있으면 B를 선택합니다. 위험을 이해한 경우에만 C를 선택합니다.
+- A) 머지 — 준비 상태 검사 통과 (완성도: 10/10)
+- B) 아직 머지하지 않음 — 먼저 경고 사항을 해결 (완성도: 10/10)
+- C) 그래도 머지 — 위험을 이해합니다 (완성도: 3/10)
 
-If the user chooses B: **STOP.** List exactly what needs to be done:
-- If reviews are stale: "Re-run `/plan-eng-review`, `/review`, or `/autoplan` to review current code."
-- If E2E not run: "Run `bun run test:e2e` to verify."
-- If docs not updated: "Run /document-release to update documentation."
-- If PR body stale: "Update the PR body to reflect current changes."
+사용자가 B를 선택한 경우: **중지.** 해야 할 일을 정확히 나열합니다:
+- 리뷰가 오래된 경우: "`/plan-eng-review`, `/review`, 또는 `/autoplan`을 다시 실행하여 현재 코드를 리뷰하세요."
+- E2E가 실행되지 않은 경우: "`bun run test:e2e`를 실행하여 검증하세요."
+- 문서가 업데이트되지 않은 경우: "/document-release를 실행하여 문서를 업데이트하세요."
+- PR 본문이 오래된 경우: "PR 본문을 현재 변경 사항에 맞게 업데이트하세요."
 
-If the user chooses A or C: continue to Step 4.
+사용자가 A 또는 C를 선택한 경우: Step 4로 계속 진행합니다.
 
 ---
 
-## Step 4: Merge the PR
+## Step 4: PR 머지
 
-Record the start timestamp for timing data.
+시작 타임스탬프를 기록합니다.
 
-Try auto-merge first (respects repo merge settings and merge queues):
+먼저 자동 머지를 시도합니다 (저장소 머지 설정 및 머지 대기열을 따름):
 
 ```bash
 gh pr merge --auto --delete-branch
 ```
 
-If `--auto` is not available (repo doesn't have auto-merge enabled), merge directly:
+`--auto`를 사용할 수 없는 경우 (저장소에 자동 머지가 활성화되지 않은 경우), 직접 머지합니다:
 
 ```bash
 gh pr merge --squash --delete-branch
 ```
 
-If the merge fails with a permission error: **STOP.** "You don't have merge permissions on this repo. Ask a maintainer to merge."
+권한 오류로 머지가 실패한 경우: **중지.** "이 저장소에 대한 머지 권한이 없습니다. 관리자에게 머지를 요청하세요."
 
-If merge queue is active, `gh pr merge --auto` will enqueue. Poll for the PR to actually merge:
+머지 대기열이 활성 상태인 경우, `gh pr merge --auto`가 대기열에 등록합니다. PR이 실제로 머지될 때까지 폴링합니다:
 
 ```bash
 gh pr view --json state -q .state
 ```
 
-Poll every 30 seconds, up to 30 minutes. Show a progress message every 2 minutes: "Waiting for merge queue... (Xm elapsed)"
+30초마다 폴링하며, 최대 30분까지 대기합니다. 2분마다 진행 메시지를 표시합니다: "머지 대기열 대기 중... (X분 경과)"
 
-If the PR state changes to `MERGED`: capture the merge commit SHA and continue.
-If the PR is removed from the queue (state goes back to `OPEN`): **STOP.** "PR was removed from the merge queue."
-If timeout (30 min): **STOP.** "Merge queue has been processing for 30 minutes. Check the queue manually."
+PR 상태가 `MERGED`로 변경된 경우: 머지 커밋 SHA를 캡처하고 계속 진행합니다.
+PR이 대기열에서 제거된 경우 (상태가 `OPEN`으로 돌아감): **중지.** "PR이 머지 대기열에서 제거되었습니다."
+타임아웃 (30분)인 경우: **중지.** "머지 대기열이 30분 동안 처리 중입니다. 대기열을 수동으로 확인하세요."
 
-Record merge timestamp and duration.
+머지 타임스탬프와 소요 시간을 기록합니다.
 
 ---
 
-## Step 5: Deploy strategy detection
+## Step 5: 배포 전략 감지
 
-Determine what kind of project this is and how to verify the deploy.
+프로젝트의 종류와 배포 검증 방법을 결정합니다.
 
-First, run the deploy configuration bootstrap to detect or read persisted deploy settings:
+먼저, 배포 설정 부트스트랩을 실행하여 저장된 배포 설정을 감지하거나 읽습니다:
 
 ```bash
 # Check for persisted deploy config in CLAUDE.md
@@ -678,162 +701,162 @@ in the decision tree below.
 
 If you want to persist deploy settings for future runs, suggest the user run `/setup-deploy`.
 
-Then run `gstack-diff-scope` to classify the changes:
+그런 다음 `gstack-diff-scope`를 실행하여 변경 사항을 분류합니다:
 
 ```bash
 eval $(~/.claude/skills/gstack/bin/gstack-diff-scope $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main) 2>/dev/null)
 echo "FRONTEND=$SCOPE_FRONTEND BACKEND=$SCOPE_BACKEND DOCS=$SCOPE_DOCS CONFIG=$SCOPE_CONFIG"
 ```
 
-**Decision tree (evaluate in order):**
+**결정 트리 (순서대로 평가):**
 
-1. If the user provided a production URL as an argument: use it for canary verification. Also check for deploy workflows.
+1. 사용자가 인자로 프로덕션 URL을 제공한 경우: 카나리 검증에 사용합니다. 배포 워크플로우도 확인합니다.
 
-2. Check for GitHub Actions deploy workflows:
+2. GitHub Actions 배포 워크플로우를 확인합니다:
 ```bash
 gh run list --branch <base> --limit 5 --json name,status,conclusion,headSha,workflowName
 ```
-Look for workflow names containing "deploy", "release", "production", "staging", or "cd". If found: poll the deploy workflow in Step 6, then run canary.
+워크플로우 이름에 "deploy", "release", "production", "staging", 또는 "cd"가 포함된 것을 찾습니다. 발견되면: Step 6에서 배포 워크플로우를 폴링한 후 카나리를 실행합니다.
 
-3. If SCOPE_DOCS is the only scope that's true (no frontend, no backend, no config): skip verification entirely. Output: "PR merged. Documentation-only change — no deploy verification needed." Go to Step 9.
+3. SCOPE_DOCS만 true인 경우 (프론트엔드, 백엔드, 설정 변경 없음): 검증을 완전히 건너뜁니다. 출력: "PR이 머지되었습니다. 문서만 변경되었으므로 배포 검증이 필요하지 않습니다." Step 9로 이동합니다.
 
-4. If no deploy workflows detected and no URL provided: use AskUserQuestion once:
-   - **Context:** PR merged successfully. No deploy workflow or production URL detected.
-   - **RECOMMENDATION:** Choose B if this is a library/CLI tool. Choose A if this is a web app.
-   - A) Provide a production URL to verify
-   - B) Skip verification — this project doesn't have a web deploy
+4. 배포 워크플로우가 감지되지 않고 URL도 제공되지 않은 경우: AskUserQuestion을 한 번 사용합니다:
+   - **컨텍스트:** PR이 성공적으로 머지되었습니다. 배포 워크플로우나 프로덕션 URL이 감지되지 않았습니다.
+   - **권장:** 라이브러리/CLI 도구인 경우 B를 선택합니다. 웹 앱인 경우 A를 선택합니다.
+   - A) 검증할 프로덕션 URL을 제공합니다
+   - B) 검증 건너뛰기 — 이 프로젝트는 웹 배포가 없습니다
 
 ---
 
-## Step 6: Wait for deploy (if applicable)
+## Step 6: 배포 대기 (해당하는 경우)
 
-The deploy verification strategy depends on the platform detected in Step 5.
+배포 검증 전략은 Step 5에서 감지된 플랫폼에 따라 달라집니다.
 
-### Strategy A: GitHub Actions workflow
+### 전략 A: GitHub Actions 워크플로우
 
-If a deploy workflow was detected, find the run triggered by the merge commit:
+배포 워크플로우가 감지된 경우, 머지 커밋에 의해 트리거된 실행을 찾습니다:
 
 ```bash
 gh run list --branch <base> --limit 10 --json databaseId,headSha,status,conclusion,name,workflowName
 ```
 
-Match by the merge commit SHA (captured in Step 4). If multiple matching workflows, prefer the one whose name matches the deploy workflow detected in Step 5.
+머지 커밋 SHA(Step 4에서 캡처)로 매칭합니다. 매칭되는 워크플로우가 여러 개인 경우, Step 5에서 감지된 배포 워크플로우와 이름이 일치하는 것을 우선합니다.
 
-Poll every 30 seconds:
+30초마다 폴링합니다:
 ```bash
 gh run view <run-id> --json status,conclusion
 ```
 
-### Strategy B: Platform CLI (Fly.io, Render, Heroku)
+### 전략 B: 플랫폼 CLI (Fly.io, Render, Heroku)
 
-If a deploy status command was configured in CLAUDE.md (e.g., `fly status --app myapp`), use it instead of or in addition to GitHub Actions polling.
+CLAUDE.md에 배포 상태 명령이 설정된 경우 (예: `fly status --app myapp`), GitHub Actions 폴링 대신 또는 추가로 사용합니다.
 
-**Fly.io:** After merge, Fly deploys via GitHub Actions or `fly deploy`. Check with:
+**Fly.io:** 머지 후 Fly는 GitHub Actions 또는 `fly deploy`를 통해 배포합니다. 다음으로 확인합니다:
 ```bash
 fly status --app {app} 2>/dev/null
 ```
-Look for `Machines` status showing `started` and recent deployment timestamp.
+`Machines` 상태가 `started`이고 최근 배포 타임스탬프가 있는지 확인합니다.
 
-**Render:** Render auto-deploys on push to the connected branch. Check by polling the production URL until it responds:
+**Render:** Render는 연결된 브랜치에 push하면 자동 배포됩니다. 프로덕션 URL이 응답할 때까지 폴링합니다:
 ```bash
 curl -sf {production-url} -o /dev/null -w "%{http_code}" 2>/dev/null
 ```
-Render deploys typically take 2-5 minutes. Poll every 30 seconds.
+Render 배포는 보통 2-5분 소요됩니다. 30초마다 폴링합니다.
 
-**Heroku:** Check latest release:
+**Heroku:** 최신 릴리스를 확인합니다:
 ```bash
 heroku releases --app {app} -n 1 2>/dev/null
 ```
 
-### Strategy C: Auto-deploy platforms (Vercel, Netlify)
+### 전략 C: 자동 배포 플랫폼 (Vercel, Netlify)
 
-Vercel and Netlify deploy automatically on merge. No explicit deploy trigger needed. Wait 60 seconds for the deploy to propagate, then proceed directly to canary verification in Step 7.
+Vercel과 Netlify는 머지 시 자동으로 배포합니다. 명시적인 배포 트리거가 필요하지 않습니다. 배포가 전파되도록 60초 대기한 후, Step 7의 카나리 검증으로 바로 진행합니다.
 
-### Strategy D: Custom deploy hooks
+### 전략 D: 커스텀 배포 후크
 
-If CLAUDE.md has a custom deploy status command in the "Custom deploy hooks" section, run that command and check its exit code.
+CLAUDE.md의 "Custom deploy hooks" 섹션에 커스텀 배포 상태 명령이 있는 경우, 해당 명령을 실행하고 종료 코드를 확인합니다.
 
-### Common: Timing and failure handling
+### 공통: 타이밍 및 실패 처리
 
-Record deploy start time. Show progress every 2 minutes: "Deploy in progress... (Xm elapsed)"
+배포 시작 시간을 기록합니다. 2분마다 진행 상황을 표시합니다: "배포 진행 중... (X분 경과)"
 
-If deploy succeeds (`conclusion` is `success` or health check passes): record deploy duration, continue to Step 7.
+배포가 성공한 경우 (`conclusion`이 `success`이거나 헬스 체크 통과): 배포 소요 시간을 기록하고 Step 7로 계속 진행합니다.
 
-If deploy fails (`conclusion` is `failure`): use AskUserQuestion:
-- **Context:** Deploy workflow failed after merging PR.
-- **RECOMMENDATION:** Choose A to investigate before reverting.
-- A) Investigate the deploy logs
-- B) Create a revert commit on the base branch
-- C) Continue anyway — the deploy failure might be unrelated
+배포가 실패한 경우 (`conclusion`이 `failure`): AskUserQuestion을 사용합니다:
+- **컨텍스트:** PR 머지 후 배포 워크플로우가 실패했습니다.
+- **권장:** 되돌리기 전에 조사하려면 A를 선택합니다.
+- A) 배포 로그 조사
+- B) 베이스 브랜치에 되돌리기 커밋 생성
+- C) 그래도 계속 — 배포 실패가 관련 없을 수 있음
 
-If timeout (20 min): warn "Deploy has been running for 20 minutes" and ask whether to continue waiting or skip verification.
+타임아웃 (20분)인 경우: "배포가 20분 동안 실행 중입니다"라고 경고하고, 계속 대기할지 검증을 건너뛸지 묻습니다.
 
 ---
 
-## Step 7: Canary verification (conditional depth)
+## Step 7: 카나리 검증 (조건부 깊이)
 
-Use the diff-scope classification from Step 5 to determine canary depth:
+Step 5의 diff-scope 분류를 사용하여 카나리 깊이를 결정합니다:
 
-| Diff Scope | Canary Depth |
+| Diff 범위 | 카나리 깊이 |
 |------------|-------------|
-| SCOPE_DOCS only | Already skipped in Step 5 |
-| SCOPE_CONFIG only | Smoke: `$B goto` + verify 200 status |
-| SCOPE_BACKEND only | Console errors + perf check |
-| SCOPE_FRONTEND (any) | Full: console + perf + screenshot |
-| Mixed scopes | Full canary |
+| SCOPE_DOCS만 | Step 5에서 이미 건너뜀 |
+| SCOPE_CONFIG만 | 스모크: `$B goto` + 200 상태 확인 |
+| SCOPE_BACKEND만 | 콘솔 에러 + 성능 체크 |
+| SCOPE_FRONTEND (포함) | 전체: 콘솔 + 성능 + 스크린샷 |
+| 혼합 범위 | 전체 카나리 |
 
-**Full canary sequence:**
+**전체 카나리 시퀀스:**
 
 ```bash
 $B goto <url>
 ```
 
-Check that the page loaded successfully (200, not an error page).
+페이지가 성공적으로 로드되었는지 확인합니다 (200, 에러 페이지가 아님).
 
 ```bash
 $B console --errors
 ```
 
-Check for critical console errors: lines containing `Error`, `Uncaught`, `Failed to load`, `TypeError`, `ReferenceError`. Ignore warnings.
+치명적인 콘솔 에러를 확인합니다: `Error`, `Uncaught`, `Failed to load`, `TypeError`, `ReferenceError`가 포함된 행. 경고는 무시합니다.
 
 ```bash
 $B perf
 ```
 
-Check that page load time is under 10 seconds.
+페이지 로드 시간이 10초 미만인지 확인합니다.
 
 ```bash
 $B text
 ```
 
-Verify the page has content (not blank, not a generic error page).
+페이지에 콘텐츠가 있는지 확인합니다 (빈 페이지나 일반 에러 페이지가 아님).
 
 ```bash
 $B snapshot -i -a -o ".gstack/deploy-reports/post-deploy.png"
 ```
 
-Take an annotated screenshot as evidence.
+증거로 주석이 달린 스크린샷을 캡처합니다.
 
-**Health assessment:**
-- Page loads successfully with 200 status → PASS
-- No critical console errors → PASS
-- Page has real content (not blank or error screen) → PASS
-- Loads in under 10 seconds → PASS
+**상태 평가:**
+- 페이지가 200 상태로 성공적으로 로드됨 → PASS
+- 치명적인 콘솔 에러 없음 → PASS
+- 페이지에 실제 콘텐츠가 있음 (빈 페이지나 에러 화면이 아님) → PASS
+- 10초 이내에 로드됨 → PASS
 
-If all pass: mark as HEALTHY, continue to Step 9.
+모두 통과한 경우: HEALTHY로 표시하고 Step 9로 계속 진행합니다.
 
-If any fail: show the evidence (screenshot path, console errors, perf numbers). Use AskUserQuestion:
-- **Context:** Post-deploy canary detected issues on the production site.
-- **RECOMMENDATION:** Choose based on severity — B for critical (site down), A for minor (console errors).
-- A) Expected (deploy in progress, cache clearing) — mark as healthy
-- B) Broken — create a revert commit
-- C) Investigate further (open the site, look at logs)
+하나라도 실패한 경우: 증거(스크린샷 경로, 콘솔 에러, 성능 수치)를 표시합니다. AskUserQuestion을 사용합니다:
+- **컨텍스트:** 배포 후 카나리가 프로덕션 사이트에서 이상을 감지했습니다.
+- **권장:** 심각도에 따라 선택합니다 — 치명적(사이트 다운)이면 B, 경미(콘솔 에러)이면 A.
+- A) 예상된 상황 (배포 진행 중, 캐시 삭제) — 정상으로 표시
+- B) 문제 발생 — 되돌리기 커밋 생성
+- C) 추가 조사 (사이트 열기, 로그 확인)
 
 ---
 
-## Step 8: Revert (if needed)
+## Step 8: 되돌리기 (필요한 경우)
 
-If the user chose to revert at any point:
+사용자가 어느 시점에서든 되돌리기를 선택한 경우:
 
 ```bash
 git fetch origin <base>
@@ -842,23 +865,23 @@ git revert <merge-commit-sha> --no-edit
 git push origin <base>
 ```
 
-If the revert has conflicts: warn "Revert has conflicts — manual resolution needed. The merge commit SHA is `<sha>`. You can run `git revert <sha>` manually."
+되돌리기에 충돌이 있는 경우: "되돌리기에 충돌이 있습니다 — 수동 해결이 필요합니다. 머지 커밋 SHA는 `<sha>`입니다. `git revert <sha>`를 수동으로 실행할 수 있습니다."라고 경고합니다.
 
-If the base branch has push protections: warn "Branch protections may prevent direct push — create a revert PR instead: `gh pr create --title 'revert: <original PR title>'`"
+베이스 브랜치에 push 보호가 있는 경우: "브랜치 보호로 인해 직접 push가 불가능할 수 있습니다 — 대신 되돌리기 PR을 생성하세요: `gh pr create --title 'revert: <original PR title>'`"라고 경고합니다.
 
-After a successful revert, note the revert commit SHA and continue to Step 9 with status REVERTED.
+되돌리기가 성공하면, 되돌리기 커밋 SHA를 기록하고 상태를 REVERTED로 하여 Step 9로 계속 진행합니다.
 
 ---
 
-## Step 9: Deploy report
+## Step 9: 배포 보고서
 
-Create the deploy report directory:
+배포 보고서 디렉토리를 생성합니다:
 
 ```bash
 mkdir -p .gstack/deploy-reports
 ```
 
-Produce and display the ASCII summary:
+ASCII 요약을 생성하고 표시합니다:
 
 ```
 LAND & DEPLOY REPORT
@@ -886,39 +909,39 @@ Verification: <HEALTHY / DEGRADED / SKIPPED / REVERTED>
 VERDICT: <DEPLOYED AND VERIFIED / DEPLOYED (UNVERIFIED) / REVERTED>
 ```
 
-Save report to `.gstack/deploy-reports/{date}-pr{number}-deploy.md`.
+보고서를 `.gstack/deploy-reports/{date}-pr{number}-deploy.md`에 저장합니다.
 
-Log to the review dashboard:
+리뷰 대시보드에 기록합니다:
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 mkdir -p ~/.gstack/projects/$SLUG
 ```
 
-Write a JSONL entry with timing data:
+타이밍 데이터가 포함된 JSONL 항목을 기록합니다:
 ```json
 {"skill":"land-and-deploy","timestamp":"<ISO>","status":"<SUCCESS/REVERTED>","pr":<number>,"merge_sha":"<sha>","deploy_status":"<HEALTHY/DEGRADED/SKIPPED>","ci_wait_s":<N>,"queue_s":<N>,"deploy_s":<N>,"canary_s":<N>,"total_s":<N>}
 ```
 
 ---
 
-## Step 10: Suggest follow-ups
+## Step 10: 후속 작업 제안
 
-After the deploy report, suggest relevant follow-ups:
+배포 보고서 후, 관련 후속 작업을 제안합니다:
 
-- If a production URL was verified: "Run `/canary <url> --duration 10m` for extended monitoring."
-- If performance data was collected: "Run `/benchmark <url>` for a deep performance audit."
-- "Run `/document-release` to update project documentation."
+- 프로덕션 URL이 검증된 경우: "장시간 모니터링을 위해 `/canary <url> --duration 10m`을 실행하세요."
+- 성능 데이터가 수집된 경우: "심층 성능 감사를 위해 `/benchmark <url>`를 실행하세요."
+- "프로젝트 문서를 업데이트하려면 `/document-release`를 실행하세요."
 
 ---
 
-## Important Rules
+## 중요 규칙
 
-- **Never force push.** Use `gh pr merge` which is safe.
-- **Never skip CI.** If checks are failing, stop.
-- **Auto-detect everything.** PR number, merge method, deploy strategy, project type. Only ask when information genuinely can't be inferred.
-- **Poll with backoff.** Don't hammer GitHub API. 30-second intervals for CI/deploy, with reasonable timeouts.
-- **Revert is always an option.** At every failure point, offer revert as an escape hatch.
-- **Single-pass verification, not continuous monitoring.** `/land-and-deploy` checks once. `/canary` does the extended monitoring loop.
-- **Clean up.** Delete the feature branch after merge (via `--delete-branch`).
-- **The goal is: user says `/land-and-deploy`, next thing they see is the deploy report.**
+- **절대 force push하지 마세요.** 안전한 `gh pr merge`를 사용합니다.
+- **절대 CI를 건너뛰지 마세요.** 체크가 실패하면 중지합니다.
+- **모든 것을 자동 감지합니다.** PR 번호, 머지 방법, 배포 전략, 프로젝트 유형. 정보를 진정으로 추론할 수 없는 경우에만 물어봅니다.
+- **백오프로 폴링합니다.** GitHub API를 과도하게 호출하지 마세요. CI/배포에 대해 30초 간격으로, 합리적인 타임아웃과 함께.
+- **되돌리기는 항상 옵션입니다.** 모든 실패 지점에서 되돌리기를 탈출구로 제공합니다.
+- **단일 패스 검증이며, 지속적 모니터링이 아닙니다.** `/land-and-deploy`는 한 번 확인합니다. `/canary`가 장시간 모니터링 루프를 수행합니다.
+- **정리합니다.** 머지 후 피처 브랜치를 삭제합니다 (`--delete-branch` 사용).
+- **목표: 사용자가 `/land-and-deploy`를 말하면, 다음에 보는 것은 배포 보고서입니다.**

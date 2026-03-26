@@ -1,85 +1,85 @@
-# QA Issue Taxonomy
+# QA 이슈 분류 체계(Taxonomy)
 
-## Severity Levels
+## 심각도 수준
 
-| Severity | Definition | Examples |
-|----------|------------|----------|
-| **critical** | Blocks a core workflow, causes data loss, or crashes the app | Form submit causes error page, checkout flow broken, data deleted without confirmation |
-| **high** | Major feature broken or unusable, no workaround | Search returns wrong results, file upload silently fails, auth redirect loop |
-| **medium** | Feature works but with noticeable problems, workaround exists | Slow page load (>5s), form validation missing but submit still works, layout broken on mobile only |
-| **low** | Minor cosmetic or polish issue | Typo in footer, 1px alignment issue, hover state inconsistent |
+| 심각도 | 정의 | 예시 |
+|--------|------|------|
+| **critical** | 핵심 워크플로우를 차단하거나, 데이터 손실을 유발하거나, 앱을 크래시시킴 | 폼 제출 시 오류 페이지, 결제 플로우 고장, 확인 없이 데이터 삭제 |
+| **high** | 주요 기능이 고장나거나 사용 불가, 우회 방법 없음 | 검색이 잘못된 결과 반환, 파일 업로드 조용히 실패, 인증 리다이렉트 루프 |
+| **medium** | 기능은 작동하지만 눈에 띄는 문제 있음, 우회 방법 존재 | 느린 페이지 로드(>5초), 폼 유효성 검증 누락이지만 제출은 작동, 모바일에서만 레이아웃 깨짐 |
+| **low** | 사소한 외관 또는 마감 문제 | 푸터 오타, 1px 정렬 문제, 호버 상태 불일치 |
 
-## Categories
+## 카테고리
 
-### 1. Visual/UI
-- Layout breaks (overlapping elements, clipped text, horizontal scrollbar)
-- Broken or missing images
-- Incorrect z-index (elements appearing behind others)
-- Font/color inconsistencies
-- Animation glitches (jank, incomplete transitions)
-- Alignment issues (off-grid, uneven spacing)
-- Dark mode / theme issues
+### 1. 시각/UI(Visual/UI)
+- 레이아웃 깨짐 (요소 겹침, 텍스트 잘림, 가로 스크롤바)
+- 깨지거나 누락된 이미지
+- 잘못된 z-index (요소가 다른 것 뒤에 나타남)
+- 폰트/색상 불일치
+- 애니메이션 결함 (끊김, 불완전한 전환)
+- 정렬 문제 (그리드 이탈, 불균등한 간격)
+- 다크 모드 / 테마 문제
 
-### 2. Functional
-- Broken links (404, wrong destination)
-- Dead buttons (click does nothing)
-- Form validation (missing, wrong, bypassed)
-- Incorrect redirects
-- State not persisting (data lost on refresh, back button)
-- Race conditions (double-submit, stale data)
-- Search returning wrong or no results
+### 2. 기능(Functional)
+- 깨진 링크 (404, 잘못된 목적지)
+- 작동하지 않는 버튼 (클릭해도 아무 반응 없음)
+- 폼 유효성 검증 (누락, 잘못됨, 우회됨)
+- 잘못된 리다이렉트
+- 상태 미유지 (새로고침, 뒤로가기 시 데이터 손실)
+- 경쟁 조건(race condition) (이중 제출, 오래된 데이터)
+- 검색이 잘못된 결과 또는 결과 없음 반환
 
 ### 3. UX
-- Confusing navigation (no breadcrumbs, dead ends)
-- Missing loading indicators (user doesn't know something is happening)
-- Slow interactions (>500ms with no feedback)
-- Unclear error messages ("Something went wrong" with no detail)
-- No confirmation before destructive actions
-- Inconsistent interaction patterns across pages
-- Dead ends (no way back, no next action)
+- 혼란스러운 내비게이션 (브레드크럼 없음, 막다른 곳)
+- 로딩 인디케이터 누락 (사용자가 진행 중인 작업을 모름)
+- 느린 인터랙션 (피드백 없이 >500ms)
+- 불명확한 오류 메시지 (상세 없이 "문제가 발생했습니다")
+- 파괴적 작업 전 확인 없음
+- 페이지 간 일관성 없는 인터랙션 패턴
+- 막다른 곳(dead end) (돌아갈 방법 없음, 다음 동작 없음)
 
-### 4. Content
-- Typos and grammar errors
-- Outdated or incorrect text
-- Placeholder / lorem ipsum text left in
-- Truncated text (cut off without ellipsis or "more")
-- Wrong labels on buttons or form fields
-- Missing or unhelpful empty states
+### 4. 콘텐츠(Content)
+- 오타 및 문법 오류
+- 오래되거나 부정확한 텍스트
+- 남겨진 플레이스홀더 / lorem ipsum 텍스트
+- 잘린 텍스트 (줄임표나 "더 보기" 없이 잘림)
+- 버튼이나 폼 필드의 잘못된 라벨
+- 누락되거나 도움이 안 되는 빈 상태(empty state)
 
-### 5. Performance
-- Slow page loads (>3 seconds)
-- Janky scrolling (dropped frames)
-- Layout shifts (content jumping after load)
-- Excessive network requests (>50 on a single page)
-- Large unoptimized images
-- Blocking JavaScript (page unresponsive during load)
+### 5. 성능(Performance)
+- 느린 페이지 로드 (>3초)
+- 끊기는 스크롤 (프레임 드롭)
+- 레이아웃 이동(layout shift) (로드 후 콘텐츠 점프)
+- 과도한 네트워크 요청 (단일 페이지에서 >50개)
+- 최적화되지 않은 대형 이미지
+- 차단하는 JavaScript (로드 중 페이지 무응답)
 
-### 6. Console/Errors
-- JavaScript exceptions (uncaught errors)
-- Failed network requests (4xx, 5xx)
-- Deprecation warnings (upcoming breakage)
-- CORS errors
-- Mixed content warnings (HTTP resources on HTTPS)
-- CSP violations
+### 6. 콘솔/오류(Console/Errors)
+- JavaScript 예외 (처리되지 않은 오류)
+- 실패한 네트워크 요청 (4xx, 5xx)
+- 사용 중단 경고(deprecation warning) (향후 중단 예정)
+- CORS 오류
+- 혼합 콘텐츠 경고(mixed content) (HTTPS에서 HTTP 리소스)
+- CSP 위반
 
-### 7. Accessibility
-- Missing alt text on images
-- Unlabeled form inputs
-- Keyboard navigation broken (can't tab to elements)
-- Focus traps (can't escape a modal or dropdown)
-- Missing or incorrect ARIA attributes
-- Insufficient color contrast
-- Content not reachable by screen reader
+### 7. 접근성(Accessibility)
+- 이미지에 alt 텍스트 누락
+- 라벨이 없는 폼 입력란
+- 키보드 내비게이션 고장 (요소에 탭으로 이동 불가)
+- 포커스 트랩(focus trap) (모달이나 드롭다운에서 탈출 불가)
+- 누락되거나 잘못된 ARIA 속성
+- 불충분한 색상 대비
+- 스크린 리더로 접근할 수 없는 콘텐츠
 
-## Per-Page Exploration Checklist
+## 페이지별 탐색 체크리스트
 
-For each page visited during a QA session:
+QA 세션 중 방문하는 각 페이지에 대해:
 
-1. **Visual scan** — Take annotated screenshot (`snapshot -i -a -o`). Look for layout issues, broken images, alignment.
-2. **Interactive elements** — Click every button, link, and control. Does each do what it says?
-3. **Forms** — Fill and submit. Test empty submission, invalid data, edge cases (long text, special characters).
-4. **Navigation** — Check all paths in/out. Breadcrumbs, back button, deep links, mobile menu.
-5. **States** — Check empty state, loading state, error state, full/overflow state.
-6. **Console** — Run `console --errors` after interactions. Any new JS errors or failed requests?
-7. **Responsiveness** — If relevant, check mobile and tablet viewports.
-8. **Auth boundaries** — What happens when logged out? Different user roles?
+1. **시각 스캔** — 주석이 달린 스크린샷을 캡처합니다 (`snapshot -i -a -o`). 레이아웃 문제, 깨진 이미지, 정렬을 확인합니다.
+2. **인터랙티브 요소** — 모든 버튼, 링크, 컨트롤을 클릭합니다. 각각이 설명대로 동작하는지 확인합니다.
+3. **폼** — 작성하고 제출합니다. 빈 제출, 잘못된 데이터, 엣지 케이스(긴 텍스트, 특수 문자)를 테스트합니다.
+4. **내비게이션** — 모든 진입/진출 경로를 확인합니다. 브레드크럼, 뒤로가기 버튼, 딥 링크, 모바일 메뉴.
+5. **상태** — 빈 상태, 로딩 상태, 오류 상태, 가득 참/오버플로우 상태를 확인합니다.
+6. **콘솔** — 인터랙션 후 `console --errors`를 실행합니다. 새로운 JS 오류나 실패한 요청이 있는지 확인합니다.
+7. **반응형** — 관련된 경우 모바일 및 태블릿 뷰포트를 확인합니다.
+8. **인증 경계** — 로그아웃 상태에서 어떻게 되는지? 다른 사용자 역할은?

@@ -3,8 +3,8 @@ name: ship
 preamble-tier: 4
 version: 1.0.0
 description: |
-  Ship workflow: detect + merge base branch, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR. Use when asked to "ship", "deploy", "push to main", "create a PR", or "merge and push".
-  Proactively suggest when the user says code is ready or asks about deploying.
+  Ship 워크플로우: 베이스 브랜치 감지 + 병합, 테스트 실행, diff 리뷰, VERSION 범프, CHANGELOG 업데이트, 커밋, 푸시, PR 생성. "ship", "deploy", "push to main", "create a PR", "merge and push"라고 요청할 때 사용합니다.
+  사용자가 코드가 준비됐다고 하거나 배포에 대해 물을 때 사전 제안합니다.
 allowed-tools:
   - Bash
   - Read
@@ -40,6 +40,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -152,6 +158,35 @@ AI makes completeness near-free. Always recommend the complete option over short
 | Bug fix | 4 hours | 15 min | ~20x |
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
+
+## yhlib 모노레포 통합
+
+`YHLIB`이 `true`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
+
+**확정 기술 스택 (프레임워크 선택 건너뛰기):**
+- Web: Next.js / App: Expo (React Native) / Backend: Supabase
+- 상태관리: Zustand / 데이터 패칭: Tanstack Query
+- 폼/검증: Zod + React Hook Form
+- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
+- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
+
+**아키텍처 참조 문서:**
+- `.claude/CLAUDE.md` — 전체 아키텍처 + DI 전략
+- `.claude/web.md` — Next.js 규칙
+- `.claude/app.md` — Expo/React Native 규칙
+- `.claude/supabase.md` — DB/Auth/Storage
+- `.claude/form.md` — 폼/입력/검증 패턴
+- `.claude/theme.md` — 테마/디자인 시스템
+- `.claude/components.md` — UI 컴포넌트 아키텍처
+- `.claude/i18n.md` — 다국어 구현
+
+**필수 동작:**
+- 프레임워크/기술 스택 질문을 건너뛰세요
+- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
+- 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
+- `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
+
+`YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
 
 ## Repo Ownership — See Something, Say Something
 
@@ -317,44 +352,44 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# Ship: Fully Automated Ship Workflow
+# Ship: 완전 자동화된 Ship 워크플로우
 
-You are running the `/ship` workflow. This is a **non-interactive, fully automated** workflow. Do NOT ask for confirmation at any step. The user said `/ship` which means DO IT. Run straight through and output the PR URL at the end.
+`/ship` 워크플로우를 실행 중입니다. 이것은 **비대화형, 완전 자동화** 워크플로우입니다. 어떤 단계에서도 확인을 요청하지 마십시오. 사용자가 `/ship`이라고 했으면 그냥 실행하라는 뜻입니다. 끝까지 쭉 실행하고 마지막에 PR URL을 출력하십시오.
 
-**Only stop for:**
-- On the base branch (abort)
-- Merge conflicts that can't be auto-resolved (stop, show conflicts)
-- In-branch test failures (pre-existing failures are triaged, not auto-blocking)
-- Pre-landing review finds ASK items that need user judgment
-- MINOR or MAJOR version bump needed (ask — see Step 4)
-- Greptile review comments that need user decision (complex fixes, false positives)
-- AI-assessed coverage below minimum threshold (hard gate with user override — see Step 3.4)
-- Plan items NOT DONE with no user override (see Step 3.45)
-- Plan verification failures (see Step 3.47)
-- TODOS.md missing and user wants to create one (ask — see Step 5.5)
-- TODOS.md disorganized and user wants to reorganize (ask — see Step 5.5)
+**다음 경우에만 중단:**
+- 베이스 브랜치에 있을 때 (중단)
+- 자동 해결할 수 없는 병합 충돌 (중단, 충돌 표시)
+- 인브랜치 테스트 실패 (기존 실패는 분류하며, 자동 차단하지 않음)
+- 사전 착륙 검증(pre-landing verification)에서 사용자 판단이 필요한 ASK 항목 발견
+- MINOR 또는 MAJOR 버전 범프 필요 (물어봄 — Step 4 참조)
+- 사용자 결정이 필요한 Greptile 리뷰 코멘트 (복잡한 수정, 오탐)
+- AI 평가 커버리지가 최소 임계값 미만 (사용자 재정의 가능한 하드 게이트 — Step 3.4 참조)
+- 사용자 재정의 없이 NOT DONE인 플랜 항목 (Step 3.45 참조)
+- 플랜 검증 실패 (Step 3.47 참조)
+- TODOS.md가 없고 사용자가 생성을 원할 때 (물어봄 — Step 5.5 참조)
+- TODOS.md가 정리되지 않았고 사용자가 재정리를 원할 때 (물어봄 — Step 5.5 참조)
 
-**Never stop for:**
-- Uncommitted changes (always include them)
-- Version bump choice (auto-pick MICRO or PATCH — see Step 4)
-- CHANGELOG content (auto-generate from diff)
-- Commit message approval (auto-commit)
-- Multi-file changesets (auto-split into bisectable commits)
-- TODOS.md completed-item detection (auto-mark)
-- Auto-fixable review findings (dead code, N+1, stale comments — fixed automatically)
-- Test coverage gaps within target threshold (auto-generate and commit, or flag in PR body)
+**절대 중단하지 않는 경우:**
+- 커밋되지 않은 변경사항 (항상 포함)
+- 버전 범프 선택 (자동으로 MICRO 또는 PATCH 선택 — Step 4 참조)
+- CHANGELOG 내용 (diff에서 자동 생성)
+- 커밋 메시지 승인 (자동 커밋)
+- 다중 파일 변경셋 (이등분 가능(bisectable) 커밋으로 자동 분할)
+- TODOS.md 완료 항목 감지 (자동 표시)
+- 자동 수정 가능한 리뷰 발견사항 (데드 코드, N+1, 오래된 주석 — 자동 수정)
+- 목표 임계값 내의 테스트 커버리지 갭 (자동 생성 및 커밋, 또는 PR 본문에 표기)
 
 ---
 
-## Step 1: Pre-flight
+## Step 1: 사전 비행 점검
 
-1. Check the current branch. If on the base branch or the repo's default branch, **abort**: "You're on the base branch. Ship from a feature branch."
+1. 현재 브랜치를 확인합니다. 베이스 브랜치 또는 저장소의 기본 브랜치에 있으면 **중단**: "You're on the base branch. Ship from a feature branch."
 
-2. Run `git status` (never use `-uall`). Uncommitted changes are always included — no need to ask.
+2. `git status`를 실행합니다 (`-uall`은 절대 사용하지 않음). 커밋되지 않은 변경사항은 항상 포함됩니다 — 물어볼 필요 없습니다.
 
-3. Run `git diff <base>...HEAD --stat` and `git log <base>..HEAD --oneline` to understand what's being shipped.
+3. `git diff <base>...HEAD --stat`과 `git log <base>..HEAD --oneline`을 실행하여 무엇이 배포되는지 파악합니다.
 
-4. Check review readiness:
+4. 리뷰 준비 상태를 확인합니다:
 
 ## Review Readiness Dashboard
 
@@ -407,63 +442,62 @@ Display:
 - For entries without a \`commit\` field (legacy entries): display "Note: {skill} review from {date} has no commit tracking — consider re-running for accurate staleness detection"
 - If all reviews match the current HEAD, do not display any staleness notes
 
-If the Eng Review is NOT "CLEAR":
+Eng Review가 "CLEAR"가 아닌 경우:
 
-Print: "No prior eng review found — ship will run its own pre-landing review in Step 3.5."
+출력: "No prior eng review found — ship will run its own pre-landing review in Step 3.5."
 
-Check diff size: `git diff <base>...HEAD --stat | tail -1`. If the diff is >200 lines, add: "Note: This is a large diff. Consider running `/plan-eng-review` or `/autoplan` for architecture-level review before shipping."
+diff 크기를 확인합니다: `git diff <base>...HEAD --stat | tail -1`. diff가 200줄을 초과하면 추가: "Note: This is a large diff. Consider running `/plan-eng-review` or `/autoplan` for architecture-level review before shipping."
 
-If CEO Review is missing, mention as informational ("CEO Review not run — recommended for product changes") but do NOT block.
+CEO Review가 없으면 정보 제공용으로 언급합니다 ("CEO Review not run — recommended for product changes") 하지만 절대 차단하지 않습니다.
 
-For Design Review: run `source <(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)`. If `SCOPE_FRONTEND=true` and no design review (plan-design-review or design-review-lite) exists in the dashboard, mention: "Design Review not run — this PR changes frontend code. The lite design check will run automatically in Step 3.5, but consider running /design-review for a full visual audit post-implementation." Still never block.
+Design Review의 경우: `source <(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)`를 실행합니다. `SCOPE_FRONTEND=true`이고 대시보드에 디자인 리뷰(plan-design-review 또는 design-review-lite)가 없으면 언급합니다: "Design Review not run — this PR changes frontend code. The lite design check will run automatically in Step 3.5, but consider running /design-review for a full visual audit post-implementation." 여전히 절대 차단하지 않습니다.
 
-Continue to Step 1.5 — do NOT block or ask. Ship runs its own review in Step 3.5.
+Step 1.5로 계속합니다 — 차단하거나 물어보지 마십시오. Ship은 Step 3.5에서 자체 리뷰를 실행합니다.
 
 ---
 
-## Step 1.5: Distribution Pipeline Check
+## Step 1.5: 배포 파이프라인 확인
 
-If the diff introduces a new standalone artifact (CLI binary, library package, tool) — not a web
-service with existing deployment — verify that a distribution pipeline exists.
+diff가 새로운 독립 실행형 아티팩트(CLI 바이너리, 라이브러리 패키지, 도구)를 도입하는 경우 — 기존 배포가 있는 웹 서비스가 아닌 — 배포 파이프라인이 존재하는지 확인합니다.
 
-1. Check if the diff adds a new `cmd/` directory, `main.go`, or `bin/` entry point:
+1. diff가 새로운 `cmd/` 디렉토리, `main.go`, 또는 `bin/` 진입점을 추가하는지 확인합니다:
    ```bash
    git diff origin/<base> --name-only | grep -E '(cmd/.*/main\.go|bin/|Cargo\.toml|setup\.py|package\.json)' | head -5
    ```
 
-2. If new artifact detected, check for a release workflow:
+2. 새 아티팩트가 감지되면 릴리스 워크플로우가 있는지 확인합니다:
    ```bash
    ls .github/workflows/ 2>/dev/null | grep -iE 'release|publish|dist'
    grep -qE 'release|publish|deploy' .gitlab-ci.yml 2>/dev/null && echo "GITLAB_CI_RELEASE"
    ```
 
-3. **If no release pipeline exists and a new artifact was added:** Use AskUserQuestion:
+3. **릴리스 파이프라인이 없고 새 아티팩트가 추가된 경우:** AskUserQuestion을 사용합니다:
    - "This PR adds a new binary/tool but there's no CI/CD pipeline to build and publish it.
      Users won't be able to download the artifact after merge."
-   - A) Add a release workflow now (CI/CD release pipeline — GitHub Actions or GitLab CI depending on platform)
-   - B) Defer — add to TODOS.md
-   - C) Not needed — this is internal/web-only, existing deployment covers it
+   - A) 지금 릴리스 워크플로우 추가 (CI/CD 릴리스 파이프라인 — 플랫폼에 따라 GitHub Actions 또는 GitLab CI)
+   - B) 나중으로 미룸 — TODOS.md에 추가
+   - C) 불필요 — 내부용/웹 전용이며 기존 배포가 처리함
 
-4. **If release pipeline exists:** Continue silently.
-5. **If no new artifact detected:** Skip silently.
+4. **릴리스 파이프라인이 존재하면:** 조용히 계속합니다.
+5. **새 아티팩트가 감지되지 않으면:** 조용히 건너뜁니다.
 
 ---
 
-## Step 2: Merge the base branch (BEFORE tests)
+## Step 2: 베이스 브랜치 병합 (테스트 전에)
 
-Fetch and merge the base branch into the feature branch so tests run against the merged state:
+베이스 브랜치를 피처 브랜치에 페치 및 병합하여 테스트가 병합된 상태에서 실행되도록 합니다:
 
 ```bash
 git fetch origin <base> && git merge origin/<base> --no-edit
 ```
 
-**If there are merge conflicts:** Try to auto-resolve if they are simple (VERSION, schema.rb, CHANGELOG ordering). If conflicts are complex or ambiguous, **STOP** and show them.
+**병합 충돌이 있는 경우:** 단순한 충돌(VERSION, schema.rb, CHANGELOG 순서)은 자동 해결을 시도합니다. 충돌이 복잡하거나 모호하면 **중단**하고 보여줍니다.
 
-**If already up to date:** Continue silently.
+**이미 최신 상태인 경우:** 조용히 계속합니다.
 
 ---
 
-## Step 2.5: Test Framework Bootstrap
+## Step 2.5: 테스트 프레임워크 부트스트랩
 
 ## Test Framework Bootstrap
 
@@ -620,13 +654,12 @@ Only commit if there are changes. Stage all bootstrap files (config, test direct
 
 ---
 
-## Step 3: Run tests (on merged code)
+## Step 3: 테스트 실행 (병합된 코드에서)
 
-**Do NOT run `RAILS_ENV=test bin/rails db:migrate`** — `bin/test-lane` already calls
-`db:test:prepare` internally, which loads the schema into the correct lane database.
-Running bare test migrations without INSTANCE hits an orphan DB and corrupts structure.sql.
+**`RAILS_ENV=test bin/rails db:migrate`를 실행하지 마십시오** — `bin/test-lane`이 내부적으로 이미 `db:test:prepare`를 호출하며, 이것이 스키마를 올바른 레인 데이터베이스에 로드합니다.
+INSTANCE 없이 베어 테스트 마이그레이션을 실행하면 고아 DB에 접근하여 structure.sql을 손상시킵니다.
 
-Run both test suites in parallel:
+두 테스트 스위트를 병렬로 실행합니다:
 
 ```bash
 bin/test-lane 2>&1 | tee /tmp/ship_tests.txt &
@@ -634,9 +667,9 @@ npm run test 2>&1 | tee /tmp/ship_vitest.txt &
 wait
 ```
 
-After both complete, read the output files and check pass/fail.
+둘 다 완료되면 출력 파일을 읽고 통과/실패를 확인합니다.
 
-**If any test fails:** Do NOT immediately stop. Apply the Test Failure Ownership Triage:
+**테스트가 실패하면:** 즉시 중단하지 마십시오. 테스트 실패 소유권 분류를 적용합니다:
 
 ## Test Failure Ownership Triage
 
@@ -742,75 +775,75 @@ Use AskUserQuestion:
 - Continue with the workflow.
 - Note in output: "Pre-existing test failure skipped: <test-name>"
 
-**After triage:** If any in-branch failures remain unfixed, **STOP**. Do not proceed. If all failures were pre-existing and handled (fixed, TODOed, assigned, or skipped), continue to Step 3.25.
+**분류 후:** 인브랜치 실패가 수정되지 않고 남아 있으면 **중단**합니다. 진행하지 마십시오. 모든 실패가 기존 것이고 처리된 경우(수정, TODO 등록, 할당 또는 건너뜀) Step 3.25로 계속합니다.
 
-**If all pass:** Continue silently — just note the counts briefly.
+**모두 통과하면:** 조용히 계속합니다 — 카운트만 간략히 메모합니다.
 
 ---
 
-## Step 3.25: Eval Suites (conditional)
+## Step 3.25: Eval 스위트 (조건부)
 
-Evals are mandatory when prompt-related files change. Skip this step entirely if no prompt files are in the diff.
+프롬프트 관련 파일이 변경된 경우 Eval은 필수입니다. diff에 프롬프트 파일이 없으면 이 단계를 완전히 건너뜁니다.
 
-**1. Check if the diff touches prompt-related files:**
+**1. diff가 프롬프트 관련 파일을 수정하는지 확인합니다:**
 
 ```bash
 git diff origin/<base> --name-only
 ```
 
-Match against these patterns (from CLAUDE.md):
+다음 패턴과 매칭합니다 (CLAUDE.md에서):
 - `app/services/*_prompt_builder.rb`
 - `app/services/*_generation_service.rb`, `*_writer_service.rb`, `*_designer_service.rb`
 - `app/services/*_evaluator.rb`, `*_scorer.rb`, `*_classifier_service.rb`, `*_analyzer.rb`
 - `app/services/concerns/*voice*.rb`, `*writing*.rb`, `*prompt*.rb`, `*token*.rb`
 - `app/services/chat_tools/*.rb`, `app/services/x_thread_tools/*.rb`
 - `config/system_prompts/*.txt`
-- `test/evals/**/*` (eval infrastructure changes affect all suites)
+- `test/evals/**/*` (eval 인프라 변경은 모든 스위트에 영향)
 
-**If no matches:** Print "No prompt-related files changed — skipping evals." and continue to Step 3.5.
+**매칭 없음:** "No prompt-related files changed — skipping evals."을 출력하고 Step 3.5로 계속합니다.
 
-**2. Identify affected eval suites:**
+**2. 영향받는 eval 스위트를 식별합니다:**
 
-Each eval runner (`test/evals/*_eval_runner.rb`) declares `PROMPT_SOURCE_FILES` listing which source files affect it. Grep these to find which suites match the changed files:
+각 eval 러너(`test/evals/*_eval_runner.rb`)는 영향을 주는 소스 파일을 나열하는 `PROMPT_SOURCE_FILES`를 선언합니다. 이를 grep하여 변경된 파일과 매칭되는 스위트를 찾습니다:
 
 ```bash
 grep -l "changed_file_basename" test/evals/*_eval_runner.rb
 ```
 
-Map runner → test file: `post_generation_eval_runner.rb` → `post_generation_eval_test.rb`.
+러너 → 테스트 파일 매핑: `post_generation_eval_runner.rb` → `post_generation_eval_test.rb`.
 
-**Special cases:**
-- Changes to `test/evals/judges/*.rb`, `test/evals/support/*.rb`, or `test/evals/fixtures/` affect ALL suites that use those judges/support files. Check imports in the eval test files to determine which.
-- Changes to `config/system_prompts/*.txt` — grep eval runners for the prompt filename to find affected suites.
-- If unsure which suites are affected, run ALL suites that could plausibly be impacted. Over-testing is better than missing a regression.
+**특수 사례:**
+- `test/evals/judges/*.rb`, `test/evals/support/*.rb`, 또는 `test/evals/fixtures/` 변경은 해당 judge/support 파일을 사용하는 모든 스위트에 영향을 줍니다. eval 테스트 파일의 import를 확인하여 어떤 것이 영향받는지 판단합니다.
+- `config/system_prompts/*.txt` 변경 — eval 러너에서 프롬프트 파일명을 grep하여 영향받는 스위트를 찾습니다.
+- 어떤 스위트가 영향받는지 불확실하면 영향받을 가능성이 있는 모든 스위트를 실행합니다. 과도한 테스트가 회귀를 놓치는 것보다 낫습니다.
 
-**3. Run affected suites at `EVAL_JUDGE_TIER=full`:**
+**3. 영향받는 스위트를 `EVAL_JUDGE_TIER=full`로 실행합니다:**
 
-`/ship` is a pre-merge gate, so always use full tier (Sonnet structural + Opus persona judges).
+`/ship`은 사전 병합 게이트이므로 항상 full 티어를 사용합니다 (Sonnet 구조적 + Opus 페르소나 judge).
 
 ```bash
 EVAL_JUDGE_TIER=full EVAL_VERBOSE=1 bin/test-lane --eval test/evals/<suite>_eval_test.rb 2>&1 | tee /tmp/ship_evals.txt
 ```
 
-If multiple suites need to run, run them sequentially (each needs a test lane). If the first suite fails, stop immediately — don't burn API cost on remaining suites.
+여러 스위트를 실행해야 하면 순차적으로 실행합니다 (각각 테스트 레인이 필요). 첫 번째 스위트가 실패하면 즉시 중단합니다 — 나머지 스위트에 API 비용을 낭비하지 마십시오.
 
-**4. Check results:**
+**4. 결과 확인:**
 
-- **If any eval fails:** Show the failures, the cost dashboard, and **STOP**. Do not proceed.
-- **If all pass:** Note pass counts and cost. Continue to Step 3.5.
+- **eval이 실패하면:** 실패와 비용 대시보드를 표시하고 **중단**합니다. 진행하지 마십시오.
+- **모두 통과하면:** 통과 카운트와 비용을 기록합니다. Step 3.5로 계속합니다.
 
-**5. Save eval output** — include eval results and cost dashboard in the PR body (Step 8).
+**5. eval 출력 저장** — eval 결과와 비용 대시보드를 PR 본문에 포함합니다 (Step 8).
 
-**Tier reference (for context — /ship always uses `full`):**
-| Tier | When | Speed (cached) | Cost |
+**티어 참조 (참고용 — /ship은 항상 `full` 사용):**
+| 티어 | 사용 시점 | 속도 (캐시됨) | 비용 |
 |------|------|----------------|------|
-| `fast` (Haiku) | Dev iteration, smoke tests | ~5s (14x faster) | ~$0.07/run |
-| `standard` (Sonnet) | Default dev, `bin/test-lane --eval` | ~17s (4x faster) | ~$0.37/run |
-| `full` (Opus persona) | **`/ship` and pre-merge** | ~72s (baseline) | ~$1.27/run |
+| `fast` (Haiku) | 개발 반복, 스모크 테스트 | ~5s (14배 빠름) | ~$0.07/실행 |
+| `standard` (Sonnet) | 기본 개발, `bin/test-lane --eval` | ~17s (4배 빠름) | ~$0.37/실행 |
+| `full` (Opus 페르소나) | **`/ship` 및 사전 병합** | ~72s (기준선) | ~$1.27/실행 |
 
 ---
 
-## Step 3.4: Test Coverage Audit
+## Step 3.4: 테스트 커버리지 감사
 
 100% coverage is the goal — every untested path is a path where bugs hide and vibe coding becomes yolo coding. Evaluate what was ACTUALLY coded (from the diff), not what was planned.
 
@@ -1071,7 +1104,7 @@ Repo: {owner/repo}
 
 ---
 
-## Step 3.45: Plan Completion Audit
+## Step 3.45: 플랜 완료 감사
 
 ### Plan File Discovery
 
@@ -1246,17 +1279,17 @@ Add a `## Verification Results` section to the PR body (Step 8):
 
 ---
 
-## Step 3.5: Pre-Landing Review
+## Step 3.5: 사전 착륙 검증(Pre-Landing Review)
 
-Review the diff for structural issues that tests don't catch.
+테스트가 잡지 못하는 구조적 이슈를 diff에서 리뷰합니다.
 
-1. Read `.claude/skills/review/checklist.md`. If the file cannot be read, **STOP** and report the error.
+1. `.claude/skills/review/checklist.md`를 읽습니다. 파일을 읽을 수 없으면 **중단**하고 오류를 보고합니다.
 
-2. Run `git diff origin/<base>` to get the full diff (scoped to feature changes against the freshly-fetched base branch).
+2. `git diff origin/<base>`를 실행하여 전체 diff를 가져옵니다 (새로 페치한 베이스 브랜치 대비 피처 변경사항 범위).
 
-3. Apply the review checklist in two passes:
-   - **Pass 1 (CRITICAL):** SQL & Data Safety, LLM Output Trust Boundary
-   - **Pass 2 (INFORMATIONAL):** All remaining categories
+3. 리뷰 체크리스트를 두 패스로 적용합니다:
+   - **패스 1 (CRITICAL):** SQL 및 데이터 안전성, LLM 출력 신뢰 경계
+   - **패스 2 (INFORMATIONAL):** 나머지 모든 카테고리
 
 ## Design Review (conditional, diff-scoped)
 
@@ -1313,75 +1346,73 @@ cat "$TMPERR_DRL" && rm -f "$TMPERR_DRL"
 
 Present Codex output under a `CODEX (design):` header, merged with the checklist findings above.
 
-   Include any design findings alongside the code review findings. They follow the same Fix-First flow below.
+   디자인 발견사항을 코드 리뷰 발견사항과 함께 포함합니다. 아래의 Fix-First 흐름을 동일하게 따릅니다.
 
-4. **Classify each finding as AUTO-FIX or ASK** per the Fix-First Heuristic in
-   checklist.md. Critical findings lean toward ASK; informational lean toward AUTO-FIX.
+4. **각 발견사항을 AUTO-FIX 또는 ASK로 분류합니다** — checklist.md의 Fix-First 휴리스틱에 따릅니다. 크리티컬 발견사항은 ASK 쪽으로, 정보성 발견사항은 AUTO-FIX 쪽으로 기울입니다.
 
-5. **Auto-fix all AUTO-FIX items.** Apply each fix. Output one line per fix:
+5. **모든 AUTO-FIX 항목을 자동 수정합니다.** 각 수정을 적용합니다. 수정당 한 줄 출력:
    `[AUTO-FIXED] [file:line] Problem → what you did`
 
-6. **If ASK items remain,** present them in ONE AskUserQuestion:
-   - List each with number, severity, problem, recommended fix
-   - Per-item options: A) Fix  B) Skip
-   - Overall RECOMMENDATION
-   - If 3 or fewer ASK items, you may use individual AskUserQuestion calls instead
+6. **ASK 항목이 남아 있으면** 하나의 AskUserQuestion으로 제시합니다:
+   - 각 항목에 번호, 심각도, 문제, 권장 수정 포함
+   - 항목별 옵션: A) 수정  B) 건너뜀
+   - 전체 RECOMMENDATION
+   - ASK 항목이 3개 이하이면 개별 AskUserQuestion 호출을 사용할 수 있습니다
 
-7. **After all fixes (auto + user-approved):**
-   - If ANY fixes were applied: commit fixed files by name (`git add <fixed-files> && git commit -m "fix: pre-landing review fixes"`), then **STOP** and tell the user to run `/ship` again to re-test.
-   - If no fixes applied (all ASK items skipped, or no issues found): continue to Step 4.
+7. **모든 수정 완료 후 (자동 + 사용자 승인):**
+   - 수정이 적용된 경우: 수정된 파일을 이름으로 커밋합니다 (`git add <fixed-files> && git commit -m "fix: pre-landing review fixes"`), 그런 다음 **중단**하고 사용자에게 재테스트를 위해 `/ship`을 다시 실행하라고 알립니다.
+   - 수정이 적용되지 않은 경우 (모든 ASK 항목 건너뜀 또는 이슈 없음): Step 4로 계속합니다.
 
-8. Output summary: `Pre-Landing Review: N issues — M auto-fixed, K asked (J fixed, L skipped)`
+8. 요약 출력: `Pre-Landing Review: N issues — M auto-fixed, K asked (J fixed, L skipped)`
 
-   If no issues found: `Pre-Landing Review: No issues found.`
+   이슈가 없으면: `Pre-Landing Review: No issues found.`
 
-9. Persist the review result to the review log:
+9. 리뷰 결과를 리뷰 로그에 저장합니다:
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"commit":"'"$(git rev-parse --short HEAD)"'","via":"ship"}'
 ```
-Substitute TIMESTAMP (ISO 8601), STATUS ("clean" if no issues, "issues_found" otherwise),
-and N values from the summary counts above. The `via:"ship"` distinguishes from standalone `/review` runs.
+TIMESTAMP(ISO 8601), STATUS(이슈 없으면 "clean", 그 외 "issues_found"), N 값을 위 요약 카운트에서 대입합니다. `via:"ship"`은 독립 실행형 `/review` 실행과 구분합니다.
 
-Save the review output — it goes into the PR body in Step 8.
+리뷰 출력을 저장합니다 — Step 8에서 PR 본문에 포함됩니다.
 
 ---
 
-## Step 3.75: Address Greptile review comments (if PR exists)
+## Step 3.75: Greptile 리뷰 코멘트 처리 (PR이 존재하는 경우)
 
-Read `.claude/skills/review/greptile-triage.md` and follow the fetch, filter, classify, and **escalation detection** steps.
+`.claude/skills/review/greptile-triage.md`를 읽고 페치, 필터, 분류, **에스컬레이션 감지** 단계를 따릅니다.
 
-**If no PR exists, `gh` fails, API returns an error, or there are zero Greptile comments:** Skip this step silently. Continue to Step 4.
+**PR이 존재하지 않거나, `gh`가 실패하거나, API가 오류를 반환하거나, Greptile 코멘트가 없으면:** 이 단계를 조용히 건너뜁니다. Step 4로 계속합니다.
 
-**If Greptile comments are found:**
+**Greptile 코멘트가 발견되면:**
 
-Include a Greptile summary in your output: `+ N Greptile comments (X valid, Y fixed, Z FP)`
+출력에 Greptile 요약을 포함합니다: `+ N Greptile comments (X valid, Y fixed, Z FP)`
 
-Before replying to any comment, run the **Escalation Detection** algorithm from greptile-triage.md to determine whether to use Tier 1 (friendly) or Tier 2 (firm) reply templates.
+코멘트에 답변하기 전에 greptile-triage.md의 **에스컬레이션 감지** 알고리즘을 실행하여 Tier 1(친절) 또는 Tier 2(단호) 답변 템플릿 중 어느 것을 사용할지 결정합니다.
 
-For each classified comment:
+분류된 각 코멘트에 대해:
 
-**VALID & ACTIONABLE:** Use AskUserQuestion with:
-- The comment (file:line or [top-level] + body summary + permalink URL)
-- `RECOMMENDATION: Choose A because [one-line reason]`
-- Options: A) Fix now, B) Acknowledge and ship anyway, C) It's a false positive
-- If user chooses A: apply the fix, commit the fixed files (`git add <fixed-files> && git commit -m "fix: address Greptile review — <brief description>"`), reply using the **Fix reply template** from greptile-triage.md (include inline diff + explanation), and save to both per-project and global greptile-history (type: fix).
-- If user chooses C: reply using the **False Positive reply template** from greptile-triage.md (include evidence + suggested re-rank), save to both per-project and global greptile-history (type: fp).
+**VALID & ACTIONABLE:** AskUserQuestion을 사용합니다:
+- 코멘트 (file:line 또는 [top-level] + 본문 요약 + 영구 링크 URL)
+- `RECOMMENDATION: Choose A because [한 줄 이유]`
+- 옵션: A) 지금 수정, B) 인정하고 그대로 배포, C) 오탐임
+- 사용자가 A를 선택하면: 수정을 적용하고, 수정된 파일을 커밋합니다 (`git add <fixed-files> && git commit -m "fix: address Greptile review — <brief description>"`), greptile-triage.md의 **Fix 답변 템플릿**을 사용하여 답변합니다 (인라인 diff + 설명 포함), 프로젝트별 및 전역 greptile-history에 저장합니다 (type: fix).
+- 사용자가 C를 선택하면: greptile-triage.md의 **False Positive 답변 템플릿**을 사용하여 답변합니다 (증거 + 재랭크 제안 포함), 프로젝트별 및 전역 greptile-history에 저장합니다 (type: fp).
 
-**VALID BUT ALREADY FIXED:** Reply using the **Already Fixed reply template** from greptile-triage.md — no AskUserQuestion needed:
-- Include what was done and the fixing commit SHA
-- Save to both per-project and global greptile-history (type: already-fixed)
+**VALID BUT ALREADY FIXED:** greptile-triage.md의 **Already Fixed 답변 템플릿**을 사용하여 답변합니다 — AskUserQuestion 불필요:
+- 무엇이 수행되었는지와 수정 커밋 SHA를 포함합니다
+- 프로젝트별 및 전역 greptile-history에 저장합니다 (type: already-fixed)
 
-**FALSE POSITIVE:** Use AskUserQuestion:
-- Show the comment and why you think it's wrong (file:line or [top-level] + body summary + permalink URL)
-- Options:
-  - A) Reply to Greptile explaining the false positive (recommended if clearly wrong)
-  - B) Fix it anyway (if trivial)
-  - C) Ignore silently
-- If user chooses A: reply using the **False Positive reply template** from greptile-triage.md (include evidence + suggested re-rank), save to both per-project and global greptile-history (type: fp)
+**FALSE POSITIVE:** AskUserQuestion을 사용합니다:
+- 코멘트와 왜 틀렸다고 생각하는지 보여줍니다 (file:line 또는 [top-level] + 본문 요약 + 영구 링크 URL)
+- 옵션:
+  - A) Greptile에 오탐 설명 답변 (명확히 틀린 경우 권장)
+  - B) 그래도 수정 (사소한 경우)
+  - C) 조용히 무시
+- 사용자가 A를 선택하면: greptile-triage.md의 **False Positive 답변 템플릿**을 사용하여 답변합니다 (증거 + 재랭크 제안 포함), 프로젝트별 및 전역 greptile-history에 저장합니다 (type: fp)
 
-**SUPPRESSED:** Skip silently — these are known false positives from previous triage.
+**SUPPRESSED:** 조용히 건너뜁니다 — 이전 분류에서 알려진 오탐입니다.
 
-**After all comments are resolved:** If any fixes were applied, the tests from Step 3 are now stale. **Re-run tests** (Step 3) before continuing to Step 4. If no fixes were applied, continue to Step 4.
+**모든 코멘트 해결 후:** 수정이 적용된 경우 Step 3의 테스트가 오래된 것입니다. Step 4로 계속하기 전에 **테스트를 재실행**합니다 (Step 3). 수정이 적용되지 않았으면 Step 4로 계속합니다.
 
 ---
 
@@ -1521,128 +1552,128 @@ High-confidence findings (agreed on by multiple sources) should be prioritized f
 
 ---
 
-## Step 4: Version bump (auto-decide)
+## Step 4: 버전 범프 (자동 결정)
 
-1. Read the current `VERSION` file (4-digit format: `MAJOR.MINOR.PATCH.MICRO`)
+1. 현재 `VERSION` 파일을 읽습니다 (4자리 형식: `MAJOR.MINOR.PATCH.MICRO`)
 
-2. **Auto-decide the bump level based on the diff:**
-   - Count lines changed (`git diff origin/<base>...HEAD --stat | tail -1`)
-   - **MICRO** (4th digit): < 50 lines changed, trivial tweaks, typos, config
-   - **PATCH** (3rd digit): 50+ lines changed, bug fixes, small-medium features
-   - **MINOR** (2nd digit): **ASK the user** — only for major features or significant architectural changes
-   - **MAJOR** (1st digit): **ASK the user** — only for milestones or breaking changes
+2. **diff를 기반으로 범프 수준을 자동 결정합니다:**
+   - 변경된 줄 수를 셉니다 (`git diff origin/<base>...HEAD --stat | tail -1`)
+   - **MICRO** (4번째 자릿수): 50줄 미만 변경, 사소한 조정, 오타, 설정
+   - **PATCH** (3번째 자릿수): 50줄 이상 변경, 버그 수정, 소-중 규모 기능
+   - **MINOR** (2번째 자릿수): **사용자에게 물어봄** — 주요 기능 또는 중대한 아키텍처 변경일 때만
+   - **MAJOR** (1번째 자릿수): **사용자에게 물어봄** — 마일스톤 또는 호환성 깨지는 변경일 때만
 
-3. Compute the new version:
-   - Bumping a digit resets all digits to its right to 0
-   - Example: `0.19.1.0` + PATCH → `0.19.2.0`
+3. 새 버전을 계산합니다:
+   - 자릿수를 범프하면 오른쪽의 모든 자릿수를 0으로 초기화합니다
+   - 예시: `0.19.1.0` + PATCH → `0.19.2.0`
 
-4. Write the new version to the `VERSION` file.
-
----
-
-## Step 5: CHANGELOG (auto-generate)
-
-1. Read `CHANGELOG.md` header to know the format.
-
-2. Auto-generate the entry from **ALL commits on the branch** (not just recent ones):
-   - Use `git log <base>..HEAD --oneline` to see every commit being shipped
-   - Use `git diff <base>...HEAD` to see the full diff against the base branch
-   - The CHANGELOG entry must be comprehensive of ALL changes going into the PR
-   - If existing CHANGELOG entries on the branch already cover some commits, replace them with one unified entry for the new version
-   - Categorize changes into applicable sections:
-     - `### Added` — new features
-     - `### Changed` — changes to existing functionality
-     - `### Fixed` — bug fixes
-     - `### Removed` — removed features
-   - Write concise, descriptive bullet points
-   - Insert after the file header (line 5), dated today
-   - Format: `## [X.Y.Z.W] - YYYY-MM-DD`
-
-**Do NOT ask the user to describe changes.** Infer from the diff and commit history.
+4. 새 버전을 `VERSION` 파일에 기록합니다.
 
 ---
 
-## Step 5.5: TODOS.md (auto-update)
+## Step 5: CHANGELOG (자동 생성)
 
-Cross-reference the project's TODOS.md against the changes being shipped. Mark completed items automatically; prompt only if the file is missing or disorganized.
+1. `CHANGELOG.md` 헤더를 읽어 형식을 파악합니다.
 
-Read `.claude/skills/review/TODOS-format.md` for the canonical format reference.
+2. **브랜치의 모든 커밋**에서 항목을 자동 생성합니다 (최근 것만이 아니라):
+   - `git log <base>..HEAD --oneline`으로 배포되는 모든 커밋을 확인합니다
+   - `git diff <base>...HEAD`로 베이스 브랜치 대비 전체 diff를 확인합니다
+   - CHANGELOG 항목은 PR에 포함되는 모든 변경사항을 포괄해야 합니다
+   - 브랜치의 기존 CHANGELOG 항목이 일부 커밋을 이미 다루고 있으면, 새 버전에 대한 하나의 통합 항목으로 교체합니다
+   - 변경사항을 해당하는 섹션으로 분류합니다:
+     - `### Added` — 새 기능
+     - `### Changed` — 기존 기능 변경
+     - `### Fixed` — 버그 수정
+     - `### Removed` — 제거된 기능
+   - 간결하고 설명적인 글머리 기호를 작성합니다
+   - 파일 헤더 뒤(5번째 줄)에 오늘 날짜로 삽입합니다
+   - 형식: `## [X.Y.Z.W] - YYYY-MM-DD`
 
-**1. Check if TODOS.md exists** in the repository root.
+**사용자에게 변경사항 설명을 요청하지 마십시오.** diff와 커밋 히스토리에서 추론합니다.
 
-**If TODOS.md does not exist:** Use AskUserQuestion:
-- Message: "GStack recommends maintaining a TODOS.md organized by skill/component, then priority (P0 at top through P4, then Completed at bottom). See TODOS-format.md for the full format. Would you like to create one?"
-- Options: A) Create it now, B) Skip for now
-- If A: Create `TODOS.md` with a skeleton (# TODOS heading + ## Completed section). Continue to step 3.
-- If B: Skip the rest of Step 5.5. Continue to Step 6.
+---
 
-**2. Check structure and organization:**
+## Step 5.5: TODOS.md (자동 업데이트)
 
-Read TODOS.md and verify it follows the recommended structure:
-- Items grouped under `## <Skill/Component>` headings
-- Each item has `**Priority:**` field with P0-P4 value
-- A `## Completed` section at the bottom
+프로젝트의 TODOS.md를 배포되는 변경사항과 교차 참조합니다. 완료된 항목은 자동으로 표시합니다; 파일이 없거나 정리되지 않은 경우에만 프롬프트합니다.
 
-**If disorganized** (missing priority fields, no component groupings, no Completed section): Use AskUserQuestion:
-- Message: "TODOS.md doesn't follow the recommended structure (skill/component groupings, P0-P4 priority, Completed section). Would you like to reorganize it?"
-- Options: A) Reorganize now (recommended), B) Leave as-is
-- If A: Reorganize in-place following TODOS-format.md. Preserve all content — only restructure, never delete items.
-- If B: Continue to step 3 without restructuring.
+`.claude/skills/review/TODOS-format.md`를 읽어 표준 형식 참조를 확인합니다.
 
-**3. Detect completed TODOs:**
+**1. TODOS.md가 존재하는지 확인합니다** — 저장소 루트에서.
 
-This step is fully automatic — no user interaction.
+**TODOS.md가 존재하지 않으면:** AskUserQuestion을 사용합니다:
+- 메시지: "GStack recommends maintaining a TODOS.md organized by skill/component, then priority (P0 at top through P4, then Completed at bottom). See TODOS-format.md for the full format. Would you like to create one?"
+- 옵션: A) 지금 생성, B) 나중에
+- A인 경우: 스켈레톤으로 `TODOS.md`를 생성합니다 (# TODOS 제목 + ## Completed 섹션). step 3으로 계속합니다.
+- B인 경우: Step 5.5의 나머지를 건너뜁니다. Step 6으로 계속합니다.
 
-Use the diff and commit history already gathered in earlier steps:
-- `git diff <base>...HEAD` (full diff against the base branch)
-- `git log <base>..HEAD --oneline` (all commits being shipped)
+**2. 구조와 정리 상태를 확인합니다:**
 
-For each TODO item, check if the changes in this PR complete it by:
-- Matching commit messages against the TODO title and description
-- Checking if files referenced in the TODO appear in the diff
-- Checking if the TODO's described work matches the functional changes
+TODOS.md를 읽고 권장 구조를 따르는지 확인합니다:
+- `## <Skill/Component>` 제목 아래 항목 그룹화
+- 각 항목에 P0-P4 값의 `**Priority:**` 필드
+- 하단에 `## Completed` 섹션
 
-**Be conservative:** Only mark a TODO as completed if there is clear evidence in the diff. If uncertain, leave it alone.
+**정리되지 않은 경우** (우선순위 필드 누락, 컴포넌트 그룹화 없음, Completed 섹션 없음): AskUserQuestion을 사용합니다:
+- 메시지: "TODOS.md doesn't follow the recommended structure (skill/component groupings, P0-P4 priority, Completed section). Would you like to reorganize it?"
+- 옵션: A) 지금 재정리 (권장), B) 그대로 유지
+- A인 경우: TODOS-format.md에 따라 제자리에서 재정리합니다. 모든 내용을 보존합니다 — 구조만 변경하고, 항목을 절대 삭제하지 않습니다.
+- B인 경우: 재정리 없이 step 3으로 계속합니다.
 
-**4. Move completed items** to the `## Completed` section at the bottom. Append: `**Completed:** vX.Y.Z (YYYY-MM-DD)`
+**3. 완료된 TODO를 감지합니다:**
 
-**5. Output summary:**
+이 단계는 완전 자동입니다 — 사용자 상호작용 없음.
+
+이전 단계에서 이미 수집한 diff와 커밋 히스토리를 사용합니다:
+- `git diff <base>...HEAD` (베이스 브랜치 대비 전체 diff)
+- `git log <base>..HEAD --oneline` (배포되는 모든 커밋)
+
+각 TODO 항목에 대해 이 PR의 변경사항이 완료하는지 확인합니다:
+- 커밋 메시지와 TODO 제목 및 설명 매칭
+- TODO에서 참조된 파일이 diff에 나타나는지 확인
+- TODO에 설명된 작업이 기능적 변경사항과 일치하는지 확인
+
+**보수적으로 판단합니다:** diff에 명확한 증거가 있을 때만 TODO를 완료로 표시합니다. 불확실하면 그대로 둡니다.
+
+**4. 완료된 항목을 이동합니다** — 하단의 `## Completed` 섹션으로. 추가: `**Completed:** vX.Y.Z (YYYY-MM-DD)`
+
+**5. 요약 출력:**
 - `TODOS.md: N items marked complete (item1, item2, ...). M items remaining.`
-- Or: `TODOS.md: No completed items detected. M items remaining.`
-- Or: `TODOS.md: Created.` / `TODOS.md: Reorganized.`
+- 또는: `TODOS.md: No completed items detected. M items remaining.`
+- 또는: `TODOS.md: Created.` / `TODOS.md: Reorganized.`
 
-**6. Defensive:** If TODOS.md cannot be written (permission error, disk full), warn the user and continue. Never stop the ship workflow for a TODOS failure.
+**6. 방어적 처리:** TODOS.md를 기록할 수 없으면 (권한 오류, 디스크 풀) 사용자에게 경고하고 계속합니다. TODOS 실패로 ship 워크플로우를 절대 중단하지 않습니다.
 
-Save this summary — it goes into the PR body in Step 8.
+이 요약을 저장합니다 — Step 8에서 PR 본문에 포함됩니다.
 
 ---
 
-## Step 6: Commit (bisectable chunks)
+## Step 6: 커밋 (이등분 가능(bisectable) 청크)
 
-**Goal:** Create small, logical commits that work well with `git bisect` and help LLMs understand what changed.
+**목표:** `git bisect`와 잘 작동하고 LLM이 변경사항을 이해하는 데 도움이 되는 작고 논리적인 커밋을 생성합니다.
 
-1. Analyze the diff and group changes into logical commits. Each commit should represent **one coherent change** — not one file, but one logical unit.
+1. diff를 분석하고 변경사항을 논리적 커밋으로 그룹화합니다. 각 커밋은 **하나의 일관된 변경** — 하나의 파일이 아니라 하나의 논리적 단위를 나타내야 합니다.
 
-2. **Commit ordering** (earlier commits first):
-   - **Infrastructure:** migrations, config changes, route additions
-   - **Models & services:** new models, services, concerns (with their tests)
-   - **Controllers & views:** controllers, views, JS/React components (with their tests)
-   - **VERSION + CHANGELOG + TODOS.md:** always in the final commit
+2. **커밋 순서** (앞선 커밋이 먼저):
+   - **인프라:** 마이그레이션, 설정 변경, 라우트 추가
+   - **모델 & 서비스:** 새 모델, 서비스, concern (테스트 포함)
+   - **컨트롤러 & 뷰:** 컨트롤러, 뷰, JS/React 컴포넌트 (테스트 포함)
+   - **VERSION + CHANGELOG + TODOS.md:** 항상 마지막 커밋
 
-3. **Rules for splitting:**
-   - A model and its test file go in the same commit
-   - A service and its test file go in the same commit
-   - A controller, its views, and its test go in the same commit
-   - Migrations are their own commit (or grouped with the model they support)
-   - Config/route changes can group with the feature they enable
-   - If the total diff is small (< 50 lines across < 4 files), a single commit is fine
+3. **분할 규칙:**
+   - 모델과 해당 테스트 파일은 같은 커밋
+   - 서비스와 해당 테스트 파일은 같은 커밋
+   - 컨트롤러, 해당 뷰, 해당 테스트는 같은 커밋
+   - 마이그레이션은 별도 커밋 (또는 지원하는 모델과 함께 그룹화)
+   - 설정/라우트 변경은 활성화하는 기능과 함께 그룹화 가능
+   - 전체 diff가 작으면 (4개 미만 파일에 50줄 미만) 단일 커밋으로 충분
 
-4. **Each commit must be independently valid** — no broken imports, no references to code that doesn't exist yet. Order commits so dependencies come first.
+4. **각 커밋은 독립적으로 유효해야 합니다** — 깨진 import 없음, 아직 존재하지 않는 코드 참조 없음. 의존성이 먼저 오도록 커밋 순서를 정합니다.
 
-5. Compose each commit message:
-   - First line: `<type>: <summary>` (type = feat/fix/chore/refactor/docs)
-   - Body: brief description of what this commit contains
-   - Only the **final commit** (VERSION + CHANGELOG) gets the version tag and co-author trailer:
+5. 각 커밋 메시지를 작성합니다:
+   - 첫 줄: `<type>: <summary>` (type = feat/fix/chore/refactor/docs)
+   - 본문: 이 커밋에 포함된 내용의 간략한 설명
+   - **마지막 커밋**(VERSION + CHANGELOG)에만 버전 태그와 공동 저자 트레일러를 포함합니다:
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -1655,31 +1686,31 @@ EOF
 
 ---
 
-## Step 6.5: Verification Gate
+## Step 6.5: 검증 게이트
 
-**IRON LAW: NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE.**
+**철칙: 새로운 검증 증거 없이 절대 완료를 주장하지 마십시오.**
 
-Before pushing, re-verify if code changed during Steps 4-6:
+푸시 전에 Step 4-6에서 코드가 변경되었는지 재검증합니다:
 
-1. **Test verification:** If ANY code changed after Step 3's test run (fixes from review findings, CHANGELOG edits don't count), re-run the test suite. Paste fresh output. Stale output from Step 3 is NOT acceptable.
+1. **테스트 검증:** Step 3의 테스트 실행 후 코드가 변경된 경우 (리뷰 발견사항 수정, CHANGELOG 편집은 해당 없음), 테스트 스위트를 재실행합니다. 새로운 출력을 붙여넣습니다. Step 3의 오래된 출력은 허용되지 않습니다.
 
-2. **Build verification:** If the project has a build step, run it. Paste output.
+2. **빌드 검증:** 프로젝트에 빌드 단계가 있으면 실행합니다. 출력을 붙여넣습니다.
 
-3. **Rationalization prevention:**
-   - "Should work now" → RUN IT.
-   - "I'm confident" → Confidence is not evidence.
-   - "I already tested earlier" → Code changed since then. Test again.
-   - "It's a trivial change" → Trivial changes break production.
+3. **합리화 방지:**
+   - "이제 작동할 것이다" → 실행하십시오.
+   - "확신한다" → 확신은 증거가 아닙니다.
+   - "이미 앞서 테스트했다" → 그 이후로 코드가 변경되었습니다. 다시 테스트하십시오.
+   - "사소한 변경이다" → 사소한 변경이 프로덕션을 깨뜨립니다.
 
-**If tests fail here:** STOP. Do not push. Fix the issue and return to Step 3.
+**여기서 테스트가 실패하면:** 중단합니다. 푸시하지 마십시오. 이슈를 수정하고 Step 3으로 돌아갑니다.
 
-Claiming work is complete without verification is dishonesty, not efficiency.
+검증 없이 작업 완료를 주장하는 것은 효율이 아니라 부정직입니다.
 
 ---
 
-## Step 7: Push
+## Step 7: 푸시
 
-Push to the remote with upstream tracking:
+업스트림 추적과 함께 리모트에 푸시합니다:
 
 ```bash
 git push -u origin <branch-name>
@@ -1687,50 +1718,50 @@ git push -u origin <branch-name>
 
 ---
 
-## Step 8: Create PR/MR
+## Step 8: PR/MR 생성
 
-Create a pull request (GitHub) or merge request (GitLab) using the platform detected in Step 0.
+Step 0에서 감지된 플랫폼을 사용하여 풀 리퀘스트(GitHub) 또는 머지 리퀘스트(GitLab)를 생성합니다.
 
-The PR/MR body should contain these sections:
+PR/MR 본문에 다음 섹션을 포함해야 합니다:
 
 ```
 ## Summary
-<bullet points from CHANGELOG>
+<CHANGELOG의 글머리 기호>
 
 ## Test Coverage
-<coverage diagram from Step 3.4, or "All new code paths have test coverage.">
-<If Step 3.4 ran: "Tests: {before} → {after} (+{delta} new)">
+<Step 3.4의 커버리지 다이어그램, 또는 "All new code paths have test coverage.">
+<Step 3.4가 실행된 경우: "Tests: {before} → {after} (+{delta} new)">
 
 ## Pre-Landing Review
-<findings from Step 3.5 code review, or "No issues found.">
+<Step 3.5 코드 리뷰의 발견사항, 또는 "No issues found.">
 
 ## Design Review
-<If design review ran: "Design Review (lite): N findings — M auto-fixed, K skipped. AI Slop: clean/N issues.">
-<If no frontend files changed: "No frontend files changed — design review skipped.">
+<디자인 리뷰가 실행된 경우: "Design Review (lite): N findings — M auto-fixed, K skipped. AI Slop: clean/N issues.">
+<프론트엔드 파일 변경 없음: "No frontend files changed — design review skipped.">
 
 ## Eval Results
-<If evals ran: suite names, pass/fail counts, cost dashboard summary. If skipped: "No prompt-related files changed — evals skipped.">
+<eval이 실행된 경우: 스위트 이름, 통과/실패 카운트, 비용 대시보드 요약. 건너뛴 경우: "No prompt-related files changed — evals skipped.">
 
 ## Greptile Review
-<If Greptile comments were found: bullet list with [FIXED] / [FALSE POSITIVE] / [ALREADY FIXED] tag + one-line summary per comment>
-<If no Greptile comments found: "No Greptile comments.">
-<If no PR existed during Step 3.75: omit this section entirely>
+<Greptile 코멘트가 발견된 경우: [FIXED] / [FALSE POSITIVE] / [ALREADY FIXED] 태그 + 코멘트당 한 줄 요약의 글머리 기호 목록>
+<Greptile 코멘트 없음: "No Greptile comments.">
+<Step 3.75에서 PR이 존재하지 않았으면: 이 섹션 전체 생략>
 
 ## Plan Completion
-<If plan file found: completion checklist summary from Step 3.45>
-<If no plan file: "No plan file detected.">
-<If plan items deferred: list deferred items>
+<플랜 파일 발견됨: Step 3.45의 완료 체크리스트 요약>
+<플랜 파일 없음: "No plan file detected.">
+<플랜 항목 보류: 보류된 항목 나열>
 
 ## Verification Results
-<If verification ran: summary from Step 3.47 (N PASS, M FAIL, K SKIPPED)>
-<If skipped: reason (no plan, no server, no verification section)>
-<If not applicable: omit this section>
+<검증이 실행된 경우: Step 3.47의 요약 (N PASS, M FAIL, K SKIPPED)>
+<건너뛴 경우: 이유 (플랜 없음, 서버 없음, 검증 섹션 없음)>
+<해당 없음: 이 섹션 생략>
 
 ## TODOS
-<If items marked complete: bullet list of completed items with version>
-<If no items completed: "No TODO items completed in this PR.">
-<If TODOS.md created or reorganized: note that>
-<If TODOS.md doesn't exist and user skipped: omit this section>
+<항목 완료됨: 버전과 함께 완료된 항목의 글머리 기호 목록>
+<완료된 항목 없음: "No TODO items completed in this PR.">
+<TODOS.md 생성 또는 재정리됨: 해당 내용 메모>
+<TODOS.md가 존재하지 않고 사용자가 건너뜀: 이 섹션 생략>
 
 ## Test plan
 - [x] All Rails tests pass (N runs, 0 failures)
@@ -1739,89 +1770,77 @@ The PR/MR body should contain these sections:
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
-**If GitHub:**
+**GitHub인 경우:**
 
 ```bash
 gh pr create --base <base> --title "<type>: <summary>" --body "$(cat <<'EOF'
-<PR body from above>
+<위의 PR 본문>
 EOF
 )"
 ```
 
-**If GitLab:**
+**GitLab인 경우:**
 
 ```bash
 glab mr create -b <base> -t "<type>: <summary>" -d "$(cat <<'EOF'
-<MR body from above>
+<위의 MR 본문>
 EOF
 )"
 ```
 
-**If neither CLI is available:**
-Print the branch name, remote URL, and instruct the user to create the PR/MR manually via the web UI. Do not stop — the code is pushed and ready.
+**두 CLI 모두 사용 불가능한 경우:**
+브랜치 이름, 리모트 URL을 출력하고 사용자에게 웹 UI를 통해 수동으로 PR/MR을 생성하도록 안내합니다. 중단하지 않습니다 — 코드는 푸시되어 준비된 상태입니다.
 
-**Output the PR/MR URL** — then proceed to Step 8.5.
+**PR/MR URL을 출력합니다** — 그런 다음 Step 8.5로 진행합니다.
 
 ---
 
-## Step 8.5: Auto-invoke /document-release
+## Step 8.5: /document-release 자동 호출
 
-After the PR is created, automatically sync project documentation. Read the
-`document-release/SKILL.md` skill file (adjacent to this skill's directory) and
-execute its full workflow:
+PR이 생성된 후 프로젝트 문서를 자동으로 동기화합니다. `document-release/SKILL.md` 스킬 파일(이 스킬의 디렉토리와 인접)을 읽고 전체 워크플로우를 실행합니다:
 
-1. Read the `/document-release` skill: `cat ${CLAUDE_SKILL_DIR}/../document-release/SKILL.md`
-2. Follow its instructions — it reads all .md files in the project, cross-references
-   the diff, and updates anything that drifted (README, ARCHITECTURE, CONTRIBUTING,
-   CLAUDE.md, TODOS, etc.)
-3. If any docs were updated, commit the changes and push to the same branch:
+1. `/document-release` 스킬을 읽습니다: `cat ${CLAUDE_SKILL_DIR}/../document-release/SKILL.md`
+2. 지시사항을 따릅니다 — 프로젝트의 모든 .md 파일을 읽고, diff와 교차 참조하여, 변경된 것들을 업데이트합니다 (README, ARCHITECTURE, CONTRIBUTING, CLAUDE.md, TODOS 등)
+3. 문서가 업데이트되면 변경사항을 커밋하고 같은 브랜치에 푸시합니다:
    ```bash
    git add -A && git commit -m "docs: sync documentation with shipped changes" && git push
    ```
-4. If no docs needed updating, say "Documentation is current — no updates needed."
+4. 업데이트가 필요한 문서가 없으면 "Documentation is current — no updates needed."라고 말합니다.
 
-This step is automatic. Do not ask the user for confirmation. The goal is zero-friction
-doc updates — the user runs `/ship` and documentation stays current without a separate command.
+이 단계는 자동입니다. 사용자에게 확인을 요청하지 마십시오. 목표는 마찰 없는 문서 업데이트입니다 — 사용자가 `/ship`을 실행하면 별도의 명령 없이 문서가 최신 상태를 유지합니다.
 
 ---
 
-## Step 8.75: Persist ship metrics
+## Step 8.75: Ship 메트릭 저장
 
-Log coverage and plan completion data so `/retro` can track trends:
+커버리지와 플랜 완료 데이터를 로그에 기록하여 `/retro`가 추세를 추적할 수 있도록 합니다:
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 ```
 
-Append to `~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl`:
+`~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl`에 추가합니다:
 
 ```bash
 echo '{"skill":"ship","timestamp":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","coverage_pct":COVERAGE_PCT,"plan_items_total":PLAN_TOTAL,"plan_items_done":PLAN_DONE,"verification_result":"VERIFY_RESULT","version":"VERSION","branch":"BRANCH"}' >> ~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl
 ```
 
-Substitute from earlier steps:
-- **COVERAGE_PCT**: coverage percentage from Step 3.4 diagram (integer, or -1 if undetermined)
-- **PLAN_TOTAL**: total plan items extracted in Step 3.45 (0 if no plan file)
-- **PLAN_DONE**: count of DONE + CHANGED items from Step 3.45 (0 if no plan file)
-- **VERIFY_RESULT**: "pass", "fail", or "skipped" from Step 3.47
-- **VERSION**: from the VERSION file
-- **BRANCH**: current branch name
+이전 단계에서 대입합니다:
+- **COVERAGE_PCT**: Step 3.4 다이어그램의 커버리지 퍼센티지 (정수, 판단 불가 시 -1)
+- **PLAN_TOTAL**: Step 3.45에서 추출한 전체 플랜 항목 (플랜 파일 없으면 0)
+- **PLAN_DONE**: Step 3.45의 DONE + CHANGED 항목 수 (플랜 파일 없으면 0)
+- **VERIFY_RESULT**: Step 3.47의 "pass", "fail", 또는 "skipped"
+- **VERSION**: VERSION 파일에서
+- **BRANCH**: 현재 브랜치 이름
 
-This step is automatic — never skip it, never ask for confirmation.
+이 단계는 자동입니다 — 절대 건너뛰지 말고, 절대 확인을 요청하지 마십시오.
 
 ---
 
-## Important Rules
+## 중요 규칙
 
-- **Never skip tests.** If tests fail, stop.
-- **Never skip the pre-landing review.** If checklist.md is unreadable, stop.
-- **Never force push.** Use regular `git push` only.
-- **Never ask for trivial confirmations** (e.g., "ready to push?", "create PR?"). DO stop for: version bumps (MINOR/MAJOR), pre-landing review findings (ASK items), and Codex structured review [P1] findings (large diffs only).
-- **Always use the 4-digit version format** from the VERSION file.
-- **Date format in CHANGELOG:** `YYYY-MM-DD`
-- **Split commits for bisectability** — each commit = one logical change.
-- **TODOS.md completion detection must be conservative.** Only mark items as completed when the diff clearly shows the work is done.
-- **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence (inline diff, code references, re-rank suggestion). Never post vague replies.
-- **Never push without fresh verification evidence.** If code changed after Step 3 tests, re-run before pushing.
-- **Step 3.4 generates coverage tests.** They must pass before committing. Never commit failing tests.
-- **The goal is: user says `/ship`, next thing they see is the review + PR URL + auto-synced docs.**
+- **절대 테스트를 건너뛰지 마십시오.** 테스트가 실패하면 중단합니다.
+- **greptile-triage.md의 Greptile 답변 템플릿을 사용합니다.** 모든 답변에 증거(인라인 diff, 코드 참조, 재랭크 제안)를 포함합니다. 모호한 답변은 절대 게시하지 마십시오.
+- **새로운 검증 증거 없이 절대 push하지 마십시오.** Step 3 테스트 후 코드가 변경되었으면 push 전에 재실행합니다.
+- **Step 3.4는 커버리지 테스트를 생성합니다.** 커밋 전에 통과해야 합니다. 실패하는 테스트를 절대 커밋하지 마십시오.
+- **목표: 사용자가 `/ship`이라고 하면, 다음으로 보는 것은 리뷰 + PR URL + 자동 동기화된 문서입니다.**

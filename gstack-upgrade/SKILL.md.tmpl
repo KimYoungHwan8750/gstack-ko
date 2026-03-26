@@ -2,9 +2,9 @@
 name: gstack-upgrade
 version: 1.1.0
 description: |
-  Upgrade gstack to the latest version. Detects global vs vendored install,
-  runs the upgrade, and shows what's new. Use when asked to "upgrade gstack",
-  "update gstack", or "get latest version".
+  gstack을 최신 버전으로 업그레이드합니다. 전역 또는 벤더 설치를 감지하고,
+  업그레이드를 실행한 뒤 변경 사항을 표시합니다. "upgrade gstack",
+  "update gstack", "get latest version" 요청 시 사용합니다.
 allowed-tools:
   - Bash
   - Read
@@ -14,15 +14,15 @@ allowed-tools:
 
 # /gstack-upgrade
 
-Upgrade gstack to the latest version and show what's new.
+gstack을 최신 버전으로 업그레이드하고 변경 사항을 표시합니다.
 
-## Inline upgrade flow
+## 인라인 업그레이드 플로우
 
-This section is referenced by all skill preambles when they detect `UPGRADE_AVAILABLE`.
+이 섹션은 모든 스킬 프리앰블이 `UPGRADE_AVAILABLE`을 감지했을 때 참조됩니다.
 
-### Step 1: Ask the user (or auto-upgrade)
+### Step 1: 사용자에게 묻기 (또는 자동 업그레이드)
 
-First, check if auto-upgrade is enabled:
+먼저, 자동 업그레이드가 활성화되어 있는지 확인합니다:
 ```bash
 _AUTO=""
 [ "${GSTACK_AUTO_UPGRADE:-}" = "1" ] && _AUTO="true"
@@ -30,21 +30,21 @@ _AUTO=""
 echo "AUTO_UPGRADE=$_AUTO"
 ```
 
-**If `AUTO_UPGRADE=true` or `AUTO_UPGRADE=1`:** Skip AskUserQuestion. Log "Auto-upgrading gstack v{old} → v{new}..." and proceed directly to Step 2. If `./setup` fails during auto-upgrade, restore from backup (`.bak` directory) and warn the user: "Auto-upgrade failed — restored previous version. Run `/gstack-upgrade` manually to retry."
+**`AUTO_UPGRADE=true` 또는 `AUTO_UPGRADE=1`인 경우:** AskUserQuestion을 건너뜁니다. "Auto-upgrading gstack v{old} → v{new}..."를 로그에 기록하고 바로 Step 2로 진행합니다. 자동 업그레이드 중 `./setup`이 실패하면, 백업(`.bak` 디렉토리)에서 복원하고 사용자에게 경고합니다: "자동 업그레이드 실패 — 이전 버전을 복원했습니다. `/gstack-upgrade`를 수동으로 실행하여 재시도하세요."
 
-**Otherwise**, use AskUserQuestion:
-- Question: "gstack **v{new}** is available (you're on v{old}). Upgrade now?"
-- Options: ["Yes, upgrade now", "Always keep me up to date", "Not now", "Never ask again"]
+**그 외의 경우**, AskUserQuestion을 사용합니다:
+- 질문: "gstack **v{new}** 버전이 출시되었습니다 (현재 v{old}). 지금 업그레이드하시겠습니까?"
+- 옵션: ["Yes, upgrade now", "Always keep me up to date", "Not now", "Never ask again"]
 
-**If "Yes, upgrade now":** Proceed to Step 2.
+**"Yes, upgrade now"인 경우:** Step 2로 진행합니다.
 
-**If "Always keep me up to date":**
+**"Always keep me up to date"인 경우:**
 ```bash
 ~/.claude/skills/gstack/bin/gstack-config set auto_upgrade true
 ```
-Tell user: "Auto-upgrade enabled. Future updates will install automatically." Then proceed to Step 2.
+사용자에게 전달합니다: "자동 업그레이드가 활성화되었습니다. 향후 업데이트는 자동으로 설치됩니다." 그런 다음 Step 2로 진행합니다.
 
-**If "Not now":** Write snooze state with escalating backoff (first snooze = 24h, second = 48h, third+ = 1 week), then continue with the current skill. Do not mention the upgrade again.
+**"Not now"인 경우:** 점진적 백오프로 다시 알림 상태를 기록합니다 (첫 번째 다시 알림 = 24시간, 두 번째 = 48시간, 세 번째 이상 = 1주일), 그런 다음 현재 스킬을 계속 진행합니다. 업그레이드에 대해 다시 언급하지 않습니다.
 ```bash
 _SNOOZE_FILE=~/.gstack/update-snoozed
 _REMOTE_VER="{new}"
@@ -60,26 +60,26 @@ _NEW_LEVEL=$((_CUR_LEVEL + 1))
 [ "$_NEW_LEVEL" -gt 3 ] && _NEW_LEVEL=3
 echo "$_REMOTE_VER $_NEW_LEVEL $(date +%s)" > "$_SNOOZE_FILE"
 ```
-Note: `{new}` is the remote version from the `UPGRADE_AVAILABLE` output — substitute it from the update check result.
+참고: `{new}`는 `UPGRADE_AVAILABLE` 출력에서 가져온 원격 버전입니다 — 업데이트 확인 결과에서 대입하세요.
 
-Tell user the snooze duration: "Next reminder in 24h" (or 48h or 1 week, depending on level). Tip: "Set `auto_upgrade: true` in `~/.gstack/config.yaml` for automatic upgrades."
+사용자에게 다시 알림 기간을 전달합니다: "다음 알림: 24시간 후" (또는 레벨에 따라 48시간 또는 1주일). 팁: "자동 업그레이드를 원하시면 `~/.gstack/config.yaml`에서 `auto_upgrade: true`로 설정하세요."
 
-**If "Never ask again":**
+**"Never ask again"인 경우:**
 ```bash
 ~/.claude/skills/gstack/bin/gstack-config set update_check false
 ```
-Tell user: "Update checks disabled. Run `~/.claude/skills/gstack/bin/gstack-config set update_check true` to re-enable."
-Continue with the current skill.
+사용자에게 전달합니다: "업데이트 확인이 비활성화되었습니다. 다시 활성화하려면 `~/.claude/skills/gstack/bin/gstack-config set update_check true`를 실행하세요."
+현재 스킬을 계속 진행합니다.
 
-### Step 2: Detect install type
+### Step 2: 설치 유형 감지
 
 ```bash
-if [ -d "$HOME/.claude/skills/gstack/.git" ]; then
+if [ -d "$HOME/.gstack/repos/gstack/.git" ]; then
+  INSTALL_TYPE="ko-fork"
+  INSTALL_DIR="$HOME/.gstack/repos/gstack"
+elif [ -d "$HOME/.claude/skills/gstack/.git" ]; then
   INSTALL_TYPE="global-git"
   INSTALL_DIR="$HOME/.claude/skills/gstack"
-elif [ -d "$HOME/.gstack/repos/gstack/.git" ]; then
-  INSTALL_TYPE="global-git"
-  INSTALL_DIR="$HOME/.gstack/repos/gstack"
 elif [ -d ".claude/skills/gstack/.git" ]; then
   INSTALL_TYPE="local-git"
   INSTALL_DIR=".claude/skills/gstack"
@@ -99,21 +99,100 @@ fi
 echo "Install type: $INSTALL_TYPE at $INSTALL_DIR"
 ```
 
-The install type and directory path printed above will be used in all subsequent steps.
+위에서 출력된 설치 유형과 디렉토리 경로는 이후 모든 단계에서 사용됩니다.
 
-### Step 3: Save old version
+### Step 3: 이전 버전 저장
 
-Use the install directory from Step 2's output below:
+아래에서 Step 2의 출력에서 얻은 설치 디렉토리를 사용합니다:
 
 ```bash
 OLD_VERSION=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
 ```
 
-### Step 4: Upgrade
+### Step 4: 업그레이드
 
-Use the install type and directory detected in Step 2:
+Step 2에서 감지된 설치 유형과 디렉토리를 사용합니다:
 
-**For git installs** (global-git, local-git):
+**한국어 fork 설치의 경우** (ko-fork) — **three-way merge 방식**:
+
+이 방식은 한글화된 커스터마이징을 보존하면서 upstream 변경 사항을 병합합니다.
+
+```bash
+cd "$INSTALL_DIR"
+
+# 1. 백업 브랜치 생성
+git branch "backup-$(date +%s)" 2>/dev/null || true
+
+# 2. upstream fetch
+git fetch upstream 2>&1
+
+# 3. base commit 확인
+BASE_SHA=$(cat .ko-base-commit 2>/dev/null || git merge-base upstream/main HEAD)
+UPSTREAM_SHA=$(git rev-parse upstream/main)
+
+if [ "$BASE_SHA" = "$UPSTREAM_SHA" ]; then
+  echo "NO_UPSTREAM_CHANGES"
+else
+  echo "UPSTREAM_CHANGES_AVAILABLE base=$BASE_SHA upstream=$UPSTREAM_SHA"
+fi
+```
+
+**`NO_UPSTREAM_CHANGES`인 경우:** "upstream에 새로운 변경 사항이 없습니다."라고 전달하고 Step 6으로 건너뜁니다.
+
+**`UPSTREAM_CHANGES_AVAILABLE`인 경우:** three-way merge를 시도합니다:
+```bash
+cd "$INSTALL_DIR"
+git merge upstream/main --no-edit 2>&1
+MERGE_STATUS=$?
+echo "MERGE_STATUS=$MERGE_STATUS"
+```
+
+**`MERGE_STATUS=0` (성공)인 경우:**
+```bash
+cd "$INSTALL_DIR"
+echo "$UPSTREAM_SHA" > .ko-base-commit
+git add .ko-base-commit && git commit -m "chore: update ko-base-commit after upstream merge" 2>/dev/null || true
+```
+
+변경된 `.tmpl` 파일 목록을 확인합니다:
+```bash
+cd "$INSTALL_DIR"
+git diff "$BASE_SHA".."$UPSTREAM_SHA" --name-only -- "*/SKILL.md.tmpl" "*.md"
+```
+
+변경된 파일이 있으면 AskUserQuestion으로 물어봅니다:
+> upstream에서 N개 파일이 변경되었습니다. 새로 추가/수정된 영어 콘텐츠를 한글로 번역할까요?
+> A) 지금 번역 (추천)
+> B) 나중에 수동으로 번역
+> C) 번역 없이 진행
+
+A를 선택하면: 변경된 각 `.tmpl` 파일을 읽고, 영어로 남아있는 새 섹션을 찾아 한글로 번역합니다. 번역 후 `bun run gen:skill-docs`를 실행합니다.
+
+**`MERGE_STATUS≠0` (충돌)인 경우:**
+충돌 파일 목록을 출력합니다:
+```bash
+cd "$INSTALL_DIR"
+git diff --name-only --diff-filter=U
+```
+
+사용자에게 전달합니다: "병합 충돌이 발생했습니다. 다음 파일에서 충돌을 해결해주세요:" 그리고 충돌 파일 목록을 표시합니다.
+
+AskUserQuestion으로 물어봅니다:
+> A) 충돌을 자동으로 해결 시도 (한글 버전 우선)
+> B) 수동으로 해결할게요 — merge를 중단하고 대기
+> C) 업그레이드 취소 — 이전 상태로 복원
+
+A를 선택하면: 각 충돌 파일에서 한글 버전(ours)을 우선하되, upstream의 새로운 섹션은 추가합니다.
+B를 선택하면: "충돌 해결 후 `cd $INSTALL_DIR && git merge --continue`를 실행한 뒤, `/gstack-upgrade`를 다시 호출하세요."
+C를 선택하면:
+```bash
+cd "$INSTALL_DIR"
+git merge --abort
+```
+
+모든 경우에 `./setup`을 실행하여 글로벌에 배포합니다.
+
+**기존 git 설치의 경우** (global-git, local-git):
 ```bash
 cd "$INSTALL_DIR"
 STASH_OUTPUT=$(git stash 2>&1)
@@ -121,9 +200,9 @@ git fetch origin
 git reset --hard origin/main
 ./setup
 ```
-If `$STASH_OUTPUT` contains "Saved working directory", warn the user: "Note: local changes were stashed. Run `git stash pop` in the skill directory to restore them."
+`$STASH_OUTPUT`에 "Saved working directory"가 포함되어 있으면, 사용자에게 경고합니다: "참고: 로컬 변경 사항이 stash되었습니다. 복원하려면 스킬 디렉토리에서 `git stash pop`을 실행하세요."
 
-**For vendored installs** (vendored, vendored-global):
+**벤더 설치의 경우** (vendored, vendored-global):
 ```bash
 PARENT=$(dirname "$INSTALL_DIR")
 TMP_DIR=$(mktemp -d)
@@ -134,9 +213,9 @@ cd "$INSTALL_DIR" && ./setup
 rm -rf "$INSTALL_DIR.bak" "$TMP_DIR"
 ```
 
-### Step 4.5: Sync local vendored copy
+### Step 4.5: 로컬 벤더 복사본 동기화
 
-Use the install directory from Step 2. Check if there's also a local vendored copy that needs updating:
+Step 2의 설치 디렉토리를 사용합니다. 업데이트가 필요한 로컬 벤더 복사본이 있는지 확인합니다:
 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -151,7 +230,7 @@ fi
 echo "LOCAL_GSTACK=$LOCAL_GSTACK"
 ```
 
-If `LOCAL_GSTACK` is non-empty, update it by copying from the freshly-upgraded primary install (same approach as README vendored install):
+`LOCAL_GSTACK`가 비어 있지 않으면, 방금 업그레이드한 기본 설치에서 복사하여 업데이트합니다 (README 벤더 설치와 동일한 방식):
 ```bash
 mv "$LOCAL_GSTACK" "$LOCAL_GSTACK.bak"
 cp -Rf "$INSTALL_DIR" "$LOCAL_GSTACK"
@@ -159,16 +238,16 @@ rm -rf "$LOCAL_GSTACK/.git"
 cd "$LOCAL_GSTACK" && ./setup
 rm -rf "$LOCAL_GSTACK.bak"
 ```
-Tell user: "Also updated vendored copy at `$LOCAL_GSTACK` — commit `.claude/skills/gstack/` when you're ready."
+사용자에게 전달합니다: "`$LOCAL_GSTACK`의 벤더 복사본도 업데이트되었습니다 — 준비되면 `.claude/skills/gstack/`을 커밋하세요."
 
-If `./setup` fails, restore from backup and warn the user:
+`./setup`이 실패하면, 백업에서 복원하고 사용자에게 경고합니다:
 ```bash
 rm -rf "$LOCAL_GSTACK"
 mv "$LOCAL_GSTACK.bak" "$LOCAL_GSTACK"
 ```
-Tell user: "Sync failed — restored previous version at `$LOCAL_GSTACK`. Run `/gstack-upgrade` manually to retry."
+사용자에게 전달합니다: "동기화 실패 — `$LOCAL_GSTACK`의 이전 버전을 복원했습니다. `/gstack-upgrade`를 수동으로 실행하여 재시도하세요."
 
-### Step 5: Write marker + clear cache
+### Step 5: 마커 기록 + 캐시 삭제
 
 ```bash
 mkdir -p ~/.gstack
@@ -177,54 +256,54 @@ rm -f ~/.gstack/last-update-check
 rm -f ~/.gstack/update-snoozed
 ```
 
-### Step 6: Show What's New
+### Step 6: 변경 사항 표시
 
-Read `$INSTALL_DIR/CHANGELOG.md`. Find all version entries between the old version and the new version. Summarize as 5-7 bullets grouped by theme. Don't overwhelm — focus on user-facing changes. Skip internal refactors unless they're significant.
+`$INSTALL_DIR/CHANGELOG.md`를 읽습니다. 이전 버전과 새 버전 사이의 모든 버전 항목을 찾습니다. 테마별로 그룹화하여 5-7개의 핵심 사항으로 요약합니다. 너무 많은 정보를 나열하지 마세요 — 사용자 대면 변경 사항에 집중합니다. 중대한 변경이 아닌 한 내부 리팩토링은 건너뜁니다.
 
-Format:
+형식:
 ```
-gstack v{new} — upgraded from v{old}!
+gstack v{new} — v{old}에서 업그레이드 완료!
 
-What's new:
-- [bullet 1]
-- [bullet 2]
+변경 사항:
+- [항목 1]
+- [항목 2]
 - ...
 
 Happy shipping!
 ```
 
-### Step 7: Continue
+### Step 7: 계속 진행
 
-After showing What's New, continue with whatever skill the user originally invoked. The upgrade is done — no further action needed.
+변경 사항을 표시한 후, 사용자가 원래 호출한 스킬을 계속 진행합니다. 업그레이드가 완료되었으므로 추가 작업은 필요하지 않습니다.
 
 ---
 
-## Standalone usage
+## 독립 실행 사용법
 
-When invoked directly as `/gstack-upgrade` (not from a preamble):
+프리앰블이 아닌 `/gstack-upgrade`로 직접 호출된 경우:
 
-1. Force a fresh update check (bypass cache):
+1. 강제로 최신 업데이트 확인을 실행합니다 (캐시 우회):
 ```bash
 ~/.claude/skills/gstack/bin/gstack-update-check --force 2>/dev/null || \
 .claude/skills/gstack/bin/gstack-update-check --force 2>/dev/null || true
 ```
-Use the output to determine if an upgrade is available.
+출력을 사용하여 업그레이드 가능 여부를 판단합니다.
 
-2. If `UPGRADE_AVAILABLE <old> <new>`: follow Steps 2-6 above.
+2. `UPGRADE_AVAILABLE <old> <new>`인 경우: 위의 Step 2-6을 따릅니다.
 
-3. If no output (primary is up to date): check for a stale local vendored copy.
+3. 출력이 없는 경우 (기본 설치가 최신인 경우): 오래된 로컬 벤더 복사본이 있는지 확인합니다.
 
-Run the Step 2 bash block above to detect the primary install type and directory (`INSTALL_TYPE` and `INSTALL_DIR`). Then run the Step 4.5 detection bash block above to check for a local vendored copy (`LOCAL_GSTACK`).
+위의 Step 2 bash 블록을 실행하여 기본 설치 유형과 디렉토리(`INSTALL_TYPE` 및 `INSTALL_DIR`)를 감지합니다. 그런 다음 위의 Step 4.5 감지 bash 블록을 실행하여 로컬 벤더 복사본(`LOCAL_GSTACK`)을 확인합니다.
 
-**If `LOCAL_GSTACK` is empty** (no local vendored copy): tell the user "You're already on the latest version (v{version})."
+**`LOCAL_GSTACK`가 비어 있는 경우** (로컬 벤더 복사본 없음): 사용자에게 "이미 최신 버전(v{version})입니다."라고 전달합니다.
 
-**If `LOCAL_GSTACK` is non-empty**, compare versions:
+**`LOCAL_GSTACK`가 비어 있지 않은 경우**, 버전을 비교합니다:
 ```bash
 PRIMARY_VER=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
 LOCAL_VER=$(cat "$LOCAL_GSTACK/VERSION" 2>/dev/null || echo "unknown")
 echo "PRIMARY=$PRIMARY_VER LOCAL=$LOCAL_VER"
 ```
 
-**If versions differ:** follow the Step 4.5 sync bash block above to update the local copy from the primary. Tell user: "Global v{PRIMARY_VER} is up to date. Updated local vendored copy from v{LOCAL_VER} → v{PRIMARY_VER}. Commit `.claude/skills/gstack/` when you're ready."
+**버전이 다른 경우:** 위의 Step 4.5 동기화 bash 블록을 따라 기본 설치에서 로컬 복사본을 업데이트합니다. 사용자에게 전달합니다: "전역 v{PRIMARY_VER}은 최신입니다. 로컬 벤더 복사본을 v{LOCAL_VER} → v{PRIMARY_VER}로 업데이트했습니다. 준비되면 `.claude/skills/gstack/`을 커밋하세요."
 
-**If versions match:** tell the user "You're on the latest version (v{PRIMARY_VER}). Global and local vendored copy are both up to date."
+**버전이 같은 경우:** 사용자에게 "최신 버전(v{PRIMARY_VER})입니다. 전역 및 로컬 벤더 복사본 모두 최신 상태입니다."라고 전달합니다.

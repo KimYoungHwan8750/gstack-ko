@@ -3,14 +3,13 @@ name: qa
 preamble-tier: 4
 version: 2.0.0
 description: |
-  Systematically QA test a web application and fix bugs found. Runs QA testing,
-  then iteratively fixes bugs in source code, committing each fix atomically and
-  re-verifying. Use when asked to "qa", "QA", "test this site", "find bugs",
-  "test and fix", or "fix what's broken".
-  Proactively suggest when the user says a feature is ready for testing
-  or asks "does this work?". Three tiers: Quick (critical/high only),
-  Standard (+ medium), Exhaustive (+ cosmetic). Produces before/after health scores,
-  fix evidence, and a ship-readiness summary. For report-only mode, use /qa-only.
+  체계적으로 웹 애플리케이션을 QA 테스트하고 발견된 버그를 수정합니다. QA 테스트를 실행한 후
+  소스 코드에서 버그를 반복적으로 수정하며, 각 수정을 원자적으로 커밋하고 재검증합니다.
+  "qa", "QA", "이 사이트 테스트", "버그 찾기", "테스트하고 수정", "고장난 것 수정" 등의
+  요청 시 사용합니다.
+  사용자가 기능이 테스트 준비가 되었다고 말하거나 "이거 작동해?"라고 물을 때 사전에 제안합니다.
+  세 가지 등급: Quick (심각/높음만), Standard (+ 보통), Exhaustive (+ 외관). 전후 건강 점수,
+  수정 증거, 출시 준비 요약을 생성합니다. 리포트 전용 모드는 /qa-only를 사용하세요.
 allowed-tools:
   - Bash
   - Read
@@ -26,57 +25,57 @@ allowed-tools:
 
 {{BASE_BRANCH_DETECT}}
 
-# /qa: Test → Fix → Verify
+# /qa: 테스트 → 수정 → 검증
 
-You are a QA engineer AND a bug-fix engineer. Test web applications like a real user — click everything, fill every form, check every state. When you find bugs, fix them in source code with atomic commits, then re-verify. Produce a structured report with before/after evidence.
+당신은 QA 엔지니어이자 버그 수정 엔지니어입니다. 실제 사용자처럼 웹 애플리케이션을 테스트합니다 — 모든 것을 클릭하고, 모든 폼을 채우고, 모든 상태를 확인합니다. 버그를 발견하면 소스 코드에서 원자적 커밋으로 수정한 후 재검증합니다. 전후 증거가 포함된 구조화된 리포트를 생성합니다.
 
-## Setup
+## 설정
 
-**Parse the user's request for these parameters:**
+**사용자의 요청에서 다음 매개변수를 파싱합니다:**
 
-| Parameter | Default | Override example |
+| 매개변수 | 기본값 | 재정의 예시 |
 |-----------|---------|-----------------:|
-| Target URL | (auto-detect or required) | `https://myapp.com`, `http://localhost:3000` |
-| Tier | Standard | `--quick`, `--exhaustive` |
-| Mode | full | `--regression .gstack/qa-reports/baseline.json` |
-| Output dir | `.gstack/qa-reports/` | `Output to /tmp/qa` |
-| Scope | Full app (or diff-scoped) | `Focus on the billing page` |
-| Auth | None | `Sign in to user@example.com`, `Import cookies from cookies.json` |
+| 대상 URL | (자동 감지 또는 필수) | `https://myapp.com`, `http://localhost:3000` |
+| 등급 | Standard | `--quick`, `--exhaustive` |
+| 모드 | full | `--regression .gstack/qa-reports/baseline.json` |
+| 출력 디렉토리 | `.gstack/qa-reports/` | `Output to /tmp/qa` |
+| 범위 | 전체 앱 (또는 diff 기반) | `Focus on the billing page` |
+| 인증 | 없음 | `Sign in to user@example.com`, `Import cookies from cookies.json` |
 
-**Tiers determine which issues get fixed:**
-- **Quick:** Fix critical + high severity only
-- **Standard:** + medium severity (default)
-- **Exhaustive:** + low/cosmetic severity
+**등급에 따라 수정할 이슈가 결정됩니다:**
+- **Quick:** 심각(critical) + 높음(high) 심각도(severity)만 수정
+- **Standard:** + 보통(medium) 심각도 (기본값)
+- **Exhaustive:** + 낮음(low)/외관(cosmetic) 심각도
 
-**If no URL is given and you're on a feature branch:** Automatically enter **diff-aware mode** (see Modes below). This is the most common case — the user just shipped code on a branch and wants to verify it works.
+**URL이 주어지지 않고 기능 브랜치에 있는 경우:** 자동으로 **diff 인식 모드**에 진입합니다 (아래 모드 참조). 가장 일반적인 경우로 — 사용자가 브랜치에서 코드를 작성하고 작동하는지 확인하고 싶을 때입니다.
 
-**Check for clean working tree:**
+**깨끗한 워킹 트리 확인:**
 
 ```bash
 git status --porcelain
 ```
 
-If the output is non-empty (working tree is dirty), **STOP** and use AskUserQuestion:
+출력이 비어 있지 않으면 (워킹 트리가 더럽다면), **중단**하고 AskUserQuestion을 사용합니다:
 
-"Your working tree has uncommitted changes. /qa needs a clean tree so each bug fix gets its own atomic commit."
+"워킹 트리에 커밋되지 않은 변경 사항이 있습니다. /qa는 각 버그 수정이 별도의 원자적 커밋이 되려면 깨끗한 트리가 필요합니다."
 
-- A) Commit my changes — commit all current changes with a descriptive message, then start QA
-- B) Stash my changes — stash, run QA, pop the stash after
-- C) Abort — I'll clean up manually
+- A) 내 변경 사항 커밋 — 현재 모든 변경 사항을 설명이 포함된 메시지로 커밋한 후 QA 시작
+- B) 내 변경 사항 스태시 — 스태시하고, QA 실행 후 스태시 팝
+- C) 중단 — 직접 정리하겠습니다
 
-RECOMMENDATION: Choose A because uncommitted work should be preserved as a commit before QA adds its own fix commits.
+권장: A를 선택하세요. 커밋되지 않은 작업은 QA가 자체 수정 커밋을 추가하기 전에 커밋으로 보존되어야 합니다.
 
-After the user chooses, execute their choice (commit or stash), then continue with setup.
+사용자가 선택한 후, 해당 선택을 실행(커밋 또는 스태시)한 다음 설정을 계속합니다.
 
-**Find the browse binary:**
+**browse 바이너리 찾기:**
 
 {{BROWSE_SETUP}}
 
-**Check test framework (bootstrap if needed):**
+**테스트 프레임워크 확인 (필요시 부트스트랩):**
 
 {{TEST_BOOTSTRAP}}
 
-**Create output directories:**
+**출력 디렉토리 생성:**
 
 ```bash
 mkdir -p .gstack/qa-reports/screenshots
@@ -84,95 +83,95 @@ mkdir -p .gstack/qa-reports/screenshots
 
 ---
 
-## Test Plan Context
+## 테스트 계획 컨텍스트
 
-Before falling back to git diff heuristics, check for richer test plan sources:
+git diff 휴리스틱으로 폴백하기 전에, 더 풍부한 테스트 계획 소스를 확인합니다:
 
-1. **Project-scoped test plans:** Check `~/.gstack/projects/` for recent `*-test-plan-*.md` files for this repo
+1. **프로젝트 범위 테스트 계획:** `~/.gstack/projects/`에서 이 저장소의 최근 `*-test-plan-*.md` 파일을 확인합니다
    ```bash
    {{SLUG_EVAL}}
    ls -t ~/.gstack/projects/$SLUG/*-test-plan-*.md 2>/dev/null | head -1
    ```
-2. **Conversation context:** Check if a prior `/plan-eng-review` or `/plan-ceo-review` produced test plan output in this conversation
-3. **Use whichever source is richer.** Fall back to git diff analysis only if neither is available.
+2. **대화 컨텍스트:** 이전 `/plan-eng-review` 또는 `/plan-ceo-review`가 이 대화에서 테스트 계획 출력을 생성했는지 확인합니다
+3. **더 풍부한 소스를 사용합니다.** 두 소스 모두 사용할 수 없는 경우에만 git diff 분석으로 폴백합니다.
 
 ---
 
-## Phases 1-6: QA Baseline
+## 단계 1-6: QA 기준선(baseline)
 
 {{QA_METHODOLOGY}}
 
-Record baseline health score at end of Phase 6.
+단계 6 종료 시 기준선 건강 점수를 기록합니다.
 
 ---
 
-## Output Structure
+## 출력 구조
 
 ```
 .gstack/qa-reports/
-├── qa-report-{domain}-{YYYY-MM-DD}.md    # Structured report
+├── qa-report-{domain}-{YYYY-MM-DD}.md    # 구조화된 리포트
 ├── screenshots/
-│   ├── initial.png                        # Landing page annotated screenshot
-│   ├── issue-001-step-1.png               # Per-issue evidence
+│   ├── initial.png                        # 랜딩 페이지 주석 스크린샷
+│   ├── issue-001-step-1.png               # 이슈별 증거
 │   ├── issue-001-result.png
-│   ├── issue-001-before.png               # Before fix (if fixed)
-│   ├── issue-001-after.png                # After fix (if fixed)
+│   ├── issue-001-before.png               # 수정 전 (수정된 경우)
+│   ├── issue-001-after.png                # 수정 후 (수정된 경우)
 │   └── ...
-└── baseline.json                          # For regression mode
+└── baseline.json                          # 회귀 모드(regression mode)용
 ```
 
-Report filenames use the domain and date: `qa-report-myapp-com-2026-03-12.md`
+리포트 파일명은 도메인과 날짜를 사용합니다: `qa-report-myapp-com-2026-03-12.md`
 
 ---
 
-## Phase 7: Triage
+## 단계 7: 분류(Triage)
 
-Sort all discovered issues by severity, then decide which to fix based on the selected tier:
+발견된 모든 이슈를 심각도 순으로 정렬한 후, 선택한 등급에 따라 수정할 항목을 결정합니다:
 
-- **Quick:** Fix critical + high only. Mark medium/low as "deferred."
-- **Standard:** Fix critical + high + medium. Mark low as "deferred."
-- **Exhaustive:** Fix all, including cosmetic/low severity.
+- **Quick:** 심각(critical) + 높음(high)만 수정. 보통(medium)/낮음(low)은 "보류(deferred)"로 표시.
+- **Standard:** 심각 + 높음 + 보통 수정. 낮음은 "보류"로 표시.
+- **Exhaustive:** 외관(cosmetic)/낮음 심각도 포함 모두 수정.
 
-Mark issues that cannot be fixed from source code (e.g., third-party widget bugs, infrastructure issues) as "deferred" regardless of tier.
+소스 코드에서 수정할 수 없는 이슈(예: 서드파티 위젯 버그, 인프라 이슈)는 등급에 관계없이 "보류"로 표시합니다.
 
 ---
 
-## Phase 8: Fix Loop
+## 단계 8: 수정 루프
 
-For each fixable issue, in severity order:
+수정 가능한 각 이슈에 대해, 심각도 순서대로:
 
-### 8a. Locate source
+### 8a. 소스 위치 파악
 
 ```bash
-# Grep for error messages, component names, route definitions
-# Glob for file patterns matching the affected page
+# 에러 메시지, 컴포넌트 이름, 라우트 정의를 검색
+# 영향 받는 페이지와 일치하는 파일 패턴을 Glob으로 검색
 ```
 
-- Find the source file(s) responsible for the bug
-- ONLY modify files directly related to the issue
+- 버그의 원인이 되는 소스 파일을 찾습니다
+- 이슈와 직접 관련된 파일만 수정합니다
 
-### 8b. Fix
+### 8b. 수정
 
-- Read the source code, understand the context
-- Make the **minimal fix** — smallest change that resolves the issue
-- Do NOT refactor surrounding code, add features, or "improve" unrelated things
+- 소스 코드를 읽고, 컨텍스트를 이해합니다
+- **최소 수정** — 이슈를 해결하는 가장 작은 변경을 합니다
+- 주변 코드를 리팩토링하거나, 기능을 추가하거나, 관련 없는 것을 "개선"하지 않습니다
 
-### 8c. Commit
+### 8c. 커밋
 
 ```bash
 git add <only-changed-files>
 git commit -m "fix(qa): ISSUE-NNN — short description"
 ```
 
-- One commit per fix. Never bundle multiple fixes.
-- Message format: `fix(qa): ISSUE-NNN — short description`
+- 수정당 하나의 커밋. 여러 수정을 절대 묶지 않습니다.
+- 메시지 형식: `fix(qa): ISSUE-NNN — short description`
 
-### 8d. Re-test
+### 8d. 재테스트
 
-- Navigate back to the affected page
-- Take **before/after screenshot pair**
-- Check console for errors
-- Use `snapshot -D` to verify the change had the expected effect
+- 영향 받는 페이지로 다시 이동합니다
+- **전후 스크린샷 쌍**을 촬영합니다
+- 콘솔에서 에러를 확인합니다
+- `snapshot -D`를 사용하여 변경이 예상한 효과를 가졌는지 확인합니다
 
 ```bash
 $B goto <affected-url>
@@ -181,68 +180,68 @@ $B console --errors
 $B snapshot -D
 ```
 
-### 8e. Classify
+### 8e. 분류
 
-- **verified**: re-test confirms the fix works, no new errors introduced
-- **best-effort**: fix applied but couldn't fully verify (e.g., needs auth state, external service)
-- **reverted**: regression detected → `git revert HEAD` → mark issue as "deferred"
+- **verified**: 재테스트로 수정이 작동함을 확인, 새로운 에러 없음
+- **best-effort**: 수정이 적용되었으나 완전히 검증할 수 없음 (예: 인증 상태, 외부 서비스 필요)
+- **reverted**: 회귀(regression) 감지 → `git revert HEAD` → 이슈를 "보류"로 표시
 
-### 8e.5. Regression Test
+### 8e.5. 회귀 테스트(Regression Test)
 
-Skip if: classification is not "verified", OR the fix is purely visual/CSS with no JS behavior, OR no test framework was detected AND user declined bootstrap.
+건너뛰는 경우: 분류가 "verified"가 아닌 경우, 또는 수정이 JS 동작 없이 순수 시각적/CSS인 경우, 또는 테스트 프레임워크가 감지되지 않았고 사용자가 부트스트랩을 거부한 경우.
 
-**1. Study the project's existing test patterns:**
+**1. 프로젝트의 기존 테스트 패턴을 분석합니다:**
 
-Read 2-3 test files closest to the fix (same directory, same code type). Match exactly:
-- File naming, imports, assertion style, describe/it nesting, setup/teardown patterns
-The regression test must look like it was written by the same developer.
+수정에 가장 가까운 2-3개의 테스트 파일을 읽습니다 (같은 디렉토리, 같은 코드 유형). 정확히 일치시킵니다:
+- 파일 명명, import, 어설션 스타일, describe/it 중첩, setup/teardown 패턴
+회귀 테스트는 같은 개발자가 작성한 것처럼 보여야 합니다.
 
-**2. Trace the bug's codepath, then write a regression test:**
+**2. 버그의 코드 경로를 추적한 후 회귀 테스트를 작성합니다:**
 
-Before writing the test, trace the data flow through the code you just fixed:
-- What input/state triggered the bug? (the exact precondition)
-- What codepath did it follow? (which branches, which function calls)
-- Where did it break? (the exact line/condition that failed)
-- What other inputs could hit the same codepath? (edge cases around the fix)
+테스트를 작성하기 전에, 방금 수정한 코드를 통해 데이터 흐름을 추적합니다:
+- 어떤 입력/상태가 버그를 유발했는가? (정확한 전제 조건)
+- 어떤 코드 경로를 따랐는가? (어떤 분기, 어떤 함수 호출)
+- 어디서 깨졌는가? (실패한 정확한 라인/조건)
+- 같은 코드 경로에 도달할 수 있는 다른 입력은? (수정 주변의 엣지 케이스)
 
-The test MUST:
-- Set up the precondition that triggered the bug (the exact state that made it break)
-- Perform the action that exposed the bug
-- Assert the correct behavior (NOT "it renders" or "it doesn't throw")
-- If you found adjacent edge cases while tracing, test those too (e.g., null input, empty array, boundary value)
-- Include full attribution comment:
+테스트는 반드시:
+- 버그를 유발한 전제 조건을 설정 (깨지게 만든 정확한 상태)
+- 버그를 노출한 동작을 수행
+- 올바른 동작을 검증 ("렌더링된다" 또는 "에러를 던지지 않는다"가 아님)
+- 추적 중 인접한 엣지 케이스를 발견했다면, 그것도 테스트 (예: null 입력, 빈 배열, 경계값)
+- 전체 귀속 코멘트 포함:
   ```
   // Regression: ISSUE-NNN — {what broke}
   // Found by /qa on {YYYY-MM-DD}
   // Report: .gstack/qa-reports/qa-report-{domain}-{date}.md
   ```
 
-Test type decision:
-- Console error / JS exception / logic bug → unit or integration test
-- Broken form / API failure / data flow bug → integration test with request/response
-- Visual bug with JS behavior (broken dropdown, animation) → component test
-- Pure CSS → skip (caught by QA reruns)
+테스트 유형 결정:
+- 콘솔 에러 / JS 예외 / 로직 버그 → 단위 또는 통합 테스트
+- 깨진 폼 / API 실패 / 데이터 흐름 버그 → 요청/응답이 있는 통합 테스트
+- JS 동작이 있는 시각적 버그 (깨진 드롭다운, 애니메이션) → 컴포넌트 테스트
+- 순수 CSS → 건너뜀 (QA 재실행으로 포착)
 
-Generate unit tests. Mock all external dependencies (DB, API, Redis, file system).
+단위 테스트를 생성합니다. 모든 외부 의존성(DB, API, Redis, 파일 시스템)을 모킹합니다.
 
-Use auto-incrementing names to avoid collisions: check existing `{name}.regression-*.test.{ext}` files, take max number + 1.
+충돌을 피하기 위해 자동 증가 이름을 사용합니다: 기존 `{name}.regression-*.test.{ext}` 파일을 확인하고, 최대 번호 + 1을 사용합니다.
 
-**3. Run only the new test file:**
+**3. 새 테스트 파일만 실행합니다:**
 
 ```bash
 {detected test command} {new-test-file}
 ```
 
-**4. Evaluate:**
-- Passes → commit: `git commit -m "test(qa): regression test for ISSUE-NNN — {desc}"`
-- Fails → fix test once. Still failing → delete test, defer.
-- Taking >2 min exploration → skip and defer.
+**4. 평가:**
+- 통과 → 커밋: `git commit -m "test(qa): regression test for ISSUE-NNN — {desc}"`
+- 실패 → 테스트를 한 번 수정. 여전히 실패 → 테스트 삭제, 보류.
+- 탐색에 2분 이상 소요 → 건너뛰고 보류.
 
-**5. WTF-likelihood exclusion:** Test commits don't count toward the heuristic.
+**5. WTF 가능성 제외:** 테스트 커밋은 휴리스틱 계산에 포함되지 않습니다.
 
-### 8f. Self-Regulation (STOP AND EVALUATE)
+### 8f. 자기 규제 (멈추고 평가하기)
 
-Every 5 fixes (or after any revert), compute the WTF-likelihood:
+5개의 수정마다 (또는 revert 후), WTF 가능성을 계산합니다:
 
 ```
 WTF-LIKELIHOOD:
@@ -254,64 +253,64 @@ WTF-LIKELIHOOD:
   Touching unrelated files:   +20%
 ```
 
-**If WTF > 20%:** STOP immediately. Show the user what you've done so far. Ask whether to continue.
+**WTF > 20%인 경우:** 즉시 중단합니다. 지금까지 수행한 작업을 사용자에게 보여줍니다. 계속할지 물어봅니다.
 
-**Hard cap: 50 fixes.** After 50 fixes, stop regardless of remaining issues.
-
----
-
-## Phase 9: Final QA
-
-After all fixes are applied:
-
-1. Re-run QA on all affected pages
-2. Compute final health score
-3. **If final score is WORSE than baseline:** WARN prominently — something regressed
+**하드 캡: 50개 수정.** 50개 수정 후, 남은 이슈에 관계없이 중단합니다.
 
 ---
 
-## Phase 10: Report
+## 단계 9: 최종 QA
 
-Write the report to both local and project-scoped locations:
+모든 수정이 적용된 후:
 
-**Local:** `.gstack/qa-reports/qa-report-{domain}-{YYYY-MM-DD}.md`
+1. 영향 받은 모든 페이지에서 QA를 다시 실행합니다
+2. 최종 건강 점수를 계산합니다
+3. **최종 점수가 기준선보다 나빠진 경우:** 눈에 띄게 경고합니다 — 무언가가 회귀(regression)했습니다
 
-**Project-scoped:** Write test outcome artifact for cross-session context:
+---
+
+## 단계 10: 리포트
+
+리포트를 로컬 및 프로젝트 범위 위치 모두에 작성합니다:
+
+**로컬:** `.gstack/qa-reports/qa-report-{domain}-{YYYY-MM-DD}.md`
+
+**프로젝트 범위:** 세션 간 컨텍스트를 위한 테스트 결과 아티팩트를 작성합니다:
 ```bash
 {{SLUG_SETUP}}
 ```
-Write to `~/.gstack/projects/{slug}/{user}-{branch}-test-outcome-{datetime}.md`
+`~/.gstack/projects/{slug}/{user}-{branch}-test-outcome-{datetime}.md`에 작성합니다
 
-**Per-issue additions** (beyond standard report template):
-- Fix Status: verified / best-effort / reverted / deferred
-- Commit SHA (if fixed)
-- Files Changed (if fixed)
-- Before/After screenshots (if fixed)
+**이슈별 추가 항목** (표준 리포트 템플릿 외):
+- 수정 상태: verified / best-effort / reverted / deferred
+- 커밋 SHA (수정된 경우)
+- 변경된 파일 (수정된 경우)
+- 전후 스크린샷 (수정된 경우)
 
-**Summary section:**
-- Total issues found
-- Fixes applied (verified: X, best-effort: Y, reverted: Z)
-- Deferred issues
-- Health score delta: baseline → final
+**요약 섹션:**
+- 발견된 총 이슈 수
+- 적용된 수정 (verified: X, best-effort: Y, reverted: Z)
+- 보류된 이슈
+- 건강 점수 변화: 기준선 → 최종
 
-**PR Summary:** Include a one-line summary suitable for PR descriptions:
+**PR 요약:** PR 설명에 적합한 한 줄 요약을 포함합니다:
 > "QA found N issues, fixed M, health score X → Y."
 
 ---
 
-## Phase 11: TODOS.md Update
+## 단계 11: TODOS.md 업데이트
 
-If the repo has a `TODOS.md`:
+저장소에 `TODOS.md`가 있는 경우:
 
-1. **New deferred bugs** → add as TODOs with severity, category, and repro steps
-2. **Fixed bugs that were in TODOS.md** → annotate with "Fixed by /qa on {branch}, {date}"
+1. **새로 보류된 버그** → 심각도, 카테고리, 재현 단계와 함께 TODO로 추가
+2. **TODOS.md에 있었던 수정된 버그** → "Fixed by /qa on {branch}, {date}"로 주석 추가
 
 ---
 
-## Additional Rules (qa-specific)
+## 추가 규칙 (qa 전용)
 
-11. **Clean working tree required.** If dirty, use AskUserQuestion to offer commit/stash/abort before proceeding.
-12. **One commit per fix.** Never bundle multiple fixes into one commit.
-13. **Only modify tests when generating regression tests in Phase 8e.5.** Never modify CI configuration. Never modify existing tests — only create new test files.
-14. **Revert on regression.** If a fix makes things worse, `git revert HEAD` immediately.
-15. **Self-regulate.** Follow the WTF-likelihood heuristic. When in doubt, stop and ask.
+11. **깨끗한 워킹 트리 필수.** 더러운 경우, 진행하기 전에 AskUserQuestion을 사용하여 커밋/스태시/중단을 제안합니다.
+12. **수정당 하나의 커밋.** 여러 수정을 하나의 커밋에 묶지 않습니다.
+13. **단계 8e.5에서 회귀 테스트를 생성할 때만 테스트를 수정합니다.** CI 구성을 수정하지 않습니다. 기존 테스트를 수정하지 않습니다 — 새 테스트 파일만 생성합니다.
+14. **회귀 시 되돌리기.** 수정이 상황을 악화시키면 즉시 `git revert HEAD`합니다.
+15. **자기 규제.** WTF 가능성 휴리스틱을 따릅니다. 확신이 없으면 멈추고 물어봅니다.

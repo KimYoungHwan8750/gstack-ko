@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-design-review"
-  short_description: "Designer's eye QA: finds visual inconsistency, spacing issues, hierarchy problems, AI slop patterns, and slow..."
+  short_description: "디자이너의 눈으로 QA: 시각적 불일치, 간격 문제, 계층 구조 문제, AI 저급 결과물(AI slop) 패턴, 느린 인터랙션을 찾아낸 후 수정합니다. 소스 코드에서 이슈를 반복적으로 수정하며, 각 수정을..."
   default_prompt: "Use gstack-design-review for this task."
 policy:
   allow_implicit_invocation: true

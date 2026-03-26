@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-unfreeze"
-  short_description: "Clear the freeze boundary set by /freeze, allowing edits to all directories again. Use when you want to widen edit..."
+  short_description: "/freeze로 설정된 freeze 경계를 해제하여, 모든 디렉토리에 대한 편집을 다시 허용합니다. 세션을 종료하지 않고 편집 범위를 넓히고 싶을 때 사용하세요. \"unfreeze\", \"unlock..."
   default_prompt: "Use gstack-unfreeze for this task."
 policy:
   allow_implicit_invocation: true

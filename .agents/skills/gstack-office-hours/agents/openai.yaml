@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-office-hours"
-  short_description: "YC Office Hours — two modes. Startup mode: six forcing questions that expose demand reality, status quo, desperate..."
+  short_description: "YC 오피스 아워 — 두 가지 모드. 스타트업 모드: 수요 현실(Demand Reality), 현상 유지(Status Quo), 절박한 구체성(Desperate Specificity), 최소..."
   default_prompt: "Use gstack-office-hours for this task."
 policy:
   allow_implicit_invocation: true

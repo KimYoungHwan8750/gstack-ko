@@ -1,203 +1,203 @@
-# Pre-Landing Review Checklist
+# 랜딩 전 리뷰 체크리스트
 
-## Instructions
+## 안내
 
-Review the `git diff origin/main` output for the issues listed below. Be specific — cite `file:line` and suggest fixes. Skip anything that's fine. Only flag real problems.
+`git diff origin/main` 출력을 아래 나열된 항목에 대해 리뷰합니다. 구체적으로 — `file:line`을 인용하고 수정 방안을 제안하세요. 문제없는 항목은 건너뛰세요. 실제 문제만 지적하세요.
 
-**Two-pass review:**
-- **Pass 1 (CRITICAL):** Run SQL & Data Safety and LLM Output Trust Boundary first. Highest severity.
-- **Pass 2 (INFORMATIONAL):** Run all remaining categories. Lower severity but still actioned.
+**2단계 리뷰:**
+- **1단계 (치명적):** SQL 및 데이터 안전성과 LLM 출력 신뢰 경계를 먼저 수행합니다. 가장 높은 심각도입니다.
+- **2단계 (참고):** 나머지 모든 카테고리를 수행합니다. 심각도는 낮지만 여전히 조치 대상입니다.
 
-All findings get action via Fix-First Review: obvious mechanical fixes are applied automatically,
-genuinely ambiguous issues are batched into a single user question.
+모든 발견 사항은 선조치 리뷰(Fix-First Review)를 통해 처리됩니다: 명백한 기계적 수정은 자동 적용되고,
+진정으로 모호한 문제는 하나의 사용자 질문으로 묶어 처리합니다.
 
-**Output format:**
+**출력 형식:**
 
 ```
 Pre-Landing Review: N issues (X critical, Y informational)
 
 **AUTO-FIXED:**
-- [file:line] Problem → fix applied
+- [file:line] 문제 → 적용된 수정
 
 **NEEDS INPUT:**
-- [file:line] Problem description
-  Recommended fix: suggested fix
+- [file:line] 문제 설명
+  Recommended fix: 제안된 수정
 ```
 
-If no issues found: `Pre-Landing Review: No issues found.`
+문제가 없으면: `Pre-Landing Review: No issues found.`
 
-Be terse. For each issue: one line describing the problem, one line with the fix. No preamble, no summaries, no "looks good overall."
+간결하게 작성하세요. 각 이슈마다: 문제 설명 한 줄, 수정 방안 한 줄. 서문, 요약, "전반적으로 괜찮아 보입니다" 같은 문구 없이.
 
 ---
 
-## Review Categories
+## 리뷰 카테고리
 
-### Pass 1 — CRITICAL
+### 1단계 — 치명적(CRITICAL)
 
-#### SQL & Data Safety
-- String interpolation in SQL (even if values are `.to_i`/`.to_f` — use parameterized queries (Rails: sanitize_sql_array/Arel; Node: prepared statements; Python: parameterized queries))
-- TOCTOU races: check-then-set patterns that should be atomic `WHERE` + `update_all`
-- Bypassing model validations for direct DB writes (Rails: update_column; Django: QuerySet.update(); Prisma: raw queries)
-- N+1 queries: Missing eager loading (Rails: .includes(); SQLAlchemy: joinedload(); Prisma: include) for associations used in loops/views
+#### SQL 및 데이터 안전성
+- SQL에서의 문자열 보간(interpolation) (값이 `.to_i`/`.to_f`인 경우에도 — 매개변수화된 쿼리 사용 (Rails: sanitize_sql_array/Arel; Node: prepared statements; Python: parameterized queries))
+- TOCTOU 경쟁 조건(race): 원자적(atomic) `WHERE` + `update_all`이어야 할 확인 후 설정 패턴
+- 모델 유효성 검증을 우회하는 직접 DB 쓰기 (Rails: update_column; Django: QuerySet.update(); Prisma: raw queries)
+- N+1 쿼리: 루프/뷰에서 사용되는 연관관계에 대한 즉시 로딩(eager loading) 누락 (Rails: .includes(); SQLAlchemy: joinedload(); Prisma: include)
 
-#### Race Conditions & Concurrency
-- Read-check-write without uniqueness constraint or catch duplicate key error and retry (e.g., `where(hash:).first` then `save!` without handling concurrent insert)
-- find-or-create without unique DB index — concurrent calls can create duplicates
-- Status transitions that don't use atomic `WHERE old_status = ? UPDATE SET new_status` — concurrent updates can skip or double-apply transitions
-- Unsafe HTML rendering (Rails: .html_safe/raw(); React: dangerouslySetInnerHTML; Vue: v-html; Django: |safe/mark_safe) on user-controlled data (XSS)
+#### 경쟁 조건(Race Conditions) 및 동시성
+- 유일성 제약 조건(uniqueness constraint) 없이 또는 중복 키 오류 캐치 및 재시도 없이 읽기-확인-쓰기 (예: 동시 삽입 처리 없이 `where(hash:).first` 후 `save!`)
+- 고유 DB 인덱스 없는 find-or-create — 동시 호출 시 중복 생성 가능
+- 원자적 `WHERE old_status = ? UPDATE SET new_status`를 사용하지 않는 상태 전환 — 동시 업데이트가 전환을 건너뛰거나 이중 적용할 수 있음
+- 사용자 제어 데이터에 대한 안전하지 않은 HTML 렌더링 (Rails: .html_safe/raw(); React: dangerouslySetInnerHTML; Vue: v-html; Django: |safe/mark_safe) (XSS)
 
-#### LLM Output Trust Boundary
-- LLM-generated values (emails, URLs, names) written to DB or passed to mailers without format validation. Add lightweight guards (`EMAIL_REGEXP`, `URI.parse`, `.strip`) before persisting.
-- Structured tool output (arrays, hashes) accepted without type/shape checks before database writes.
+#### LLM 출력 신뢰 경계(Trust Boundary)
+- LLM이 생성한 값(이메일, URL, 이름)이 형식 검증 없이 DB에 쓰이거나 메일러에 전달됨. 저장 전에 경량 가드(`EMAIL_REGEXP`, `URI.parse`, `.strip`) 추가 필요.
+- 구조화된 도구 출력(배열, 해시)이 데이터베이스 쓰기 전 타입/형태 검사 없이 수용됨.
 
-#### Enum & Value Completeness
-When the diff introduces a new enum value, status string, tier name, or type constant:
-- **Trace it through every consumer.** Read (don't just grep — READ) each file that switches on, filters by, or displays that value. If any consumer doesn't handle the new value, flag it. Common miss: adding a value to the frontend dropdown but the backend model/compute method doesn't persist it.
-- **Check allowlists/filter arrays.** Search for arrays or `%w[]` lists containing sibling values (e.g., if adding "revise" to tiers, find every `%w[quick lfg mega]` and verify "revise" is included where needed).
-- **Check `case`/`if-elsif` chains.** If existing code branches on the enum, does the new value fall through to a wrong default?
-To do this: use Grep to find all references to the sibling values (e.g., grep for "lfg" or "mega" to find all tier consumers). Read each match. This step requires reading code OUTSIDE the diff.
+#### 열거형(Enum) 및 값 완전성
+열거형 값, 상태 문자열, 티어 이름 또는 타입 상수가 diff에 새로 추가될 때:
+- **모든 소비자를 추적하세요.** 해당 값을 switch하거나, 필터링하거나, 표시하는 각 파일을 읽으세요(grep만 하지 말고 — 읽으세요). 소비자 중 새 값을 처리하지 않는 곳이 있으면 지적하세요. 흔한 누락: 프론트엔드 드롭다운에 값을 추가했지만 백엔드 모델/계산 메서드가 이를 저장하지 않는 경우.
+- **허용 목록/필터 배열을 확인하세요.** 형제 값을 포함하는 배열이나 `%w[]` 목록을 검색하세요 (예: 티어에 "revise"를 추가하는 경우, 모든 `%w[quick lfg mega]`를 찾아 필요한 곳에 "revise"가 포함되었는지 확인).
+- **`case`/`if-elsif` 체인을 확인하세요.** 기존 코드가 열거형에 따라 분기하는 경우, 새 값이 잘못된 기본값으로 빠지지 않는지 확인하세요.
+이를 위해: Grep을 사용하여 형제 값의 모든 참조를 찾으세요 (예: "lfg" 또는 "mega"를 grep하여 모든 티어 소비자를 찾기). 각 매치를 읽으세요. 이 단계는 diff 외부의 코드를 읽어야 합니다.
 
-### Pass 2 — INFORMATIONAL
+### 2단계 — 참고(INFORMATIONAL)
 
-#### Conditional Side Effects
-- Code paths that branch on a condition but forget to apply a side effect on one branch. Example: item promoted to verified but URL only attached when a secondary condition is true — the other branch promotes without the URL, creating an inconsistent record.
-- Log messages that claim an action happened but the action was conditionally skipped. The log should reflect what actually occurred.
+#### 조건부 부수 효과(Side Effects)
+- 조건에 따라 분기하지만 한 분기에서 부수 효과 적용을 잊은 코드 경로. 예: 항목이 verified로 승격되었지만 URL은 보조 조건이 참일 때만 첨부됨 — 다른 분기는 URL 없이 승격하여 불일치 레코드 생성.
+- 동작이 수행되었다고 주장하지만 실제로는 조건부로 건너뛴 로그 메시지. 로그는 실제 발생한 내용을 반영해야 합니다.
 
-#### Magic Numbers & String Coupling
-- Bare numeric literals used in multiple files — should be named constants documented together
-- Error message strings used as query filters elsewhere (grep for the string — is anything matching on it?)
+#### 매직 넘버(Magic Numbers) 및 문자열 결합(String Coupling)
+- 여러 파일에서 사용되는 단순 숫자 리터럴 — 함께 문서화된 명명된 상수여야 함
+- 다른 곳에서 쿼리 필터로 사용되는 오류 메시지 문자열 (문자열을 grep하세요 — 이를 매칭하는 코드가 있나요?)
 
-#### Dead Code & Consistency
-- Variables assigned but never read
-- Version mismatch between PR title and VERSION/CHANGELOG files
-- CHANGELOG entries that describe changes inaccurately (e.g., "changed from X to Y" when X never existed)
-- Comments/docstrings that describe old behavior after the code changed
+#### 죽은 코드(Dead Code) 및 일관성
+- 할당되었지만 읽히지 않는 변수
+- PR 제목과 VERSION/CHANGELOG 파일 간 버전 불일치
+- 변경사항을 부정확하게 설명하는 CHANGELOG 항목 (예: X가 존재한 적 없는데 "X에서 Y로 변경")
+- 코드 변경 후 이전 동작을 설명하는 주석/문서 문자열
 
-#### LLM Prompt Issues
-- 0-indexed lists in prompts (LLMs reliably return 1-indexed)
-- Prompt text listing available tools/capabilities that don't match what's actually wired up in the `tool_classes`/`tools` array
-- Word/token limits stated in multiple places that could drift
+#### LLM 프롬프트 문제
+- 프롬프트의 0-인덱스 목록 (LLM은 1-인덱스를 안정적으로 반환)
+- `tool_classes`/`tools` 배열에 실제로 연결된 것과 일치하지 않는 가용 도구/기능을 나열하는 프롬프트 텍스트
+- 여러 곳에 명시된 단어/토큰 제한이 서로 다를 수 있음
 
-#### Test Gaps
-- Negative-path tests that assert type/status but not the side effects (URL attached? field populated? callback fired?)
-- Assertions on string content without checking format (e.g., asserting title present but not URL format)
-- `.expects(:something).never` missing when a code path should explicitly NOT call an external service
-- Security enforcement features (blocking, rate limiting, auth) without integration tests verifying the enforcement path works end-to-end
+#### 테스트 공백(Test Gaps)
+- 타입/상태는 검증하지만 부수 효과(URL 첨부됨? 필드 채워짐? 콜백 실행됨?)는 검증하지 않는 부정 경로(negative-path) 테스트
+- 형식 확인 없이 문자열 내용만 검증하는 어설션 (예: 제목 존재 여부는 검증하지만 URL 형식은 미확인)
+- 코드 경로가 외부 서비스를 명시적으로 호출하지 않아야 할 때 누락된 `.expects(:something).never`
+- 엔드투엔드 적용 경로 작동을 검증하는 통합 테스트 없는 보안 강제 기능(차단, 속도 제한, 인증)
 
-#### Completeness Gaps
-- Shortcut implementations where the complete version would cost <30 minutes CC time (e.g., partial enum handling, incomplete error paths, missing edge cases that are straightforward to add)
-- Options presented with only human-team effort estimates — should show both human and CC+gstack time
-- Test coverage gaps where adding the missing tests is a "lake" not an "ocean" (e.g., missing negative-path tests, missing edge case tests that mirror happy-path structure)
-- Features implemented at 80-90% when 100% is achievable with modest additional code
+#### 완전성 공백(Completeness Gaps)
+- 완전한 버전이 CC 시간 30분 미만으로 구현 가능한 축약 구현 (예: 부분적 열거형 처리, 불완전한 오류 경로, 추가가 간단한 누락된 엣지 케이스)
+- 인력 투입 추정치만 제시된 옵션 — 인력 시간과 CC+gstack 시간 모두 표시해야 함
+- 누락된 테스트 추가가 "호수" 규모이지 "바다" 규모가 아닌 테스트 커버리지 공백 (예: 누락된 부정 경로 테스트, 해피 경로 구조를 미러링하는 누락된 엣지 케이스 테스트)
+- 적절한 추가 코드로 100% 달성 가능한데 80-90%로 구현된 기능
 
-#### Crypto & Entropy
-- Truncation of data instead of hashing (last N chars instead of SHA-256) — less entropy, easier collisions
-- `rand()` / `Random.rand` for security-sensitive values — use `SecureRandom` instead
-- Non-constant-time comparisons (`==`) on secrets or tokens — vulnerable to timing attacks
+#### 암호화 및 엔트로피(Crypto & Entropy)
+- 해싱 대신 데이터 잘라내기(truncation) (SHA-256 대신 마지막 N자) — 엔트로피 감소, 충돌 용이
+- 보안에 민감한 값에 `rand()` / `Random.rand` 사용 — 대신 `SecureRandom` 사용
+- 시크릿 또는 토큰에 대한 상수 시간이 아닌 비교(`==`) — 타이밍 공격(timing attack)에 취약
 
-#### Time Window Safety
-- Date-key lookups that assume "today" covers 24h — report at 8am PT only sees midnight→8am under today's key
-- Mismatched time windows between related features — one uses hourly buckets, another uses daily keys for the same data
+#### 시간 윈도우 안전성(Time Window Safety)
+- "오늘"이 24시간을 커버한다고 가정하는 날짜 키 조회 — 오전 8시 PT 리포트는 오늘 키 아래 자정→오전 8시만 조회
+- 관련 기능 간 불일치하는 시간 윈도우 — 하나는 시간별 버킷, 다른 하나는 같은 데이터에 대해 일별 키 사용
 
-#### Type Coercion at Boundaries
-- Values crossing Ruby→JSON→JS boundaries where type could change (numeric vs string) — hash/digest inputs must normalize types
-- Hash/digest inputs that don't call `.to_s` or equivalent before serialization — `{ cores: 8 }` vs `{ cores: "8" }` produce different hashes
+#### 경계에서의 타입 강제 변환(Type Coercion at Boundaries)
+- Ruby→JSON→JS 경계를 넘는 값에서 타입이 변경될 수 있는 경우(숫자 vs 문자열) — 해시/다이제스트 입력은 타입을 정규화해야 함
+- 직렬화 전 `.to_s` 또는 동등한 메서드를 호출하지 않는 해시/다이제스트 입력 — `{ cores: 8 }` vs `{ cores: "8" }`는 서로 다른 해시를 생성
 
-#### View/Frontend
-- Inline `<style>` blocks in partials (re-parsed every render)
-- O(n*m) lookups in views (`Array#find` in a loop instead of `index_by` hash)
-- Ruby-side `.select{}` filtering on DB results that could be a `WHERE` clause (unless intentionally avoiding leading-wildcard `LIKE`)
+#### 뷰/프론트엔드(View/Frontend)
+- 파셜의 인라인 `<style>` 블록 (렌더링마다 재파싱)
+- 뷰에서의 O(n*m) 조회 (루프 내 `Array#find` 대신 `index_by` 해시 사용)
+- DB 결과에 대한 Ruby 측 `.select{}` 필터링으로 `WHERE` 절이 될 수 있는 것 (의도적으로 선행 와일드카드 `LIKE`를 피하는 경우 제외)
 
-#### Performance & Bundle Impact
-- New `dependencies` entries in package.json that are known-heavy: moment.js (→ date-fns, 330KB→22KB), lodash full (→ lodash-es or per-function imports), jquery, core-js full polyfill
-- Significant lockfile growth (many new transitive dependencies from a single addition)
-- Images added without `loading="lazy"` or explicit width/height attributes (causes layout shift / CLS)
-- Large static assets committed to repo (>500KB per file)
-- Synchronous `<script>` tags without async/defer
-- CSS `@import` in stylesheets (blocks parallel loading — use bundler imports instead)
-- `useEffect` with fetch that depends on another fetch result (request waterfall — combine or parallelize)
-- Named → default import switches on tree-shakeable libraries (breaks tree-shaking)
-- New `require()` calls in ESM codebases
+#### 성능 및 번들 영향(Performance & Bundle Impact)
+- 무거운 것으로 알려진 package.json의 새 `dependencies` 항목: moment.js (→ date-fns, 330KB→22KB), lodash 전체 (→ lodash-es 또는 함수별 임포트), jquery, core-js 전체 폴리필
+- 상당한 lockfile 증가 (단일 추가로 인한 많은 전이적(transitive) 의존성)
+- `loading="lazy"` 또는 명시적 width/height 속성 없이 추가된 이미지 (레이아웃 이동 / CLS 유발)
+- 저장소에 커밋된 대형 정적 자산 (파일당 >500KB)
+- async/defer 없는 동기 `<script>` 태그
+- 스타일시트의 CSS `@import` (병렬 로딩 차단 — 대신 번들러 임포트 사용)
+- 다른 fetch 결과에 의존하는 `useEffect` 내 fetch (요청 워터폴(waterfall) — 결합 또는 병렬화)
+- 트리 셰이킹 가능한 라이브러리에서 named → default import 전환 (트리 셰이킹 무력화)
+- ESM 코드베이스에서의 새 `require()` 호출
 
-**DO NOT flag:**
-- devDependencies additions (don't affect production bundle)
-- Dynamic `import()` calls (code splitting — these are good)
-- Small utility additions (<5KB gzipped)
-- Server-side-only dependencies
+**지적하지 마세요:**
+- devDependencies 추가 (프로덕션 번들에 영향 없음)
+- 동적 `import()` 호출 (코드 스플리팅 — 이는 좋은 패턴)
+- 소형 유틸리티 추가 (gzip 기준 <5KB)
+- 서버 측 전용 의존성
 
-#### Distribution & CI/CD Pipeline
-- CI/CD workflow changes (`.github/workflows/`): verify build tool versions match project requirements, artifact names/paths are correct, secrets use `${{ secrets.X }}` not hardcoded values
-- New artifact types (CLI binary, library, package): verify a publish/release workflow exists and targets correct platforms
-- Cross-platform builds: verify CI matrix covers all target OS/arch combinations, or documents which are untested
-- Version tag format consistency: `v1.2.3` vs `1.2.3` — must match across VERSION file, git tags, and publish scripts
-- Publish step idempotency: re-running the publish workflow should not fail (e.g., `gh release delete` before `gh release create`)
+#### 배포 및 CI/CD 파이프라인(Distribution & CI/CD Pipeline)
+- CI/CD 워크플로우 변경 (`.github/workflows/`): 빌드 도구 버전이 프로젝트 요구사항과 일치하는지, 아티팩트 이름/경로가 올바른지, 시크릿이 하드코딩된 값이 아닌 `${{ secrets.X }}`를 사용하는지 확인
+- 새 아티팩트 유형 (CLI 바이너리, 라이브러리, 패키지): 게시/릴리스 워크플로우가 존재하고 올바른 플랫폼을 대상으로 하는지 확인
+- 크로스 플랫폼 빌드: CI 매트릭스가 모든 대상 OS/아키텍처 조합을 커버하는지, 또는 미테스트 항목이 문서화되어 있는지 확인
+- 버전 태그 형식 일관성: `v1.2.3` vs `1.2.3` — VERSION 파일, git 태그, 게시 스크립트 전체에서 일치해야 함
+- 게시 단계 멱등성(idempotency): 게시 워크플로우 재실행 시 실패하지 않아야 함 (예: `gh release create` 전에 `gh release delete`)
 
-**DO NOT flag:**
-- Web services with existing auto-deploy pipelines (Docker build + K8s deploy)
-- Internal tools not distributed outside the team
-- Test-only CI changes (adding test steps, not publish steps)
-
----
-
-## Severity Classification
-
-```
-CRITICAL (highest severity):      INFORMATIONAL (lower severity):
-├─ SQL & Data Safety              ├─ Conditional Side Effects
-├─ Race Conditions & Concurrency  ├─ Magic Numbers & String Coupling
-├─ LLM Output Trust Boundary      ├─ Dead Code & Consistency
-└─ Enum & Value Completeness      ├─ LLM Prompt Issues
-                                   ├─ Test Gaps
-                                   ├─ Completeness Gaps
-                                   ├─ Crypto & Entropy
-                                   ├─ Time Window Safety
-                                   ├─ Type Coercion at Boundaries
-                                   ├─ View/Frontend
-                                   ├─ Performance & Bundle Impact
-                                   └─ Distribution & CI/CD Pipeline
-
-All findings are actioned via Fix-First Review. Severity determines
-presentation order and classification of AUTO-FIX vs ASK — critical
-findings lean toward ASK (they're riskier), informational findings
-lean toward AUTO-FIX (they're more mechanical).
-```
+**지적하지 마세요:**
+- 기존 자동 배포 파이프라인이 있는 웹 서비스 (Docker 빌드 + K8s 배포)
+- 팀 외부로 배포되지 않는 내부 도구
+- 테스트 전용 CI 변경 (게시 단계가 아닌 테스트 단계 추가)
 
 ---
 
-## Fix-First Heuristic
-
-This heuristic is referenced by both `/review` and `/ship`. It determines whether
-the agent auto-fixes a finding or asks the user.
+## 심각도 분류
 
 ```
-AUTO-FIX (agent fixes without asking):     ASK (needs human judgment):
-├─ Dead code / unused variables            ├─ Security (auth, XSS, injection)
-├─ N+1 queries (missing eager loading)      ├─ Race conditions
-├─ Stale comments contradicting code       ├─ Design decisions
-├─ Magic numbers → named constants         ├─ Large fixes (>20 lines)
-├─ Missing LLM output validation           ├─ Enum completeness
-├─ Version/path mismatches                 ├─ Removing functionality
-├─ Variables assigned but never read       └─ Anything changing user-visible
-└─ Inline styles, O(n*m) view lookups        behavior
+치명적(CRITICAL, 가장 높은 심각도):   참고(INFORMATIONAL, 낮은 심각도):
+├─ SQL 및 데이터 안전성               ├─ 조건부 부수 효과
+├─ 경쟁 조건 및 동시성                ├─ 매직 넘버 및 문자열 결합
+├─ LLM 출력 신뢰 경계                ├─ 죽은 코드 및 일관성
+└─ 열거형 및 값 완전성                ├─ LLM 프롬프트 문제
+                                      ├─ 테스트 공백
+                                      ├─ 완전성 공백
+                                      ├─ 암호화 및 엔트로피
+                                      ├─ 시간 윈도우 안전성
+                                      ├─ 경계에서의 타입 강제 변환
+                                      ├─ 뷰/프론트엔드
+                                      ├─ 성능 및 번들 영향
+                                      └─ 배포 및 CI/CD 파이프라인
+
+모든 발견 사항은 선조치 리뷰(Fix-First Review)를 통해 처리됩니다.
+심각도에 따라 표시 순서와 AUTO-FIX vs ASK 분류가 결정됩니다 —
+치명적 발견 사항은 ASK 쪽으로 기울고(더 위험하므로),
+참고 발견 사항은 AUTO-FIX 쪽으로 기웁니다(더 기계적이므로).
 ```
-
-**Rule of thumb:** If the fix is mechanical and a senior engineer would apply it
-without discussion, it's AUTO-FIX. If reasonable engineers could disagree about
-the fix, it's ASK.
-
-**Critical findings default toward ASK** (they're inherently riskier).
-**Informational findings default toward AUTO-FIX** (they're more mechanical).
 
 ---
 
-## Suppressions — DO NOT flag these
+## 선조치(Fix-First) 휴리스틱
 
-- "X is redundant with Y" when the redundancy is harmless and aids readability (e.g., `present?` redundant with `length > 20`)
-- "Add a comment explaining why this threshold/constant was chosen" — thresholds change during tuning, comments rot
-- "This assertion could be tighter" when the assertion already covers the behavior
-- Suggesting consistency-only changes (wrapping a value in a conditional to match how another constant is guarded)
-- "Regex doesn't handle edge case X" when the input is constrained and X never occurs in practice
-- "Test exercises multiple guards simultaneously" — that's fine, tests don't need to isolate every guard
-- Eval threshold changes (max_actionable, min scores) — these are tuned empirically and change constantly
-- Harmless no-ops (e.g., `.reject` on an element that's never in the array)
-- ANYTHING already addressed in the diff you're reviewing — read the FULL diff before commenting
+이 휴리스틱은 `/review`와 `/ship` 모두에서 참조됩니다. 에이전트가 발견 사항을
+자동 수정할지 사용자에게 물을지를 결정합니다.
+
+```
+AUTO-FIX (에이전트가 묻지 않고 수정):       ASK (사람의 판단 필요):
+├─ 죽은 코드 / 미사용 변수                 ├─ 보안 (인증, XSS, 인젝션)
+├─ N+1 쿼리 (즉시 로딩 누락)               ├─ 경쟁 조건
+├─ 코드와 모순되는 오래된 주석             ├─ 설계 결정
+├─ 매직 넘버 → 명명된 상수                 ├─ 대규모 수정 (>20줄)
+├─ 누락된 LLM 출력 유효성 검증            ├─ 열거형 완전성
+├─ 버전/경로 불일치                        ├─ 기능 제거
+├─ 할당되었지만 읽히지 않는 변수           └─ 사용자에게 보이는 동작을
+└─ 인라인 스타일, O(n*m) 뷰 조회             변경하는 모든 것
+```
+
+**경험 법칙:** 수정이 기계적이고 시니어 엔지니어가 논의 없이 적용할 수준이면
+AUTO-FIX입니다. 합리적인 엔지니어들이 수정에 대해 의견이 다를 수 있다면
+ASK입니다.
+
+**치명적 발견 사항은 기본적으로 ASK 쪽으로 기웁니다** (본질적으로 더 위험하므로).
+**참고 발견 사항은 기본적으로 AUTO-FIX 쪽으로 기웁니다** (더 기계적이므로).
+
+---
+
+## 억제(Suppressions) — 지적하지 마세요
+
+- 중복이 해가 없고 가독성에 도움이 되는 "X가 Y와 중복됩니다" (예: `present?`가 `length > 20`과 중복)
+- "이 임계값/상수가 선택된 이유를 설명하는 주석을 추가하세요" — 임계값은 튜닝 중 변경되며, 주석은 부패함
+- 어설션이 이미 동작을 커버하는데 "이 어설션이 더 엄격할 수 있습니다"
+- 일관성만을 위한 변경 제안 (다른 상수가 보호되는 방식과 일치시키기 위해 값을 조건문으로 감싸기)
+- 입력이 제한되어 있고 X가 실제로 발생하지 않는 경우 "정규식이 엣지 케이스 X를 처리하지 않습니다"
+- "테스트가 여러 가드를 동시에 실행합니다" — 괜찮습니다, 테스트가 모든 가드를 격리할 필요는 없습니다
+- 평가 임계값 변경 (max_actionable, 최소 점수) — 이들은 경험적으로 튜닝되며 지속적으로 변경됩니다
+- 무해한 no-op (예: 배열에 절대 없는 요소에 대한 `.reject`)
+- 리뷰 중인 diff에서 이미 해결된 모든 것 — 댓글 달기 전에 전체 diff를 읽으세요
