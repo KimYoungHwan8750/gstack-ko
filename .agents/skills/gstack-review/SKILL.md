@@ -3,10 +3,10 @@ name: review
 preamble-tier: 4
 version: 1.0.0
 description: |
-  Pre-landing PR review. Analyzes diff against the base branch for SQL safety, LLM trust
-  boundary violations, conditional side effects, and other structural issues. Use when
-  asked to "review this PR", "code review", "pre-landing review", or "check my diff".
-  Proactively suggest when the user is about to merge or land code changes.
+  사전 착륙(pre-landing) PR 리뷰. base 브랜치 대비 diff를 분석하여 SQL 안전성, LLM 신뢰 경계
+  위반, 조건부 부작용, 기타 구조적 문제를 검출합니다. "review this PR", "code review",
+  "pre-landing review", "check my diff" 등의 요청 시 사용합니다.
+  사용자가 코드를 merge하거나 land하려 할 때 선제적으로 제안합니다.
 allowed-tools:
   - Bash
   - Read
@@ -47,6 +47,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$($GSTACK_BIN/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -203,6 +209,35 @@ AI makes completeness near-free. Always recommend the complete option over short
 | Bug fix | 4 hours | 15 min | ~20x |
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
+
+## yhlib 모노레포 통합
+
+`YHLIB`이 `true`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
+
+**확정 기술 스택 (프레임워크 선택 건너뛰기):**
+- Web: Next.js / App: Expo (React Native) / Backend: Supabase
+- 상태관리: Zustand / 데이터 패칭: Tanstack Query
+- 폼/검증: Zod + React Hook Form
+- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
+- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
+
+**아키텍처 참조 문서:**
+- `.claude/CLAUDE.md` — 전체 아키텍처 + DI 전략
+- `.claude/web.md` — Next.js 규칙
+- `.claude/app.md` — Expo/React Native 규칙
+- `.claude/supabase.md` — DB/Auth/Storage
+- `.claude/form.md` — 폼/입력/검증 패턴
+- `.claude/theme.md` — 테마/디자인 시스템
+- `.claude/components.md` — UI 컴포넌트 아키텍처
+- `.claude/i18n.md` — 다국어 구현
+
+**필수 동작:**
+- 프레임워크/기술 스택 질문을 건너뛰세요
+- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
+- 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
+- `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
+
+`YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
 
 ## Repo Ownership — See Something, Say Something
 
@@ -368,29 +403,29 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# Pre-Landing PR Review
+# 사전 착륙 PR 리뷰(Pre-Landing PR Review)
 
-You are running the `/review` workflow. Analyze the current branch's diff against the base branch for structural issues that tests don't catch.
-
----
-
-## Step 1: Check branch
-
-1. Run `git branch --show-current` to get the current branch.
-2. If on the base branch, output: **"Nothing to review — you're on the base branch or have no changes against it."** and stop.
-3. Run `git fetch origin <base> --quiet && git diff origin/<base> --stat` to check if there's a diff. If no diff, output the same message and stop.
+`/review` 워크플로우를 실행합니다. 현재 브랜치의 diff를 base 브랜치와 비교하여 테스트가 잡아내지 못하는 구조적 문제를 분석합니다.
 
 ---
 
-## Step 1.5: Scope Drift Detection
+## Step 1: 브랜치 확인
 
-Before reviewing code quality, check: **did they build what was requested — nothing more, nothing less?**
+1. `git branch --show-current`를 실행하여 현재 브랜치를 확인합니다.
+2. base 브랜치에 있다면 다음을 출력하고 중단합니다: **"리뷰할 내용이 없습니다 — base 브랜치에 있거나 변경사항이 없습니다."**
+3. `git fetch origin <base> --quiet && git diff origin/<base> --stat`를 실행하여 diff가 있는지 확인합니다. diff가 없으면 같은 메시지를 출력하고 중단합니다.
 
-1. Read `TODOS.md` (if it exists). Read PR description (`gh pr view --json body --jq .body 2>/dev/null || true`).
-   Read commit messages (`git log origin/<base>..HEAD --oneline`).
-   **If no PR exists:** rely on commit messages and TODOS.md for stated intent — this is the common case since /review runs before /ship creates the PR.
-2. Identify the **stated intent** — what was this branch supposed to accomplish?
-3. Run `git diff origin/<base>...HEAD --stat` and compare the files changed against the stated intent.
+---
+
+## Step 1.5: 범위 이탈 감지(Scope Drift Detection)
+
+코드 품질을 리뷰하기 전에 먼저 확인합니다: **요청된 것만 정확히 구현했는가 — 그 이상도 이하도 아닌가?**
+
+1. `TODOS.md`(존재하는 경우)를 읽습니다. PR 설명(`gh pr view --json body --jq .body 2>/dev/null || true`)을 읽습니다.
+   커밋 메시지(`git log origin/<base>..HEAD --oneline`)를 읽습니다.
+   **PR이 없는 경우:** 커밋 메시지와 TODOS.md를 기반으로 의도를 파악합니다 — /review는 /ship이 PR을 생성하기 전에 실행되므로 이것이 일반적인 케이스입니다.
+2. **명시된 의도**를 파악합니다 — 이 브랜치가 달성해야 할 목표는 무엇이었는가?
+3. `git diff origin/<base>...HEAD --stat`를 실행하고 변경된 파일을 명시된 의도와 비교합니다.
 
 ### Plan File Discovery
 
@@ -506,82 +541,82 @@ Plan items: N DONE, M PARTIAL, K NOT DONE
 
 **No plan file found:** Fall back to existing scope drift behavior (check TODOS.md and PR description only).
 
-4. Evaluate with skepticism (incorporating plan completion results if available):
+4. 회의적 시각으로 평가합니다 (가능한 경우 플랜 완료 결과를 반영):
 
-   **SCOPE CREEP detection:**
-   - Files changed that are unrelated to the stated intent
-   - New features or refactors not mentioned in the plan
-   - "While I was in there..." changes that expand blast radius
+   **범위 이탈(SCOPE CREEP) 감지:**
+   - 명시된 의도와 무관한 파일 변경
+   - 플랜에 언급되지 않은 새 기능이나 리팩토링
+   - "이 김에..." 식의 변경으로 영향 범위가 확대된 경우
 
-   **MISSING REQUIREMENTS detection:**
-   - Requirements from TODOS.md/PR description not addressed in the diff
-   - Test coverage gaps for stated requirements
-   - Partial implementations (started but not finished)
+   **누락 요구사항(MISSING REQUIREMENTS) 감지:**
+   - TODOS.md/PR 설명의 요구사항 중 diff에서 다뤄지지 않은 항목
+   - 명시된 요구사항에 대한 테스트 커버리지 부족
+   - 부분 구현 (시작했으나 완료하지 않은 경우)
 
-5. Output (before the main review begins):
+5. 출력 (메인 리뷰 시작 전):
    ```
    Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
-   Intent: <1-line summary of what was requested>
-   Delivered: <1-line summary of what the diff actually does>
-   [If drift: list each out-of-scope change]
-   [If missing: list each unaddressed requirement]
+   Intent: <요청된 내용 1줄 요약>
+   Delivered: <diff가 실제로 수행하는 내용 1줄 요약>
+   [이탈 시: 범위 외 변경사항 각각 나열]
+   [누락 시: 미해결 요구사항 각각 나열]
    ```
 
-6. This is **INFORMATIONAL** — does not block the review. Proceed to Step 2.
+6. 이 단계는 **정보 제공용**이며 리뷰를 차단하지 않습니다. Step 2로 진행합니다.
 
 ---
 
-## Step 2: Read the checklist
+## Step 2: 체크리스트 읽기
 
-Read `.agents/skills/gstack/review/checklist.md`.
+`.agents/skills/gstack/review/checklist.md`를 읽습니다.
 
-**If the file cannot be read, STOP and report the error.** Do not proceed without the checklist.
-
----
-
-## Step 2.5: Check for Greptile review comments
-
-Read `.agents/skills/gstack/review/greptile-triage.md` and follow the fetch, filter, classify, and **escalation detection** steps.
-
-**If no PR exists, `gh` fails, API returns an error, or there are zero Greptile comments:** Skip this step silently. Greptile integration is additive — the review works without it.
-
-**If Greptile comments are found:** Store the classifications (VALID & ACTIONABLE, VALID BUT ALREADY FIXED, FALSE POSITIVE, SUPPRESSED) — you will need them in Step 5.
+**파일을 읽을 수 없으면 즉시 중단하고 오류를 보고합니다.** 체크리스트 없이 진행하지 마십시오.
 
 ---
 
-## Step 3: Get the diff
+## Step 2.5: Greptile 리뷰 코멘트 확인
 
-Fetch the latest base branch to avoid false positives from stale local state:
+`.agents/skills/gstack/review/greptile-triage.md`를 읽고 fetch, filter, classify 및 **에스컬레이션 감지(escalation detection)** 단계를 따릅니다.
+
+**PR이 없거나, `gh`가 실패하거나, API가 오류를 반환하거나, Greptile 코멘트가 없는 경우:** 이 단계를 조용히 건너뜁니다. Greptile 통합은 부가적 기능이며 — 없어도 리뷰는 정상 동작합니다.
+
+**Greptile 코멘트가 발견된 경우:** 분류 결과(VALID & ACTIONABLE, VALID BUT ALREADY FIXED, FALSE POSITIVE, SUPPRESSED)를 저장합니다 — Step 5에서 필요합니다.
+
+---
+
+## Step 3: diff 가져오기
+
+오래된 로컬 상태로 인한 오탐을 방지하기 위해 최신 base 브랜치를 fetch합니다:
 
 ```bash
 git fetch origin <base> --quiet
 ```
 
-Run `git diff origin/<base>` to get the full diff. This includes both committed and uncommitted changes against the latest base branch.
+`git diff origin/<base>`를 실행하여 전체 diff를 가져옵니다. 여기에는 최신 base 브랜치 대비 커밋된 변경사항과 커밋되지 않은 변경사항이 모두 포함됩니다.
 
 ---
 
-## Step 4: Two-pass review
+## Step 4: 2단계 리뷰(Two-pass review)
 
-Apply the checklist against the diff in two passes:
+체크리스트를 diff에 대해 2단계로 적용합니다:
 
-1. **Pass 1 (CRITICAL):** SQL & Data Safety, Race Conditions & Concurrency, LLM Output Trust Boundary, Enum & Value Completeness
-2. **Pass 2 (INFORMATIONAL):** Conditional Side Effects, Magic Numbers & String Coupling, Dead Code & Consistency, LLM Prompt Issues, Test Gaps, View/Frontend, Performance & Bundle Impact
+1. **Pass 1 (CRITICAL):** SQL & 데이터 안전성, 경쟁 조건(Race Conditions) & 동시성(Concurrency), LLM 출력 신뢰 경계(Trust Boundary), Enum & 값 완전성(Value Completeness)
+2. **Pass 2 (INFORMATIONAL):** 조건부 부작용(Conditional Side Effects), 매직 넘버 & 문자열 결합(String Coupling), 죽은 코드 & 일관성, LLM 프롬프트 문제, 테스트 갭, 뷰/프론트엔드, 성능 & 번들 영향
 
-**Enum & Value Completeness requires reading code OUTSIDE the diff.** When the diff introduces a new enum value, status, tier, or type constant, use Grep to find all files that reference sibling values, then Read those files to check if the new value is handled. This is the one category where within-diff review is insufficient.
+**Enum & 값 완전성은 diff 외부의 코드를 읽어야 합니다.** diff가 새로운 enum 값, 상태, 티어 또는 타입 상수를 도입하면, Grep을 사용하여 형제 값을 참조하는 모든 파일을 찾은 다음 해당 파일을 Read하여 새 값이 처리되는지 확인합니다. 이것이 diff 내 리뷰만으로는 불충분한 유일한 카테고리입니다.
 
-**Search-before-recommending:** When recommending a fix pattern (especially for concurrency, caching, auth, or framework-specific behavior):
-- Verify the pattern is current best practice for the framework version in use
-- Check if a built-in solution exists in newer versions before recommending a workaround
-- Verify API signatures against current docs (APIs change between versions)
+**추천 전 검색(Search-before-recommending):** 수정 패턴을 추천할 때 (특히 동시성, 캐싱, 인증 또는 프레임워크별 동작의 경우):
+- 해당 패턴이 사용 중인 프레임워크 버전의 현재 모범 사례인지 확인합니다
+- 우회 방법을 추천하기 전에 최신 버전에 내장 솔루션이 있는지 확인합니다
+- 현재 문서 대비 API 시그니처를 검증합니다 (API는 버전 간 변경됩니다)
 
-Takes seconds, prevents recommending outdated patterns. If WebSearch is unavailable, note it and proceed with in-distribution knowledge.
+몇 초면 되지만, 구식 패턴 추천을 방지합니다. WebSearch를 사용할 수 없는 경우 해당 사실을 언급하고 기존 지식으로 진행합니다.
 
-Follow the output format specified in the checklist. Respect the suppressions — do NOT flag items listed in the "DO NOT flag" section.
+체크리스트에 지정된 출력 형식을 따릅니다. 억제 항목(suppressions)을 준수합니다 — "DO NOT flag" 섹션에 나열된 항목은 지적하지 마십시오.
 
 ---
 
-## Step 4.5: Design Review (conditional)
+## Step 4.5: 디자인 리뷰 (조건부)
 
 ## Design Review (conditional, diff-scoped)
 
@@ -616,11 +651,11 @@ $GSTACK_BIN/gstack-review-log '{"skill":"design-review-lite","timestamp":"TIMEST
 
 Substitute: TIMESTAMP = ISO 8601 datetime, STATUS = "clean" if 0 findings or "issues_found", N = total findings, M = auto-fixed count, COMMIT = output of `git rev-parse --short HEAD`.
 
-Include any design findings alongside the findings from Step 4. They follow the same Fix-First flow in Step 5 — AUTO-FIX for mechanical CSS fixes, ASK for everything else.
+디자인 관련 발견사항을 Step 4의 발견사항과 함께 포함합니다. 이들은 Step 5의 동일한 Fix-First 흐름을 따릅니다 — 기계적 CSS 수정은 AUTO-FIX, 나머지는 ASK입니다.
 
 ---
 
-## Step 4.75: Test Coverage Diagram
+## Step 4.75: 테스트 커버리지 다이어그램
 
 100% coverage is the goal. Evaluate every codepath changed in the diff and identify test gaps. Gaps become INFORMATIONAL findings that follow the Fix-First flow.
 
@@ -808,149 +843,146 @@ This is INFORMATIONAL — does not block /review. But it makes low coverage visi
 
 If coverage percentage cannot be determined, skip the warning silently.
 
-This step subsumes the "Test Gaps" category from Pass 2 — do not duplicate findings between the checklist Test Gaps item and this coverage diagram. Include any coverage gaps alongside the findings from Step 4 and Step 4.5. They follow the same Fix-First flow — gaps are INFORMATIONAL findings.
+이 단계는 Pass 2의 "테스트 갭" 카테고리를 대체합니다 — 체크리스트의 테스트 갭 항목과 이 커버리지 다이어그램 간에 발견사항을 중복하지 마십시오. 커버리지 갭은 Step 4 및 Step 4.5의 발견사항과 함께 포함합니다. 이들은 동일한 Fix-First 흐름을 따릅니다 — 갭은 INFORMATIONAL 발견사항입니다.
 
 ---
 
-## Step 5: Fix-First Review
+## Step 5: Fix-First 리뷰
 
-**Every finding gets action — not just critical ones.**
+**모든 발견사항에 대해 조치를 취합니다 — 중요한 것만이 아닙니다.**
 
-Output a summary header: `Pre-Landing Review: N issues (X critical, Y informational)`
+요약 헤더를 출력합니다: `Pre-Landing Review: N issues (X critical, Y informational)`
 
-### Step 5a: Classify each finding
+### Step 5a: 각 발견사항 분류
 
-For each finding, classify as AUTO-FIX or ASK per the Fix-First Heuristic in
-checklist.md. Critical findings lean toward ASK; informational findings lean
-toward AUTO-FIX.
+각 발견사항에 대해 checklist.md의 Fix-First 휴리스틱에 따라 AUTO-FIX 또는 ASK로 분류합니다. 중요(Critical) 발견사항은 ASK 쪽으로, 정보성(Informational) 발견사항은 AUTO-FIX 쪽으로 기울입니다.
 
-### Step 5b: Auto-fix all AUTO-FIX items
+### Step 5b: 모든 AUTO-FIX 항목 자동 수정
 
-Apply each fix directly. For each one, output a one-line summary:
-`[AUTO-FIXED] [file:line] Problem → what you did`
+각 수정을 직접 적용합니다. 각 항목에 대해 한 줄 요약을 출력합니다:
+`[AUTO-FIXED] [file:line] 문제 → 수행한 조치`
 
-### Step 5c: Batch-ask about ASK items
+### Step 5c: ASK 항목 일괄 질문
 
-If there are ASK items remaining, present them in ONE AskUserQuestion:
+ASK 항목이 남아있으면 하나의 AskUserQuestion으로 일괄 제시합니다:
 
-- List each item with a number, the severity label, the problem, and a recommended fix
-- For each item, provide options: A) Fix as recommended, B) Skip
-- Include an overall RECOMMENDATION
+- 각 항목에 번호, 심각도 라벨, 문제, 권장 수정안을 함께 나열합니다
+- 각 항목에 옵션을 제공합니다: A) 권장대로 수정, B) 건너뛰기
+- 전체 RECOMMENDATION을 포함합니다
 
-Example format:
+예시 형식:
 ```
-I auto-fixed 5 issues. 2 need your input:
+5개 이슈를 자동 수정했습니다. 2개에 대해 판단이 필요합니다:
 
-1. [CRITICAL] app/models/post.rb:42 — Race condition in status transition
-   Fix: Add `WHERE status = 'draft'` to the UPDATE
-   → A) Fix  B) Skip
+1. [CRITICAL] app/models/post.rb:42 — 상태 전환에서 경쟁 조건(Race condition)
+   수정: UPDATE에 `WHERE status = 'draft'` 추가
+   → A) 수정  B) 건너뛰기
 
-2. [INFORMATIONAL] app/services/generator.rb:88 — LLM output not type-checked before DB write
-   Fix: Add JSON schema validation
-   → A) Fix  B) Skip
+2. [INFORMATIONAL] app/services/generator.rb:88 — LLM 출력이 DB 쓰기 전에 타입 검사되지 않음
+   수정: JSON 스키마 유효성 검증 추가
+   → A) 수정  B) 건너뛰기
 
-RECOMMENDATION: Fix both — #1 is a real race condition, #2 prevents silent data corruption.
+RECOMMENDATION: 둘 다 수정 — #1은 실제 경쟁 조건이고, #2는 무음 데이터 손상을 방지합니다.
 ```
 
-If 3 or fewer ASK items, you may use individual AskUserQuestion calls instead of batching.
+ASK 항목이 3개 이하이면 일괄 처리 대신 개별 AskUserQuestion 호출을 사용할 수 있습니다.
 
-### Step 5d: Apply user-approved fixes
+### Step 5d: 사용자 승인 수정 적용
 
-Apply fixes for items where the user chose "Fix." Output what was fixed.
+사용자가 "수정"을 선택한 항목에 대해 수정을 적용합니다. 수정된 내용을 출력합니다.
 
-If no ASK items exist (everything was AUTO-FIX), skip the question entirely.
+ASK 항목이 없으면 (모두 AUTO-FIX인 경우) 질문을 완전히 건너뜁니다.
 
-### Verification of claims
+### 주장의 검증
 
-Before producing the final review output:
-- If you claim "this pattern is safe" → cite the specific line proving safety
-- If you claim "this is handled elsewhere" → read and cite the handling code
-- If you claim "tests cover this" → name the test file and method
-- Never say "likely handled" or "probably tested" — verify or flag as unknown
+최종 리뷰 출력을 생성하기 전에:
+- "이 패턴은 안전하다"고 주장하는 경우 → 안전성을 증명하는 구체적인 줄을 인용합니다
+- "다른 곳에서 처리된다"고 주장하는 경우 → 처리 코드를 읽고 인용합니다
+- "테스트가 이를 커버한다"고 주장하는 경우 → 테스트 파일명과 메서드명을 명시합니다
+- "아마 처리되어 있을 것" 또는 "아마 테스트되어 있을 것"이라고 절대 말하지 마십시오 — 검증하거나 미확인으로 표시합니다
 
-**Rationalization prevention:** "This looks fine" is not a finding. Either cite evidence it IS fine, or flag it as unverified.
+**합리화 방지:** "괜찮아 보입니다"는 발견사항이 아닙니다. 괜찮다는 증거를 인용하거나, 미검증으로 표시합니다.
 
-### Greptile comment resolution
+### Greptile 코멘트 해결
 
-After outputting your own findings, if Greptile comments were classified in Step 2.5:
+자체 발견사항을 출력한 후, Step 2.5에서 Greptile 코멘트가 분류된 경우:
 
-**Include a Greptile summary in your output header:** `+ N Greptile comments (X valid, Y fixed, Z FP)`
+**출력 헤더에 Greptile 요약을 포함합니다:** `+ N Greptile comments (X valid, Y fixed, Z FP)`
 
-Before replying to any comment, run the **Escalation Detection** algorithm from greptile-triage.md to determine whether to use Tier 1 (friendly) or Tier 2 (firm) reply templates.
+코멘트에 답변하기 전에 greptile-triage.md의 **에스컬레이션 감지(Escalation Detection)** 알고리즘을 실행하여 Tier 1 (우호적) 또는 Tier 2 (단호한) 답변 템플릿 중 어떤 것을 사용할지 결정합니다.
 
-1. **VALID & ACTIONABLE comments:** These are included in your findings — they follow the Fix-First flow (auto-fixed if mechanical, batched into ASK if not) (A: Fix it now, B: Acknowledge, C: False positive). If the user chooses A (fix), reply using the **Fix reply template** from greptile-triage.md (include inline diff + explanation). If the user chooses C (false positive), reply using the **False Positive reply template** (include evidence + suggested re-rank), save to both per-project and global greptile-history.
+1. **VALID & ACTIONABLE 코멘트:** 이들은 발견사항에 포함됩니다 — Fix-First 흐름을 따릅니다 (기계적이면 자동 수정, 아니면 ASK로 일괄 처리) (A: 지금 수정, B: 확인, C: 오탐). 사용자가 A(수정)를 선택하면 greptile-triage.md의 **Fix reply template**을 사용하여 답변합니다 (인라인 diff + 설명 포함). 사용자가 C(오탐)를 선택하면 **False Positive reply template**을 사용하여 답변하고 (증거 + 재랭크 제안 포함), 프로젝트별 및 글로벌 greptile-history에 저장합니다.
 
-2. **FALSE POSITIVE comments:** Present each one via AskUserQuestion:
-   - Show the Greptile comment: file:line (or [top-level]) + body summary + permalink URL
-   - Explain concisely why it's a false positive
-   - Options:
-     - A) Reply to Greptile explaining why this is incorrect (recommended if clearly wrong)
-     - B) Fix it anyway (if low-effort and harmless)
-     - C) Ignore — don't reply, don't fix
+2. **FALSE POSITIVE 코멘트:** 각각을 AskUserQuestion으로 제시합니다:
+   - Greptile 코멘트를 표시합니다: file:line (또는 [top-level]) + 본문 요약 + 퍼머링크 URL
+   - 왜 오탐인지 간결하게 설명합니다
+   - 옵션:
+     - A) Greptile에 왜 잘못된 것인지 답변 (명백히 틀린 경우 권장)
+     - B) 그래도 수정 (적은 노력이고 무해한 경우)
+     - C) 무시 — 답변도 수정도 하지 않음
 
-   If the user chooses A, reply using the **False Positive reply template** from greptile-triage.md (include evidence + suggested re-rank), save to both per-project and global greptile-history.
+   사용자가 A를 선택하면 greptile-triage.md의 **False Positive reply template**을 사용하여 답변하고 (증거 + 재랭크 제안 포함), 프로젝트별 및 글로벌 greptile-history에 저장합니다.
 
-3. **VALID BUT ALREADY FIXED comments:** Reply using the **Already Fixed reply template** from greptile-triage.md — no AskUserQuestion needed:
-   - Include what was done and the fixing commit SHA
-   - Save to both per-project and global greptile-history
+3. **VALID BUT ALREADY FIXED 코멘트:** greptile-triage.md의 **Already Fixed reply template**을 사용하여 답변합니다 — AskUserQuestion 불필요:
+   - 수행된 작업과 수정 커밋 SHA를 포함합니다
+   - 프로젝트별 및 글로벌 greptile-history에 저장합니다
 
-4. **SUPPRESSED comments:** Skip silently — these are known false positives from previous triage.
-
----
-
-## Step 5.5: TODOS cross-reference
-
-Read `TODOS.md` in the repository root (if it exists). Cross-reference the PR against open TODOs:
-
-- **Does this PR close any open TODOs?** If yes, note which items in your output: "This PR addresses TODO: <title>"
-- **Does this PR create work that should become a TODO?** If yes, flag it as an informational finding.
-- **Are there related TODOs that provide context for this review?** If yes, reference them when discussing related findings.
-
-If TODOS.md doesn't exist, skip this step silently.
+4. **SUPPRESSED 코멘트:** 조용히 건너뜁니다 — 이전 분류에서 알려진 오탐입니다.
 
 ---
 
-## Step 5.6: Documentation staleness check
+## Step 5.5: TODOS 교차 참조
 
-Cross-reference the diff against documentation files. For each `.md` file in the repo root (README.md, ARCHITECTURE.md, CONTRIBUTING.md, CLAUDE.md, etc.):
+저장소 루트의 `TODOS.md`(존재하는 경우)를 읽습니다. PR을 열린 TODO와 교차 참조합니다:
 
-1. Check if code changes in the diff affect features, components, or workflows described in that doc file.
-2. If the doc file was NOT updated in this branch but the code it describes WAS changed, flag it as an INFORMATIONAL finding:
-   "Documentation may be stale: [file] describes [feature/component] but code changed in this branch. Consider running `/document-release`."
+- **이 PR이 열린 TODO를 닫는가?** 그렇다면 출력에 해당 항목을 표시합니다: "This PR addresses TODO: <title>"
+- **이 PR이 TODO가 되어야 할 작업을 생성하는가?** 그렇다면 정보성 발견사항으로 표시합니다.
+- **이 리뷰에 맥락을 제공하는 관련 TODO가 있는가?** 그렇다면 관련 발견사항을 논의할 때 참조합니다.
 
-This is informational only — never critical. The fix action is `/document-release`.
+TODOS.md가 존재하지 않으면 이 단계를 조용히 건너뜁니다.
 
-If no documentation files exist, skip this step silently.
+---
+
+## Step 5.6: 문서 최신성 검사
+
+diff를 문서 파일과 교차 참조합니다. 저장소 루트의 각 `.md` 파일 (README.md, ARCHITECTURE.md, CONTRIBUTING.md, CLAUDE.md 등)에 대해:
+
+1. diff의 코드 변경이 해당 문서 파일에 설명된 기능, 컴포넌트 또는 워크플로우에 영향을 미치는지 확인합니다.
+2. 해당 문서 파일이 이 브랜치에서 업데이트되지 않았지만 설명하는 코드가 변경된 경우, INFORMATIONAL 발견사항으로 표시합니다:
+   "문서가 오래되었을 수 있습니다: [file]이 [feature/component]를 설명하지만 이 브랜치에서 코드가 변경되었습니다. `/document-release` 실행을 고려하십시오."
+
+이것은 정보 제공 전용이며 — 절대 critical이 아닙니다. 수정 액션은 `/document-release`입니다.
+
+문서 파일이 없으면 이 단계를 조용히 건너뜁니다.
 
 ---
 
 
 
-## Step 5.8: Persist Eng Review result
+## Step 5.8: Eng Review 결과 영속화
 
-After all review passes complete, persist the final `/review` outcome so `/ship` can
-recognize that Eng Review was run on this branch.
+모든 리뷰 패스가 완료된 후, 최종 `/review` 결과를 영속화하여 `/ship`이 이 브랜치에서 Eng Review가 실행되었음을 인식할 수 있게 합니다.
 
-Run:
+실행:
 
 ```bash
 $GSTACK_ROOT/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"commit":"COMMIT"}'
 ```
 
-Substitute:
-- `TIMESTAMP` = ISO 8601 datetime
-- `STATUS` = `"clean"` if there are no remaining unresolved findings after Fix-First handling and adversarial review, otherwise `"issues_found"`
-- `issues_found` = total remaining unresolved findings
-- `critical` = remaining unresolved critical findings
-- `informational` = remaining unresolved informational findings
-- `COMMIT` = output of `git rev-parse --short HEAD`
+치환할 값:
+- `TIMESTAMP` = ISO 8601 날짜시간
+- `STATUS` = Fix-First 처리 및 적대적 리뷰(adversarial review) 후 미해결 발견사항이 없으면 `"clean"`, 그렇지 않으면 `"issues_found"`
+- `issues_found` = 총 미해결 발견사항 수
+- `critical` = 미해결 critical 발견사항 수
+- `informational` = 미해결 informational 발견사항 수
+- `COMMIT` = `git rev-parse --short HEAD`의 출력
 
-If the review exits early before a real review completes (for example, no diff against the base branch), do **not** write this entry.
+실제 리뷰가 완료되기 전에 조기 종료되는 경우 (예: base 브랜치 대비 diff 없음) 이 항목을 기록하지 **마십시오**.
 
-## Important Rules
+## 중요 규칙
 
-- **Read the FULL diff before commenting.** Do not flag issues already addressed in the diff.
-- **Fix-first, not read-only.** AUTO-FIX items are applied directly. ASK items are only applied after user approval. Never commit, push, or create PRs — that's /ship's job.
-- **Be terse.** One line problem, one line fix. No preamble.
-- **Only flag real problems.** Skip anything that's fine.
-- **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence. Never post vague replies.
+- **전체 diff를 읽은 후 코멘트합니다.** diff에서 이미 해결된 문제를 지적하지 마십시오.
+- **읽기 전용이 아닌 Fix-first.** AUTO-FIX 항목은 직접 적용합니다. ASK 항목은 사용자 승인 후에만 적용합니다. 절대 커밋, push 또는 PR 생성을 하지 마십시오 — 그것은 /ship의 역할입니다.
+- **간결하게.** 한 줄로 문제, 한 줄로 수정. 서두 없이.
+- **실제 문제만 지적합니다.** 괜찮은 것은 건너뜁니다.
+- **greptile-triage.md의 Greptile 답변 템플릿을 사용합니다.** 모든 답변에 증거를 포함합니다. 모호한 답변은 절대 게시하지 마십시오.

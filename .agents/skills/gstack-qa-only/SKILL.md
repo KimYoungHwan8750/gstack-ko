@@ -3,11 +3,11 @@ name: qa-only
 preamble-tier: 4
 version: 1.0.0
 description: |
-  Report-only QA testing. Systematically tests a web application and produces a
-  structured report with health score, screenshots, and repro steps — but never
-  fixes anything. Use when asked to "just report bugs", "qa report only", or
-  "test but don't fix". For the full test-fix-verify loop, use /qa instead.
-  Proactively suggest when the user wants a bug report without any code changes.
+  리포트 전용 QA 테스트. 웹 애플리케이션을 체계적으로 테스트하고 건강 점수, 스크린샷,
+  재현 단계가 포함된 구조화된 리포트를 생성합니다 — 아무것도 수정하지 않습니다.
+  "버그만 보고해줘", "qa 리포트만", "테스트만 하고 수정은 하지 마" 등의 요청 시 사용합니다.
+  전체 테스트-수정-검증 루프는 /qa를 사용하세요.
+  사용자가 코드 변경 없이 버그 리포트를 원할 때 사전에 제안합니다.
 allowed-tools:
   - Bash
   - Read
@@ -44,6 +44,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$($GSTACK_BIN/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -201,6 +207,35 @@ AI makes completeness near-free. Always recommend the complete option over short
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
 
+## yhlib 모노레포 통합
+
+`YHLIB`이 `true`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
+
+**확정 기술 스택 (프레임워크 선택 건너뛰기):**
+- Web: Next.js / App: Expo (React Native) / Backend: Supabase
+- 상태관리: Zustand / 데이터 패칭: Tanstack Query
+- 폼/검증: Zod + React Hook Form
+- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
+- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
+
+**아키텍처 참조 문서:**
+- `.claude/CLAUDE.md` — 전체 아키텍처 + DI 전략
+- `.claude/web.md` — Next.js 규칙
+- `.claude/app.md` — Expo/React Native 규칙
+- `.claude/supabase.md` — DB/Auth/Storage
+- `.claude/form.md` — 폼/입력/검증 패턴
+- `.claude/theme.md` — 테마/디자인 시스템
+- `.claude/components.md` — UI 컴포넌트 아키텍처
+- `.claude/i18n.md` — 다국어 구현
+
+**필수 동작:**
+- 프레임워크/기술 스택 질문을 건너뛰세요
+- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
+- 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
+- `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
+
+`YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
+
 ## Repo Ownership — See Something, Say Something
 
 `REPO_MODE` controls how to handle issues outside your branch:
@@ -326,25 +361,25 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# /qa-only: Report-Only QA Testing
+# /qa-only: 리포트 전용 QA 테스트
 
-You are a QA engineer. Test web applications like a real user — click everything, fill every form, check every state. Produce a structured report with evidence. **NEVER fix anything.**
+당신은 QA 엔지니어입니다. 실제 사용자처럼 웹 애플리케이션을 테스트합니다 — 모든 것을 클릭하고, 모든 폼을 채우고, 모든 상태를 확인합니다. 증거가 포함된 구조화된 리포트를 생성합니다. **절대 아무것도 수정하지 않습니다.**
 
-## Setup
+## 설정
 
-**Parse the user's request for these parameters:**
+**사용자의 요청에서 다음 매개변수를 파싱합니다:**
 
-| Parameter | Default | Override example |
+| 매개변수 | 기본값 | 재정의 예시 |
 |-----------|---------|-----------------:|
-| Target URL | (auto-detect or required) | `https://myapp.com`, `http://localhost:3000` |
-| Mode | full | `--quick`, `--regression .gstack/qa-reports/baseline.json` |
-| Output dir | `.gstack/qa-reports/` | `Output to /tmp/qa` |
-| Scope | Full app (or diff-scoped) | `Focus on the billing page` |
-| Auth | None | `Sign in to user@example.com`, `Import cookies from cookies.json` |
+| 대상 URL | (자동 감지 또는 필수) | `https://myapp.com`, `http://localhost:3000` |
+| 모드 | full | `--quick`, `--regression .gstack/qa-reports/baseline.json` |
+| 출력 디렉토리 | `.gstack/qa-reports/` | `Output to /tmp/qa` |
+| 범위 | 전체 앱 (또는 diff 기반) | `Focus on the billing page` |
+| 인증 | 없음 | `Sign in to user@example.com`, `Import cookies from cookies.json` |
 
-**If no URL is given and you're on a feature branch:** Automatically enter **diff-aware mode** (see Modes below). This is the most common case — the user just shipped code on a branch and wants to verify it works.
+**URL이 주어지지 않고 기능 브랜치에 있는 경우:** 자동으로 **diff 인식 모드**에 진입합니다 (아래 모드 참조). 가장 일반적인 경우로 — 사용자가 브랜치에서 코드를 작성하고 작동하는지 확인하고 싶을 때입니다.
 
-**Find the browse binary:**
+**browse 바이너리 찾기:**
 
 ## SETUP (run this check BEFORE any browse command)
 
@@ -365,7 +400,7 @@ If `NEEDS_SETUP`:
 2. Run: `cd <SKILL_DIR> && ./setup`
 3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
 
-**Create output directories:**
+**출력 디렉토리 생성:**
 
 ```bash
 REPORT_DIR=".gstack/qa-reports"
@@ -374,17 +409,17 @@ mkdir -p "$REPORT_DIR/screenshots"
 
 ---
 
-## Test Plan Context
+## 테스트 계획 컨텍스트
 
-Before falling back to git diff heuristics, check for richer test plan sources:
+git diff 휴리스틱으로 폴백하기 전에, 더 풍부한 테스트 계획 소스를 확인합니다:
 
-1. **Project-scoped test plans:** Check `~/.gstack/projects/` for recent `*-test-plan-*.md` files for this repo
+1. **프로젝트 범위 테스트 계획:** `~/.gstack/projects/`에서 이 저장소의 최근 `*-test-plan-*.md` 파일을 확인합니다
    ```bash
    eval "$($GSTACK_BIN/gstack-slug 2>/dev/null)"
    ls -t ~/.gstack/projects/$SLUG/*-test-plan-*.md 2>/dev/null | head -1
    ```
-2. **Conversation context:** Check if a prior `/plan-eng-review` or `/plan-ceo-review` produced test plan output in this conversation
-3. **Use whichever source is richer.** Fall back to git diff analysis only if neither is available.
+2. **대화 컨텍스트:** 이전 `/plan-eng-review` 또는 `/plan-ceo-review`가 이 대화에서 테스트 계획 출력을 생성했는지 확인합니다
+3. **더 풍부한 소스를 사용합니다.** 두 소스 모두 사용할 수 없는 경우에만 git diff 분석으로 폴백합니다.
 
 ---
 
@@ -668,36 +703,36 @@ Minimum 0 per category.
 
 ---
 
-## Output
+## 출력
 
-Write the report to both local and project-scoped locations:
+리포트를 로컬 및 프로젝트 범위 위치 모두에 작성합니다:
 
-**Local:** `.gstack/qa-reports/qa-report-{domain}-{YYYY-MM-DD}.md`
+**로컬:** `.gstack/qa-reports/qa-report-{domain}-{YYYY-MM-DD}.md`
 
-**Project-scoped:** Write test outcome artifact for cross-session context:
+**프로젝트 범위:** 세션 간 컨텍스트를 위한 테스트 결과 아티팩트를 작성합니다:
 ```bash
 eval "$($GSTACK_BIN/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 ```
-Write to `~/.gstack/projects/{slug}/{user}-{branch}-test-outcome-{datetime}.md`
+`~/.gstack/projects/{slug}/{user}-{branch}-test-outcome-{datetime}.md`에 작성합니다
 
-### Output Structure
+### 출력 구조
 
 ```
 .gstack/qa-reports/
-├── qa-report-{domain}-{YYYY-MM-DD}.md    # Structured report
+├── qa-report-{domain}-{YYYY-MM-DD}.md    # 구조화된 리포트
 ├── screenshots/
-│   ├── initial.png                        # Landing page annotated screenshot
-│   ├── issue-001-step-1.png               # Per-issue evidence
+│   ├── initial.png                        # 랜딩 페이지 주석 스크린샷
+│   ├── issue-001-step-1.png               # 이슈별 증거
 │   ├── issue-001-result.png
 │   └── ...
-└── baseline.json                          # For regression mode
+└── baseline.json                          # 회귀 모드(regression mode)용
 ```
 
-Report filenames use the domain and date: `qa-report-myapp-com-2026-03-12.md`
+리포트 파일명은 도메인과 날짜를 사용합니다: `qa-report-myapp-com-2026-03-12.md`
 
 ---
 
-## Additional Rules (qa-only specific)
+## 추가 규칙 (qa-only 전용)
 
-11. **Never fix bugs.** Find and document only. Do not read source code, edit files, or suggest fixes in the report. Your job is to report what's broken, not to fix it. Use `/qa` for the test-fix-verify loop.
-12. **No test framework detected?** If the project has no test infrastructure (no test config files, no test directories), include in the report summary: "No test framework detected. Run `/qa` to bootstrap one and enable regression test generation."
+11. **절대 버그를 수정하지 않습니다.** 찾고 문서화만 합니다. 소스 코드를 읽거나, 파일을 편집하거나, 리포트에서 수정을 제안하지 않습니다. 당신의 역할은 무엇이 고장났는지 보고하는 것이지, 수정하는 것이 아닙니다. 테스트-수정-검증 루프는 `/qa`를 사용하세요.
+12. **테스트 프레임워크가 감지되지 않은 경우?** 프로젝트에 테스트 인프라가 없다면 (테스트 구성 파일 없음, 테스트 디렉토리 없음), 리포트 요약에 포함합니다: "테스트 프레임워크가 감지되지 않았습니다. `/qa`를 실행하여 부트스트랩하고 회귀 테스트(regression test) 생성을 활성화하세요."

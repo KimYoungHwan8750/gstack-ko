@@ -3,10 +3,10 @@ name: setup-browser-cookies
 preamble-tier: 1
 version: 1.0.0
 description: |
-  Import cookies from your real Chromium browser into the headless browse session.
-  Opens an interactive picker UI where you select which cookie domains to import.
-  Use before QA testing authenticated pages. Use when asked to "import cookies",
-  "login to the site", or "authenticate the browser".
+  실제 Chromium 브라우저의 쿠키를 헤드리스 browse 세션으로 가져옵니다.
+  가져올 쿠키 도메인을 선택할 수 있는 인터랙티브 피커 UI를 엽니다.
+  인증이 필요한 페이지의 QA 테스트 전에 사용합니다. "import cookies",
+  "login to the site", "authenticate the browser" 요청 시 사용합니다.
 allowed-tools:
   - Bash
   - Read
@@ -41,6 +41,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$($GSTACK_BIN/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -242,26 +248,26 @@ plan's living status.
 
 # Setup Browser Cookies
 
-Import logged-in sessions from your real Chromium browser into the headless browse session.
+실제 Chromium 브라우저의 로그인 세션을 헤드리스 browse 세션으로 가져옵니다.
 
-## CDP mode check
+## CDP 모드 확인
 
-First, check if browse is already connected to the user's real browser:
+먼저, browse가 이미 사용자의 실제 브라우저에 연결되어 있는지 확인합니다:
 ```bash
 $B status 2>/dev/null | grep -q "Mode: cdp" && echo "CDP_MODE=true" || echo "CDP_MODE=false"
 ```
-If `CDP_MODE=true`: tell the user "Not needed — you're connected to your real browser via CDP. Your cookies and sessions are already available." and stop. No cookie import needed.
+`CDP_MODE=true`인 경우: 사용자에게 "필요 없습니다 — CDP를 통해 실제 브라우저에 연결되어 있습니다. 쿠키와 세션이 이미 사용 가능합니다."라고 알리고 중단합니다. 쿠키 가져오기가 필요 없습니다.
 
-## How it works
+## 동작 방식
 
-1. Find the browse binary
-2. Run `cookie-import-browser` to detect installed browsers and open the picker UI
-3. User selects which cookie domains to import in their browser
-4. Cookies are decrypted and loaded into the Playwright session
+1. browse 바이너리를 찾습니다
+2. `cookie-import-browser`를 실행하여 설치된 브라우저를 감지하고 피커 UI를 엽니다
+3. 사용자가 브라우저에서 가져올 쿠키 도메인을 선택합니다
+4. 쿠키가 복호화되어 Playwright 세션에 로드됩니다
 
-## Steps
+## 단계
 
-### 1. Find the browse binary
+### 1. browse 바이너리 찾기
 
 ## SETUP (run this check BEFORE any browse command)
 
@@ -282,45 +288,45 @@ If `NEEDS_SETUP`:
 2. Run: `cd <SKILL_DIR> && ./setup`
 3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
 
-### 2. Open the cookie picker
+### 2. 쿠키 피커 열기
 
 ```bash
 $B cookie-import-browser
 ```
 
-This auto-detects installed Chromium browsers and opens
-an interactive picker UI in your default browser where you can:
-- Switch between installed browsers
-- Search domains
-- Click "+" to import a domain's cookies
-- Click trash to remove imported cookies
+설치된 Chromium 브라우저를 자동 감지하고
+기본 브라우저에서 인터랙티브 피커 UI를 엽니다. 피커에서 다음을 수행할 수 있습니다:
+- 설치된 브라우저 간 전환
+- 도메인 검색
+- "+"를 클릭하여 도메인의 쿠키 가져오기
+- 휴지통을 클릭하여 가져온 쿠키 제거
 
-Tell the user: **"Cookie picker opened — select the domains you want to import in your browser, then tell me when you're done."**
+사용자에게 전달합니다: **"쿠키 피커가 열렸습니다 — 브라우저에서 가져올 도메인을 선택한 후, 완료되면 알려주세요."**
 
-### 3. Direct import (alternative)
+### 3. 직접 가져오기 (대체 방법)
 
-If the user specifies a domain directly (e.g., `/setup-browser-cookies github.com`), skip the UI:
+사용자가 도메인을 직접 지정한 경우 (예: `/setup-browser-cookies github.com`), UI를 건너뜁니다:
 
 ```bash
 $B cookie-import-browser comet --domain github.com
 ```
 
-Replace `comet` with the appropriate browser if specified.
+지정된 브라우저가 있으면 `comet`을 해당 브라우저로 교체합니다.
 
-### 4. Verify
+### 4. 확인
 
-After the user confirms they're done:
+사용자가 완료를 확인한 후:
 
 ```bash
 $B cookies
 ```
 
-Show the user a summary of imported cookies (domain counts).
+가져온 쿠키의 요약(도메인별 개수)을 사용자에게 표시합니다.
 
-## Notes
+## 참고 사항
 
-- On macOS, the first import per browser may trigger a Keychain dialog — click "Allow" / "Always Allow"
-- On Linux, `v11` cookies may require `secret-tool`/libsecret access; `v10` cookies use Chromium's standard fallback key
-- Cookie picker is served on the same port as the browse server (no extra process)
-- Only domain names and cookie counts are shown in the UI — no cookie values are exposed
-- The browse session persists cookies between commands, so imported cookies work immediately
+- macOS에서는 브라우저당 첫 번째 가져오기 시 Keychain 대화상자가 표시될 수 있습니다 — "Allow" / "Always Allow"를 클릭하세요
+- Linux에서는 `v11` 쿠키에 `secret-tool`/libsecret 접근이 필요할 수 있습니다; `v10` 쿠키는 Chromium의 표준 폴백 키를 사용합니다
+- 쿠키 피커는 browse 서버와 동일한 포트에서 제공됩니다 (추가 프로세스 없음)
+- UI에는 도메인 이름과 쿠키 개수만 표시됩니다 — 쿠키 값은 노출되지 않습니다
+- browse 세션은 명령 간에 쿠키를 유지하므로, 가져온 쿠키는 즉시 적용됩니다

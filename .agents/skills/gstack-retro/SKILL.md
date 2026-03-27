@@ -3,11 +3,11 @@ name: retro
 preamble-tier: 2
 version: 2.0.0
 description: |
-  Weekly engineering retrospective. Analyzes commit history, work patterns,
-  and code quality metrics with persistent history and trend tracking.
-  Team-aware: breaks down per-person contributions with praise and growth areas.
-  Use when asked to "weekly retro", "what did we ship", or "engineering retrospective".
-  Proactively suggest at the end of a work week or sprint.
+  주간 엔지니어링 회고. 커밋 히스토리, 작업 패턴, 코드 품질 메트릭을
+  영속적 히스토리와 트렌드 추적으로 분석합니다.
+  팀 인식: 기여자별 기여도를 칭찬과 성장 영역으로 분석합니다.
+  "weekly retro", "what did we ship", "engineering retrospective" 요청 시 사용하세요.
+  작업 주간이나 스프린트 마무리 시 선제적으로 제안하세요.
 allowed-tools:
   - Bash
   - Read
@@ -44,6 +44,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$($GSTACK_BIN/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -347,30 +353,30 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# /retro — Weekly Engineering Retrospective
+# /retro — 주간 엔지니어링 회고
 
-Generates a comprehensive engineering retrospective analyzing commit history, work patterns, and code quality metrics. Team-aware: identifies the user running the command, then analyzes every contributor with per-person praise and growth opportunities. Designed for a senior IC/CTO-level builder using Claude Code as a force multiplier.
+커밋 히스토리, 작업 패턴, 코드 품질 메트릭을 분석하는 종합 엔지니어링 회고를 생성합니다. 팀 인식: 명령을 실행하는 사용자를 식별한 후, 기여자별 칭찬과 성장 기회를 분석합니다. Claude Code를 포스 멀티플라이어로 사용하는 시니어 IC/CTO급 빌더를 위해 설계되었습니다.
 
-## User-invocable
-When the user types `/retro`, run this skill.
+## 사용자 호출
+사용자가 `/retro`를 입력하면 이 스킬을 실행하세요.
 
-## Arguments
-- `/retro` — default: last 7 days
-- `/retro 24h` — last 24 hours
-- `/retro 14d` — last 14 days
-- `/retro 30d` — last 30 days
-- `/retro compare` — compare current window vs prior same-length window
-- `/retro compare 14d` — compare with explicit window
-- `/retro global` — cross-project retro across all AI coding tools (7d default)
-- `/retro global 14d` — cross-project retro with explicit window
+## 인자
+- `/retro` — 기본: 최근 7일
+- `/retro 24h` — 최근 24시간
+- `/retro 14d` — 최근 14일
+- `/retro 30d` — 최근 30일
+- `/retro compare` — 현재 윈도우 vs 이전 동일 길이 윈도우 비교
+- `/retro compare 14d` — 명시적 윈도우로 비교
+- `/retro global` — 모든 AI 코딩 도구에 걸친 크로스 프로젝트 회고 (7일 기본)
+- `/retro global 14d` — 명시적 윈도우로 크로스 프로젝트 회고
 
-## Instructions
+## 지침
 
-Parse the argument to determine the time window. Default to 7 days if no argument given. All times should be reported in the user's **local timezone** (use the system default — do NOT set `TZ`).
+인자를 파싱하여 시간 윈도우를 결정합니다. 인자가 없으면 7일 기본. 모든 시간은 사용자의 **로컬 타임존**으로 보고합니다 (시스템 기본 사용 — `TZ`를 설정하지 마세요).
 
-**Midnight-aligned windows:** For day (`d`) and week (`w`) units, compute an absolute start date at local midnight, not a relative string. For example, if today is 2026-03-18 and the window is 7 days: the start date is 2026-03-11. Use `--since="2026-03-11T00:00:00"` for git log queries — the explicit `T00:00:00` suffix ensures git starts from midnight. Without it, git uses the current wall-clock time (e.g., `--since="2026-03-11"` at 11pm means 11pm, not midnight). For week units, multiply by 7 to get days (e.g., `2w` = 14 days back). For hour (`h`) units, use `--since="N hours ago"` since midnight alignment does not apply to sub-day windows.
+**자정 정렬 윈도우:** 일(`d`)과 주(`w`) 단위는 상대 문자열이 아닌 로컬 자정의 절대 시작 날짜를 계산합니다. 예를 들어, 오늘이 2026-03-18이고 윈도우가 7일이면: 시작 날짜는 2026-03-11. git log 쿼리에 `--since="2026-03-11T00:00:00"` 사용 — 명시적 `T00:00:00` 접미사가 git이 자정부터 시작하도록 보장합니다. 없으면 git은 현재 벽시계 시간을 사용합니다 (예: `--since="2026-03-11"`이 오후 11시에 실행되면 오전 0시가 아닌 오후 11시). 주 단위는 7을 곱하여 일수를 구합니다 (예: `2w` = 14일 전). 시간(`h`) 단위는 자정 정렬이 적용되지 않으므로 `--since="N hours ago"`를 사용합니다.
 
-**Argument validation:** If the argument doesn't match a number followed by `d`, `h`, or `w`, the word `compare` (optionally followed by a window), or the word `global` (optionally followed by a window), show this usage and stop:
+**인자 검증:** 인자가 숫자 뒤에 `d`, `h`, `w`, `compare` (선택적으로 윈도우 포함), `global` (선택적으로 윈도우 포함) 형식과 일치하지 않으면, 사용법을 보여주고 중단합니다:
 ```
 Usage: /retro [window | compare | global]
   /retro              — last 7 days (default)
@@ -383,87 +389,87 @@ Usage: /retro [window | compare | global]
   /retro global 14d   — cross-project retro with explicit window
 ```
 
-**If the first argument is `global`:** Skip the normal repo-scoped retro (Steps 1-14). Instead, follow the **Global Retrospective** flow at the end of this document. The optional second argument is the time window (default 7d). This mode does NOT require being inside a git repo.
+**첫 번째 인자가 `global`이면:** 일반 저장소 범위 회고 (Steps 1-14)를 건너뜁니다. 대신 이 문서 끝의 **글로벌 회고** 플로우를 따르세요. 선택적 두 번째 인자가 시간 윈도우 (기본 7d). 이 모드는 git 저장소 안에 있을 필요가 없습니다.
 
-### Step 1: Gather Raw Data
+### Step 1: 원시 데이터 수집
 
-First, fetch origin and identify the current user:
+먼저, origin을 fetch하고 현재 사용자를 식별합니다:
 ```bash
 git fetch origin <default> --quiet
-# Identify who is running the retro
+# 회고를 실행하는 사람 식별
 git config user.name
 git config user.email
 ```
 
-The name returned by `git config user.name` is **"you"** — the person reading this retro. All other authors are teammates. Use this to orient the narrative: "your" commits vs teammate contributions.
+`git config user.name`이 반환하는 이름이 **"당신"**입니다 — 이 회고를 읽는 사람. 다른 모든 작성자는 팀원입니다. 내러티브 방향 설정에 사용: "당신의" 커밋 vs 팀원 기여.
 
-Run ALL of these git commands in parallel (they are independent):
+모든 git 명령을 병렬로 실행합니다 (독립적):
 
 ```bash
-# 1. All commits in window with timestamps, subject, hash, AUTHOR, files changed, insertions, deletions
+# 1. 윈도우 내 모든 커밋: 타임스탬프, 제목, 해시, 작성자, 변경 파일, 삽입, 삭제
 git log origin/<default> --since="<window>" --format="%H|%aN|%ae|%ai|%s" --shortstat
 
-# 2. Per-commit test vs total LOC breakdown with author
-#    Each commit block starts with COMMIT:<hash>|<author>, followed by numstat lines.
-#    Separate test files (matching test/|spec/|__tests__/) from production files.
+# 2. 커밋별 테스트 vs 전체 LOC 분석 (작성자 포함)
+#    각 커밋 블록은 COMMIT:<hash>|<author>로 시작, numstat 라인이 뒤따름.
+#    테스트 파일(test/|spec/|__tests__/ 매칭)과 프로덕션 파일을 분리.
 git log origin/<default> --since="<window>" --format="COMMIT:%H|%aN" --numstat
 
-# 3. Commit timestamps for session detection and hourly distribution (with author)
+# 3. 세션 감지 및 시간별 분포를 위한 커밋 타임스탬프 (작성자 포함)
 git log origin/<default> --since="<window>" --format="%at|%aN|%ai|%s" | sort -n
 
-# 4. Files most frequently changed (hotspot analysis)
+# 4. 가장 자주 변경된 파일 (핫스팟 분석)
 git log origin/<default> --since="<window>" --format="" --name-only | grep -v '^$' | sort | uniq -c | sort -rn
 
-# 5. PR/MR numbers from commit messages (GitHub #NNN, GitLab !NNN)
+# 5. 커밋 메시지의 PR/MR 번호 (GitHub #NNN, GitLab !NNN)
 git log origin/<default> --since="<window>" --format="%s" | grep -oE '[#!][0-9]+' | sort -t'#' -k1 | uniq
 
-# 6. Per-author file hotspots (who touches what)
+# 6. 작성자별 파일 핫스팟 (누가 무엇을 수정하는지)
 git log origin/<default> --since="<window>" --format="AUTHOR:%aN" --name-only
 
-# 7. Per-author commit counts (quick summary)
+# 7. 작성자별 커밋 수 (빠른 요약)
 git shortlog origin/<default> --since="<window>" -sn --no-merges
 
-# 8. Greptile triage history (if available)
+# 8. Greptile 분류 히스토리 (가능한 경우)
 cat ~/.gstack/greptile-history.md 2>/dev/null || true
 
-# 9. TODOS.md backlog (if available)
+# 9. TODOS.md 백로그 (가능한 경우)
 cat TODOS.md 2>/dev/null || true
 
-# 10. Test file count
+# 10. 테스트 파일 수
 find . -name '*.test.*' -o -name '*.spec.*' -o -name '*_test.*' -o -name '*_spec.*' 2>/dev/null | grep -v node_modules | wc -l
 
-# 11. Regression test commits in window
+# 11. 윈도우 내 회귀 테스트 커밋
 git log origin/<default> --since="<window>" --oneline --grep="test(qa):" --grep="test(design):" --grep="test: coverage"
 
-# 12. gstack skill usage telemetry (if available)
+# 12. gstack 스킬 사용 텔레메트리 (가능한 경우)
 cat ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
 
-# 12. Test files changed in window
+# 12. 윈도우 내 변경된 테스트 파일
 git log origin/<default> --since="<window>" --format="" --name-only | grep -E '\.(test|spec)\.' | sort -u | wc -l
 ```
 
-### Step 2: Compute Metrics
+### Step 2: 메트릭 계산
 
-Calculate and present these metrics in a summary table:
+다음 메트릭을 요약 테이블로 계산하고 제시합니다:
 
-| Metric | Value |
-|--------|-------|
-| Commits to main | N |
-| Contributors | N |
-| PRs merged | N |
-| Total insertions | N |
-| Total deletions | N |
-| Net LOC added | N |
-| Test LOC (insertions) | N |
-| Test LOC ratio | N% |
-| Version range | vX.Y.Z.W → vX.Y.Z.W |
-| Active days | N |
-| Detected sessions | N |
-| Avg LOC/session-hour | N |
-| Greptile signal | N% (Y catches, Z FPs) |
-| Test Health | N total tests · M added this period · K regression tests |
+| 메트릭 | 값 |
+|--------|------|
+| main으로의 커밋 | N |
+| 기여자 | N |
+| 머지된 PR | N |
+| 총 삽입 | N |
+| 총 삭제 | N |
+| 순 LOC 추가 | N |
+| 테스트 LOC (삽입) | N |
+| 테스트 LOC 비율 | N% |
+| 버전 범위 | vX.Y.Z.W → vX.Y.Z.W |
+| 활동 일수 | N |
+| 감지된 세션 | N |
+| 평균 LOC/세션시간 | N |
+| Greptile 시그널 | N% (Y catches, Z FPs) |
+| 테스트 건강 | 총 N 테스트 · 이 기간 M 추가 · K 회귀 테스트 |
 
-Then show a **per-author leaderboard** immediately below:
+바로 아래에 **작성자별 리더보드**를 표시합니다:
 
 ```
 Contributor         Commits   +/-          Top area
@@ -472,49 +478,49 @@ alice                    12   +800/-150    app/services/
 bob                       3   +120/-40     tests/
 ```
 
-Sort by commits descending. The current user (from `git config user.name`) always appears first, labeled "You (name)".
+커밋 수 내림차순 정렬. 현재 사용자 (`git config user.name`에서)는 항상 첫 번째, "You (name)"으로 표시.
 
-**Greptile signal (if history exists):** Read `~/.gstack/greptile-history.md` (fetched in Step 1, command 8). Filter entries within the retro time window by date. Count entries by type: `fix`, `fp`, `already-fixed`. Compute signal ratio: `(fix + already-fixed) / (fix + already-fixed + fp)`. If no entries exist in the window or the file doesn't exist, skip the Greptile metric row. Skip unparseable lines silently.
+**Greptile 시그널 (히스토리 존재 시):** `~/.gstack/greptile-history.md`를 읽습니다 (Step 1, 명령 8에서 가져옴). 회고 시간 윈도우 내 항목을 날짜로 필터링합니다. 유형별 항목 수: `fix`, `fp`, `already-fixed`. 시그널 비율 계산: `(fix + already-fixed) / (fix + already-fixed + fp)`. 윈도우 내 항목이 없거나 파일이 없으면, Greptile 메트릭 행을 건너뜁니다. 파싱 불가능한 라인은 조용히 건너뜁니다.
 
-**Backlog Health (if TODOS.md exists):** Read `TODOS.md` (fetched in Step 1, command 9). Compute:
-- Total open TODOs (exclude items in `## Completed` section)
-- P0/P1 count (critical/urgent items)
-- P2 count (important items)
-- Items completed this period (items in Completed section with dates within the retro window)
-- Items added this period (cross-reference git log for commits that modified TODOS.md within the window)
+**백로그 건강 (TODOS.md 존재 시):** `TODOS.md`를 읽습니다 (Step 1, 명령 9에서 가져옴). 계산:
+- 총 열린 TODO (## Completed 섹션의 항목 제외)
+- P0/P1 수 (크리티컬/긴급 항목)
+- P2 수 (중요한 항목)
+- 이 기간 완료된 항목 (Completed 섹션에서 회고 윈도우 내 날짜를 가진 항목)
+- 이 기간 추가된 항목 (윈도우 내 TODOS.md를 수정한 커밋과 상호 참조)
 
-Include in the metrics table:
+메트릭 테이블에 포함:
 ```
 | Backlog Health | N open (X P0/P1, Y P2) · Z completed this period |
 ```
 
-If TODOS.md doesn't exist, skip the Backlog Health row.
+TODOS.md가 없으면, Backlog Health 행을 건너뜁니다.
 
-**Skill Usage (if analytics exist):** Read `~/.gstack/analytics/skill-usage.jsonl` if it exists. Filter entries within the retro time window by `ts` field. Separate skill activations (no `event` field) from hook fires (`event: "hook_fire"`). Aggregate by skill name. Present as:
+**스킬 사용 (분석 존재 시):** `~/.gstack/analytics/skill-usage.jsonl`이 존재하면 읽습니다. `ts` 필드로 회고 시간 윈도우 내 항목을 필터링합니다. 스킬 활성화 (`event` 필드 없음)와 훅 발동 (`event: "hook_fire"`)을 분리합니다. 스킬 이름별 집계. 제시:
 
 ```
 | Skill Usage | /ship(12) /qa(8) /review(5) · 3 safety hook fires |
 ```
 
-If the JSONL file doesn't exist or has no entries in the window, skip the Skill Usage row.
+JSONL 파일이 없거나 윈도우 내 항목이 없으면, Skill Usage 행을 건너뜁니다.
 
-**Eureka Moments (if logged):** Read `~/.gstack/analytics/eureka.jsonl` if it exists. Filter entries within the retro time window by `ts` field. For each eureka moment, show the skill that flagged it, the branch, and a one-line summary of the insight. Present as:
+**유레카 순간 (기록된 경우):** `~/.gstack/analytics/eureka.jsonl`이 존재하면 읽습니다. `ts` 필드로 회고 시간 윈도우 내 항목을 필터링합니다. 각 유레카 순간에 대해, 플래그한 스킬, 브랜치, 인사이트의 한 줄 요약을 표시합니다. 제시:
 
 ```
 | Eureka Moments | 2 this period |
 ```
 
-If moments exist, list them:
+순간이 존재하면, 나열합니다:
 ```
   EUREKA /office-hours (branch: garrytan/auth-rethink): "Session tokens don't need server storage — browser crypto API makes client-side JWT validation viable"
   EUREKA /plan-eng-review (branch: garrytan/cache-layer): "Redis isn't needed here — Bun's built-in LRU cache handles this workload"
 ```
 
-If the JSONL file doesn't exist or has no entries in the window, skip the Eureka Moments row.
+JSONL 파일이 없거나 윈도우 내 항목이 없으면, Eureka Moments 행을 건너뜁니다.
 
-### Step 3: Commit Time Distribution
+### Step 3: 커밋 시간 분포
 
-Show hourly histogram in local time using bar chart:
+로컬 시간으로 시간별 히스토그램을 막대 차트로 표시합니다:
 
 ```
 Hour  Commits  ████████████████
@@ -523,32 +529,32 @@ Hour  Commits  ████████████████
  ...
 ```
 
-Identify and call out:
-- Peak hours
-- Dead zones
-- Whether pattern is bimodal (morning/evening) or continuous
-- Late-night coding clusters (after 10pm)
+식별하고 호출합니다:
+- 피크 시간
+- 데드존
+- 패턴이 바이모달 (아침/저녁)인지 연속적인지
+- 심야 코딩 클러스터 (오후 10시 이후)
 
-### Step 4: Work Session Detection
+### Step 4: 작업 세션 감지
 
-Detect sessions using **45-minute gap** threshold between consecutive commits. For each session report:
-- Start/end time (Pacific)
-- Number of commits
-- Duration in minutes
+연속 커밋 간 **45분 갭** 임계값을 사용하여 세션을 감지합니다. 각 세션에 대해 보고:
+- 시작/종료 시간
+- 커밋 수
+- 분 단위 기간
 
-Classify sessions:
-- **Deep sessions** (50+ min)
-- **Medium sessions** (20-50 min)
-- **Micro sessions** (<20 min, typically single-commit fire-and-forget)
+세션 분류:
+- **딥 세션** (50분 이상)
+- **미디엄 세션** (20-50분)
+- **마이크로 세션** (20분 미만, 일반적으로 단일 커밋 fire-and-forget)
 
-Calculate:
-- Total active coding time (sum of session durations)
-- Average session length
-- LOC per hour of active time
+계산:
+- 총 활성 코딩 시간 (세션 기간 합계)
+- 평균 세션 길이
+- 활성 시간당 LOC
 
-### Step 5: Commit Type Breakdown
+### Step 5: 커밋 유형 분석
 
-Categorize by conventional commit prefix (feat/fix/refactor/test/chore/docs). Show as percentage bar:
+관례적 커밋 접두사(feat/fix/refactor/test/chore/docs)로 분류합니다. 백분율 막대로 표시:
 
 ```
 feat:     20  (40%)  ████████████████████
@@ -556,88 +562,88 @@ fix:      27  (54%)  ███████████████████�
 refactor:  2  ( 4%)  ██
 ```
 
-Flag if fix ratio exceeds 50% — this signals a "ship fast, fix fast" pattern that may indicate review gaps.
+fix 비율이 50%를 초과하면 플래그 — "빠르게 배포하고, 빠르게 수정하는" 패턴으로 리뷰 갭을 나타낼 수 있습니다.
 
-### Step 6: Hotspot Analysis
+### Step 6: 핫스팟 분석
 
-Show top 10 most-changed files. Flag:
-- Files changed 5+ times (churn hotspots)
-- Test files vs production files in the hotspot list
-- VERSION/CHANGELOG frequency (version discipline indicator)
+가장 많이 변경된 상위 10개 파일을 표시합니다. 플래그:
+- 5회 이상 변경된 파일 (변동 핫스팟)
+- 핫스팟 목록의 테스트 파일 vs 프로덕션 파일
+- VERSION/CHANGELOG 빈도 (버전 규율 지표)
 
-### Step 7: PR Size Distribution
+### Step 7: PR 크기 분포
 
-From commit diffs, estimate PR sizes and bucket them:
-- **Small** (<100 LOC)
+커밋 diff에서 PR 크기를 추정하고 버킷으로 분류합니다:
+- **Small** (100 LOC 미만)
 - **Medium** (100-500 LOC)
 - **Large** (500-1500 LOC)
-- **XL** (1500+ LOC)
+- **XL** (1500 LOC 이상)
 
-### Step 8: Focus Score + Ship of the Week
+### Step 8: 집중 점수 + 이 주의 배포
 
-**Focus score:** Calculate the percentage of commits touching the single most-changed top-level directory (e.g., `app/services/`, `app/views/`). Higher score = deeper focused work. Lower score = scattered context-switching. Report as: "Focus score: 62% (app/services/)"
+**집중 점수:** 가장 많이 변경된 단일 최상위 디렉토리 (예: `app/services/`, `app/views/`)에 접촉하는 커밋의 백분율을 계산합니다. 높은 점수 = 깊은 집중 작업. 낮은 점수 = 산만한 컨텍스트 전환. 보고: "Focus score: 62% (app/services/)"
 
-**Ship of the week:** Auto-identify the single highest-LOC PR in the window. Highlight it:
-- PR number and title
-- LOC changed
-- Why it matters (infer from commit messages and files touched)
+**이 주의 배포:** 윈도우에서 가장 높은 LOC PR을 자동 식별합니다. 하이라이트:
+- PR 번호와 제목
+- 변경된 LOC
+- 왜 중요한지 (커밋 메시지와 수정된 파일에서 추론)
 
-### Step 9: Team Member Analysis
+### Step 9: 팀원 분석
 
-For each contributor (including the current user), compute:
+각 기여자 (현재 사용자 포함)에 대해 계산:
 
-1. **Commits and LOC** — total commits, insertions, deletions, net LOC
-2. **Areas of focus** — which directories/files they touched most (top 3)
-3. **Commit type mix** — their personal feat/fix/refactor/test breakdown
-4. **Session patterns** — when they code (their peak hours), session count
-5. **Test discipline** — their personal test LOC ratio
-6. **Biggest ship** — their single highest-impact commit or PR in the window
+1. **커밋과 LOC** — 총 커밋, 삽입, 삭제, 순 LOC
+2. **집중 영역** — 가장 많이 수정한 디렉토리/파일 (상위 3)
+3. **커밋 유형 믹스** — 개인 feat/fix/refactor/test 분석
+4. **세션 패턴** — 코딩하는 시간대 (피크 시간), 세션 수
+5. **테스트 규율** — 개인 테스트 LOC 비율
+6. **최대 배포** — 윈도우에서 가장 높은 임팩트 커밋 또는 PR
 
-**For the current user ("You"):** This section gets the deepest treatment. Include all the detail from the solo retro — session analysis, time patterns, focus score. Frame it in first person: "Your peak hours...", "Your biggest ship..."
+**현재 사용자 ("You")의 경우:** 이 섹션이 가장 깊은 처리를 받습니다. 솔로 회고의 모든 세부사항 포함 — 세션 분석, 시간 패턴, 집중 점수. 1인칭으로 작성: "당신의 피크 시간...", "당신의 최대 배포..."
 
-**For each teammate:** Write 2-3 sentences covering what they worked on and their pattern. Then:
+**각 팀원의 경우:** 그들이 작업한 것과 패턴을 2-3문장으로 작성합니다. 그런 다음:
 
-- **Praise** (1-2 specific things): Anchor in actual commits. Not "great work" — say exactly what was good. Examples: "Shipped the entire auth middleware rewrite in 3 focused sessions with 45% test coverage", "Every PR under 200 LOC — disciplined decomposition."
-- **Opportunity for growth** (1 specific thing): Frame as a leveling-up suggestion, not criticism. Anchor in actual data. Examples: "Test ratio was 12% this week — adding test coverage to the payment module before it gets more complex would pay off", "5 fix commits on the same file suggest the original PR could have used a review pass."
+- **칭찬** (1-2가지 구체적인 것): 실제 커밋에 근거. "좋은 작업"이 아닌 — 정확히 무엇이 좋았는지 말하세요. 예: "전체 인증 미들웨어 재작성을 3개의 집중된 세션에서 45% 테스트 커버리지로 배포", "모든 PR이 200 LOC 미만 — 규율 있는 분해."
+- **성장 기회** (1가지 구체적인 것): 비판이 아닌 레벨업 제안으로 프레이밍. 실제 데이터에 근거. 예: "이번 주 테스트 비율이 12%였습니다 — 결제 모듈이 더 복잡해지기 전에 테스트 커버리지에 투자하면 보상이 클 것입니다", "같은 파일에 5개 fix 커밋이 있어 원래 PR이 리뷰 패스를 했으면 좋았을 것 같습니다."
 
-**If only one contributor (solo repo):** Skip the team breakdown and proceed as before — the retro is personal.
+**기여자가 한 명 (솔로 저장소)인 경우:** 팀 분석을 건너뛰고 이전처럼 진행 — 회고가 개인적입니다.
 
-**If there are Co-Authored-By trailers:** Parse `Co-Authored-By:` lines in commit messages. Credit those authors for the commit alongside the primary author. Note AI co-authors (e.g., `noreply@anthropic.com`) but do not include them as team members — instead, track "AI-assisted commits" as a separate metric.
+**Co-Authored-By 트레일러가 있으면:** 커밋 메시지의 `Co-Authored-By:` 라인을 파싱합니다. 해당 작성자를 주 작성자와 함께 커밋에 크레딧합니다. AI 공동 작성자 (예: `noreply@anthropic.com`)는 기록하되 팀원으로 포함하지 마세요 — 대신 "AI 지원 커밋"을 별도 메트릭으로 추적합니다.
 
-### Step 10: Week-over-Week Trends (if window >= 14d)
+### Step 10: 주별 트렌드 (윈도우 >= 14일인 경우)
 
-If the time window is 14 days or more, split into weekly buckets and show trends:
-- Commits per week (total and per-author)
-- LOC per week
-- Test ratio per week
-- Fix ratio per week
-- Session count per week
+시간 윈도우가 14일 이상이면, 주별 버킷으로 나누고 트렌드를 표시합니다:
+- 주별 커밋 (총계 및 작성자별)
+- 주별 LOC
+- 주별 테스트 비율
+- 주별 fix 비율
+- 주별 세션 수
 
-### Step 11: Streak Tracking
+### Step 11: 연속 기록 추적
 
-Count consecutive days with at least 1 commit to origin/<default>, going back from today. Track both team streak and personal streak:
+오늘부터 거슬러 올라가며 origin/<default>에 최소 1개 커밋이 있는 연속 일수를 셉니다. 팀 연속 기록과 개인 연속 기록 모두 추적:
 
 ```bash
-# Team streak: all unique commit dates (local time) — no hard cutoff
+# 팀 연속 기록: 모든 고유 커밋 날짜 (로컬 시간) — 하드 컷오프 없음
 git log origin/<default> --format="%ad" --date=format:"%Y-%m-%d" | sort -u
 
-# Personal streak: only the current user's commits
+# 개인 연속 기록: 현재 사용자의 커밋만
 git log origin/<default> --author="<user_name>" --format="%ad" --date=format:"%Y-%m-%d" | sort -u
 ```
 
-Count backward from today — how many consecutive days have at least one commit? This queries the full history so streaks of any length are reported accurately. Display both:
+오늘부터 거꾸로 세기 — 최소 하나의 커밋이 있는 연속 일수는? 전체 히스토리를 쿼리하므로 어떤 길이의 연속 기록도 정확하게 보고됩니다. 둘 다 표시:
 - "Team shipping streak: 47 consecutive days"
 - "Your shipping streak: 32 consecutive days"
 
-### Step 12: Load History & Compare
+### Step 12: 히스토리 로드 & 비교
 
-Before saving the new snapshot, check for prior retro history:
+새 스냅샷을 저장하기 전에, 이전 회고 히스토리를 확인합니다:
 
 ```bash
 ls -t .context/retros/*.json 2>/dev/null
 ```
 
-**If prior retros exist:** Load the most recent one using the Read tool. Calculate deltas for key metrics and include a **Trends vs Last Retro** section:
+**이전 회고가 있으면:** Read 도구를 사용하여 가장 최근 것을 로드합니다. 주요 메트릭의 델타를 계산하고 **이전 회고 대비 트렌드** 섹션을 포함합니다:
 ```
                     Last        Now         Delta
 Test ratio:         22%    →    41%         ↑19pp
@@ -648,26 +654,26 @@ Commits:            32     →    47          ↑47%
 Deep sessions:      3      →    5           ↑2
 ```
 
-**If no prior retros exist:** Skip the comparison section and append: "First retro recorded — run again next week to see trends."
+**이전 회고가 없으면:** 비교 섹션을 건너뛰고 추가: "첫 회고 기록 — 다음 주에 다시 실행하면 트렌드를 볼 수 있습니다."
 
-### Step 13: Save Retro History
+### Step 13: 회고 히스토리 저장
 
-After computing all metrics (including streak) and loading any prior history for comparison, save a JSON snapshot:
+모든 메트릭 (연속 기록 포함)을 계산하고 비교를 위한 이전 히스토리를 로드한 후, JSON 스냅샷을 저장합니다:
 
 ```bash
 mkdir -p .context/retros
 ```
 
-Determine the next sequence number for today (substitute the actual date for `$(date +%Y-%m-%d)`):
+오늘의 다음 시퀀스 번호를 결정합니다 (실제 날짜를 `$(date +%Y-%m-%d)` 대신 대입):
 ```bash
-# Count existing retros for today to get next sequence number
+# 오늘 기존 회고 수를 세어 다음 시퀀스 번호 획득
 today=$(date +%Y-%m-%d)
 existing=$(ls .context/retros/${today}-*.json 2>/dev/null | wc -l | tr -d ' ')
 next=$((existing + 1))
-# Save as .context/retros/${today}-${next}.json
+# .context/retros/${today}-${next}.json으로 저장
 ```
 
-Use the Write tool to save the JSON file with this schema:
+Write 도구를 사용하여 이 스키마로 JSON 파일을 저장합니다:
 ```json
 {
   "date": "2026-03-08",
@@ -707,9 +713,9 @@ Use the Write tool to save the JSON file with this schema:
 }
 ```
 
-**Note:** Only include the `greptile` field if `~/.gstack/greptile-history.md` exists and has entries within the time window. Only include the `backlog` field if `TODOS.md` exists. Only include the `test_health` field if test files were found (command 10 returns > 0). If any has no data, omit the field entirely.
+**참고:** `greptile` 필드는 `~/.gstack/greptile-history.md`가 존재하고 시간 윈도우 내 항목이 있을 때만 포함. `backlog` 필드는 `TODOS.md`가 있을 때만 포함. `test_health` 필드는 테스트 파일이 발견되었을 때만 (명령 10이 > 0) 포함. 데이터가 없으면, 해당 필드를 완전히 생략합니다.
 
-Include test health data in the JSON when test files exist:
+테스트 파일이 있을 때 JSON에 테스트 건강 데이터 포함:
 ```json
   "test_health": {
     "total_test_files": 47,
@@ -719,7 +725,7 @@ Include test health data in the JSON when test files exist:
   }
 ```
 
-Include backlog data in the JSON when TODOS.md exists:
+TODOS.md가 있을 때 JSON에 백로그 데이터 포함:
 ```json
   "backlog": {
     "total_open": 28,
@@ -730,139 +736,139 @@ Include backlog data in the JSON when TODOS.md exists:
   }
 ```
 
-### Step 14: Write the Narrative
+### Step 14: 내러티브 작성
 
-Structure the output as:
+다음과 같이 출력을 구조화합니다:
 
 ---
 
-**Tweetable summary** (first line, before everything else):
+**트윗 가능 요약** (첫 줄, 모든 것 앞에):
 ```
 Week of Mar 1: 47 commits (3 contributors), 3.2k LOC, 38% tests, 12 PRs, peak: 10pm | Streak: 47d
 ```
 
-## Engineering Retro: [date range]
+## Engineering Retro: [날짜 범위]
 
-### Summary Table
-(from Step 2)
+### 요약 테이블
+(Step 2에서)
 
-### Trends vs Last Retro
-(from Step 11, loaded before save — skip if first retro)
+### 이전 회고 대비 트렌드
+(Step 11에서, 저장 전에 로드 — 첫 회고이면 건너뛰기)
 
-### Time & Session Patterns
-(from Steps 3-4)
+### 시간 & 세션 패턴
+(Steps 3-4에서)
 
-Narrative interpreting what the team-wide patterns mean:
-- When the most productive hours are and what drives them
-- Whether sessions are getting longer or shorter over time
-- Estimated hours per day of active coding (team aggregate)
-- Notable patterns: do team members code at the same time or in shifts?
+팀 전체 패턴이 의미하는 바를 해석하는 내러티브:
+- 가장 생산적인 시간대와 이를 이끄는 요인
+- 세션이 시간이 지남에 따라 길어지는지 짧아지는지
+- 일당 활성 코딩 추정 시간 (팀 집계)
+- 주목할 패턴: 팀원들이 같은 시간에 코딩하나 교대로 하나?
 
-### Shipping Velocity
-(from Steps 5-7)
+### 배포 속도
+(Steps 5-7에서)
 
-Narrative covering:
-- Commit type mix and what it reveals
-- PR size distribution and what it reveals about shipping cadence
-- Fix-chain detection (sequences of fix commits on the same subsystem)
-- Version bump discipline
+내러티브:
+- 커밋 유형 믹스와 이것이 드러내는 것
+- PR 크기 분포와 배포 케이던스에 대해 드러내는 것
+- fix 체인 감지 (같은 서브시스템에 대한 fix 커밋 시퀀스)
+- 버전 올림 규율
 
-### Code Quality Signals
-- Test LOC ratio trend
-- Hotspot analysis (are the same files churning?)
-- Greptile signal ratio and trend (if history exists): "Greptile: X% signal (Y valid catches, Z false positives)"
+### 코드 품질 시그널
+- 테스트 LOC 비율 트렌드
+- 핫스팟 분석 (같은 파일이 계속 변동하나?)
+- Greptile 시그널 비율과 트렌드 (히스토리 존재 시): "Greptile: X% signal (Y valid catches, Z false positives)"
 
-### Test Health
-- Total test files: N (from command 10)
-- Tests added this period: M (from command 12 — test files changed)
-- Regression test commits: list `test(qa):` and `test(design):` and `test: coverage` commits from command 11
-- If prior retro exists and has `test_health`: show delta "Test count: {last} → {now} (+{delta})"
-- If test ratio < 20%: flag as growth area — "100% test coverage is the goal. Tests make vibe coding safe."
+### 테스트 건강
+- 총 테스트 파일: N (명령 10에서)
+- 이 기간 추가된 테스트: M (명령 12에서 — 변경된 테스트 파일)
+- 회귀 테스트 커밋: 명령 11의 `test(qa):`, `test(design):`, `test: coverage` 커밋 나열
+- 이전 회고가 있고 `test_health`가 있으면: 델타 표시 "Test count: {last} → {now} (+{delta})"
+- 테스트 비율 < 20%이면: 성장 영역으로 플래그 — "100% 테스트 커버리지가 목표입니다. 테스트가 바이브 코딩을 안전하게 합니다."
 
-### Plan Completion
-Check review JSONL logs for plan completion data from /ship runs this period:
+### 플랜 완성도
+이 기간의 /ship 실행에서 플랜 완성도 데이터를 리뷰 JSONL 로그에서 확인합니다:
 
 ```bash
 eval "$($GSTACK_ROOT/bin/gstack-slug 2>/dev/null)"
 cat ~/.gstack/projects/$SLUG/*-reviews.jsonl 2>/dev/null | grep '"skill":"ship"' | grep '"plan_items_total"' || echo "NO_PLAN_DATA"
 ```
 
-If plan completion data exists within the retro time window:
-- Count branches shipped with plans (entries that have `plan_items_total` > 0)
-- Compute average completion: sum of `plan_items_done` / sum of `plan_items_total`
-- Identify most-skipped item category if data supports it
+플랜 완성도 데이터가 회고 시간 윈도우 내에 존재하면:
+- 플랜과 함께 배포된 브랜치 수 (`plan_items_total` > 0인 항목)
+- 평균 완성도 계산: `plan_items_done` 합계 / `plan_items_total` 합계
+- 데이터가 지원하면 가장 많이 건너뛴 항목 카테고리 식별
 
-Output:
+출력:
 ```
 Plan Completion This Period:
   {N} branches shipped with plans
   Average completion: {X}% ({done}/{total} items)
 ```
 
-If no plan data exists, skip this section silently.
+플랜 데이터가 없으면, 이 섹션을 조용히 건너뜁니다.
 
-### Focus & Highlights
-(from Step 8)
-- Focus score with interpretation
-- Ship of the week callout
+### 집중 & 하이라이트
+(Step 8에서)
+- 해석이 포함된 집중 점수
+- 이 주의 배포 호출
 
-### Your Week (personal deep-dive)
-(from Step 9, for the current user only)
+### 당신의 주간 (개인 딥다이브)
+(Step 9에서, 현재 사용자만)
 
-This is the section the user cares most about. Include:
-- Their personal commit count, LOC, test ratio
-- Their session patterns and peak hours
-- Their focus areas
-- Their biggest ship
-- **What you did well** (2-3 specific things anchored in commits)
-- **Where to level up** (1-2 specific, actionable suggestions)
+사용자가 가장 관심을 갖는 섹션입니다. 포함:
+- 개인 커밋 수, LOC, 테스트 비율
+- 세션 패턴과 피크 시간
+- 집중 영역
+- 최대 배포
+- **잘한 것** (커밋에 근거한 2-3가지 구체적인 것)
+- **레벨업할 곳** (1-2가지 구체적이고 실행 가능한 제안)
 
-### Team Breakdown
-(from Step 9, for each teammate — skip if solo repo)
+### 팀 분석
+(Step 9에서, 각 팀원 — 솔로 저장소이면 건너뛰기)
 
-For each teammate (sorted by commits descending), write a section:
+각 팀원 (커밋 수 내림차순)에 대해, 섹션을 작성합니다:
 
-#### [Name]
-- **What they shipped**: 2-3 sentences on their contributions, areas of focus, and commit patterns
-- **Praise**: 1-2 specific things they did well, anchored in actual commits. Be genuine — what would you actually say in a 1:1? Examples:
-  - "Cleaned up the entire auth module in 3 small, reviewable PRs — textbook decomposition"
-  - "Added integration tests for every new endpoint, not just happy paths"
-  - "Fixed the N+1 query that was causing 2s load times on the dashboard"
-- **Opportunity for growth**: 1 specific, constructive suggestion. Frame as investment, not criticism. Examples:
-  - "Test coverage on the payment module is at 8% — worth investing in before the next feature lands on top of it"
-  - "Most commits land in a single burst — spacing work across the day could reduce context-switching fatigue"
-  - "All commits land between 1-4am — sustainable pace matters for code quality long-term"
+#### [이름]
+- **배포한 것**: 기여, 집중 영역, 커밋 패턴에 대한 2-3문장
+- **칭찬**: 잘한 1-2가지 구체적인 것, 실제 커밋에 근거. 진심 — 1:1에서 실제로 말할 것은? 예:
+  - "전체 인증 모듈을 3개의 작고 리뷰 가능한 PR로 정리 — 교과서적 분해"
+  - "모든 새 엔드포인트에 통합 테스트 추가, 해피 패스만이 아닌"
+  - "대시보드에서 2초 로드 타임을 유발하던 N+1 쿼리 수정"
+- **성장 기회**: 1가지 구체적이고 건설적인 제안. 비판이 아닌 투자로 프레이밍. 예:
+  - "결제 모듈의 테스트 커버리지가 8% — 다음 기능이 그 위에 올라가기 전에 투자할 가치가 있습니다"
+  - "대부분의 커밋이 한꺼번에 — 하루에 걸쳐 작업을 분산하면 컨텍스트 전환 피로를 줄일 수 있습니다"
+  - "모든 커밋이 새벽 1-4시 사이 — 지속 가능한 페이스가 코드 품질에 장기적으로 중요합니다"
 
-**AI collaboration note:** If many commits have `Co-Authored-By` AI trailers (e.g., Claude, Copilot), note the AI-assisted commit percentage as a team metric. Frame it neutrally — "N% of commits were AI-assisted" — without judgment.
+**AI 협업 참고:** 많은 커밋에 `Co-Authored-By` AI 트레일러가 있으면 (예: Claude, Copilot), AI 지원 커밋 백분율을 팀 메트릭으로 기록합니다. 중립적으로 — "커밋의 N%가 AI 지원됨" — 판단 없이.
 
-### Top 3 Team Wins
-Identify the 3 highest-impact things shipped in the window across the whole team. For each:
-- What it was
-- Who shipped it
-- Why it matters (product/architecture impact)
+### 팀 최고의 3가지 성과
+윈도우에서 가장 높은 임팩트의 3가지 배포를 전체 팀에 걸쳐 식별합니다. 각각에 대해:
+- 무엇이었는지
+- 누가 배포했는지
+- 왜 중요한지 (제품/아키텍처 임팩트)
 
-### 3 Things to Improve
-Specific, actionable, anchored in actual commits. Mix personal and team-level suggestions. Phrase as "to get even better, the team could..."
+### 개선할 3가지
+구체적이고, 실행 가능하며, 실제 커밋에 근거. 개인과 팀 수준 제안을 섞습니다. "더 나아지려면, 팀이..."로 표현합니다.
 
-### 3 Habits for Next Week
-Small, practical, realistic. Each must be something that takes <5 minutes to adopt. At least one should be team-oriented (e.g., "review each other's PRs same-day").
+### 다음 주를 위한 3가지 습관
+작고, 실용적이고, 현실적. 각각 채택하는 데 5분 미만이어야 합니다. 최소 하나는 팀 지향적이어야 합니다 (예: "서로의 PR을 당일에 리뷰").
 
-### Week-over-Week Trends
-(if applicable, from Step 10)
+### 주별 트렌드
+(해당되면, Step 10에서)
 
 ---
 
-## Global Retrospective Mode
+## 글로벌 회고 모드
 
-When the user runs `/retro global` (or `/retro global 14d`), follow this flow instead of the repo-scoped Steps 1-14. This mode works from any directory — it does NOT require being inside a git repo.
+사용자가 `/retro global` (또는 `/retro global 14d`)을 실행하면, 저장소 범위 Steps 1-14 대신 이 플로우를 따릅니다. 이 모드는 어떤 디렉토리에서든 작동 — git 저장소 안에 있을 필요가 없습니다.
 
-### Global Step 1: Compute time window
+### 글로벌 Step 1: 시간 윈도우 계산
 
-Same midnight-aligned logic as the regular retro. Default 7d. The second argument after `global` is the window (e.g., `14d`, `30d`, `24h`).
+일반 회고와 동일한 자정 정렬 로직. 기본 7d. `global` 뒤의 두 번째 인자가 윈도우 (예: `14d`, `30d`, `24h`).
 
-### Global Step 2: Run discovery
+### 글로벌 Step 2: 디스커버리 실행
 
-Locate and run the discovery script using this fallback chain:
+다음 폴백 체인을 사용하여 디스커버리 스크립트를 찾고 실행합니다:
 
 ```bash
 DISCOVER_BIN=""
@@ -873,95 +879,94 @@ DISCOVER_BIN=""
 echo "DISCOVER_BIN: $DISCOVER_BIN"
 ```
 
-If no binary is found, tell the user: "Discovery script not found. Run `bun run build` in the gstack directory to compile it." and stop.
+바이너리를 찾을 수 없으면: "디스커버리 스크립트를 찾을 수 없습니다. gstack 디렉토리에서 `bun run build`를 실행하여 컴파일하세요."라고 알리고 중단합니다.
 
-Run the discovery:
+디스커버리 실행:
 ```bash
 $DISCOVER_BIN --since "<window>" --format json 2>/tmp/gstack-discover-stderr
 ```
 
-Read the stderr output from `/tmp/gstack-discover-stderr` for diagnostic info. Parse the JSON output from stdout.
+진단 정보를 위해 `/tmp/gstack-discover-stderr`의 stderr 출력을 읽습니다. stdout의 JSON 출력을 파싱합니다.
 
-If `total_sessions` is 0, say: "No AI coding sessions found in the last <window>. Try a longer window: `/retro global 30d`" and stop.
+`total_sessions`가 0이면: "최근 <window>에 AI 코딩 세션이 발견되지 않았습니다. 더 긴 윈도우를 시도하세요: `/retro global 30d`"라고 말하고 중단합니다.
 
-### Global Step 3: Run git log on each discovered repo
+### 글로벌 Step 3: 발견된 각 저장소에서 git log 실행
 
-For each repo in the discovery JSON's `repos` array, find the first valid path in `paths[]` (directory exists with `.git/`). If no valid path exists, skip the repo and note it.
+디스커버리 JSON의 `repos` 배열에서 각 저장소에 대해, `paths[]`에서 첫 번째 유효한 경로를 찾습니다 (`.git/`이 있는 디렉토리 존재). 유효한 경로가 없으면 저장소를 건너뛰고 기록합니다.
 
-**For local-only repos** (where `remote` starts with `local:`): skip `git fetch` and use the local default branch. Use `git log HEAD` instead of `git log origin/$DEFAULT`.
+**로컬 전용 저장소** (`remote`가 `local:`로 시작하는 경우): `git fetch`를 건너뛰고 로컬 기본 브랜치를 사용합니다. `git log origin/$DEFAULT` 대신 `git log HEAD` 사용.
 
-**For repos with remotes:**
+**리모트가 있는 저장소:**
 
 ```bash
 git -C <path> fetch origin --quiet 2>/dev/null
 ```
 
-Detect the default branch for each repo: first try `git symbolic-ref refs/remotes/origin/HEAD`, then check common branch names (`main`, `master`), then fall back to `git rev-parse --abbrev-ref HEAD`. Use the detected branch as `<default>` in the commands below.
+각 저장소의 기본 브랜치 감지: 먼저 `git symbolic-ref refs/remotes/origin/HEAD` 시도, 그 다음 일반적인 브랜치 이름 (`main`, `master`) 확인, 그런 다음 `git rev-parse --abbrev-ref HEAD`로 폴백. 감지된 브랜치를 아래 명령의 `<default>`로 사용합니다.
 
 ```bash
-# Commits with stats
+# 통계가 포함된 커밋
 git -C <path> log origin/$DEFAULT --since="<start_date>T00:00:00" --format="%H|%aN|%ai|%s" --shortstat
 
-# Commit timestamps for session detection, streak, and context switching
+# 세션 감지, 연속 기록, 컨텍스트 전환을 위한 커밋 타임스탬프
 git -C <path> log origin/$DEFAULT --since="<start_date>T00:00:00" --format="%at|%aN|%ai|%s" | sort -n
 
-# Per-author commit counts
+# 작성자별 커밋 수
 git -C <path> shortlog origin/$DEFAULT --since="<start_date>T00:00:00" -sn --no-merges
 
-# PR/MR numbers from commit messages (GitHub #NNN, GitLab !NNN)
+# 커밋 메시지의 PR/MR 번호 (GitHub #NNN, GitLab !NNN)
 git -C <path> log origin/$DEFAULT --since="<start_date>T00:00:00" --format="%s" | grep -oE '[#!][0-9]+' | sort -t'#' -k1 | uniq
 ```
 
-For repos that fail (deleted paths, network errors): skip and note "N repos could not be reached."
+실패하는 저장소 (삭제된 경로, 네트워크 에러): 건너뛰고 "N개 저장소에 연결할 수 없습니다." 기록.
 
-### Global Step 4: Compute global shipping streak
+### 글로벌 Step 4: 글로벌 배포 연속 기록 계산
 
-For each repo, get commit dates (capped at 365 days):
+각 저장소에 대해, 커밋 날짜를 얻습니다 (365일 제한):
 
 ```bash
 git -C <path> log origin/$DEFAULT --since="365 days ago" --format="%ad" --date=format:"%Y-%m-%d" | sort -u
 ```
 
-Union all dates across all repos. Count backward from today — how many consecutive days have at least one commit to ANY repo? If the streak hits 365 days, display as "365+ days".
+모든 저장소의 날짜를 합집합합니다. 오늘부터 거꾸로 세기 — 어떤 저장소에든 최소 하나의 커밋이 있는 연속 일수는? 연속 기록이 365일에 도달하면, "365+ days"로 표시합니다.
 
-### Global Step 5: Compute context switching metric
+### 글로벌 Step 5: 컨텍스트 전환 메트릭 계산
 
-From the commit timestamps gathered in Step 3, group by date. For each date, count how many distinct repos had commits that day. Report:
-- Average repos/day
-- Maximum repos/day
-- Which days were focused (1 repo) vs. fragmented (3+ repos)
+Step 3에서 수집한 커밋 타임스탬프를 날짜별로 그룹화합니다. 각 날짜에 대해, 그 날 커밋이 있는 고유 저장소 수를 셉니다. 보고:
+- 일 평균 저장소 수
+- 일 최대 저장소 수
+- 집중된 날 (1개 저장소) vs 파편화된 날 (3개 이상 저장소)
 
-### Global Step 6: Per-tool productivity patterns
+### 글로벌 Step 6: 도구별 생산성 패턴
 
-From the discovery JSON, analyze tool usage patterns:
-- Which AI tool is used for which repos (exclusive vs. shared)
-- Session count per tool
-- Behavioral patterns (e.g., "Codex used exclusively for myapp, Claude Code for everything else")
+디스커버리 JSON에서 도구 사용 패턴을 분석합니다:
+- 어떤 AI 도구가 어떤 저장소에 사용되는지 (배타적 vs 공유)
+- 도구별 세션 수
+- 행동 패턴 (예: "Codex는 myapp에 배타적으로, Claude Code는 나머지 모두에 사용")
 
-### Global Step 7: Aggregate and generate narrative
+### 글로벌 Step 7: 집계 및 내러티브 생성
 
-Structure the output with the **shareable personal card first**, then the full
-team/project breakdown below. The personal card is designed to be screenshot-friendly
-— everything someone would want to share on X/Twitter in one clean block.
+**공유 가능한 개인 카드를 먼저**, 그 다음에 전체 팀/프로젝트 분석으로 출력을 구조화합니다.
+개인 카드는 스크린샷 친화적으로 설계 — X/Twitter에서 공유하고 싶은 모든 것이 하나의 깔끔한 블록에.
 
 ---
 
-**Tweetable summary** (first line, before everything else):
+**트윗 가능 요약** (첫 줄, 모든 것 앞에):
 ```
 Week of Mar 14: 5 projects, 138 commits, 250k LOC across 5 repos | 48 AI sessions | Streak: 52d 🔥
 ```
 
-## 🚀 Your Week: [user name] — [date range]
+## 🚀 당신의 주간: [사용자 이름] — [날짜 범위]
 
-This section is the **shareable personal card**. It contains ONLY the current user's
-stats — no team data, no project breakdowns. Designed to screenshot and post.
+이 섹션이 **공유 가능한 개인 카드**입니다. 현재 사용자의 통계만 포함 — 팀 데이터 없음,
+프로젝트 분석 없음. 스크린샷을 찍어 포스팅하도록 설계.
 
-Use the user identity from `git config user.name` to filter all per-repo git data.
-Aggregate across all repos to compute personal totals.
+`git config user.name`의 사용자 ID를 사용하여 모든 저장소별 git 데이터를 필터링합니다.
+모든 저장소에 걸쳐 집계하여 개인 합계를 계산합니다.
 
-Render as a single visually clean block. Left border only — no right border (LLMs
-can't align right borders reliably). Pad repo names to the longest name so columns
-align cleanly. Never truncate project names.
+시각적으로 깔끔한 단일 블록으로 렌더링합니다. 왼쪽 테두리만 — 오른쪽 테두리 없음 (LLM이
+오른쪽 테두리를 안정적으로 정렬할 수 없음). 열이 깔끔하게 정렬되도록 저장소 이름을
+가장 긴 이름에 맞춰 패딩합니다. 프로젝트 이름을 절대 잘라내지 마세요.
 
 ```
 ╔═══════════════════════════════════════════════════════════════
@@ -991,66 +996,66 @@ align cleanly. Never truncate project names.
 ╚═══════════════════════════════════════════════════════════════
 ```
 
-**Rules for the personal card:**
-- Only show repos where the user has commits. Skip repos with 0 commits.
-- Sort repos by user's commit count descending.
-- **Never truncate repo names.** Use the full repo name (e.g., `analyze_transcripts`
-  not `analyze_trans`). Pad the name column to the longest repo name so all columns
-  align. If names are long, widen the box — the box width adapts to content.
-- For LOC, use "k" formatting for thousands (e.g., "+64.0k" not "+64010").
-- Role: "solo" if user is the only contributor, "team" if others contributed.
-- Ship of the Week: the user's single highest-LOC PR across ALL repos.
-- Top Work: 3 bullet points summarizing the user's major themes, inferred from
-  commit messages. Not individual commits — synthesize into themes.
-  E.g., "Built /retro global — cross-project retrospective with AI session discovery"
-  not "feat: gstack-global-discover" + "feat: /retro global template".
-- The card must be self-contained. Someone seeing ONLY this block should understand
-  the user's week without any surrounding context.
-- Do NOT include team members, project totals, or context switching data here.
+**개인 카드 규칙:**
+- 사용자가 커밋한 저장소만 표시. 커밋 0인 저장소 건너뛰기.
+- 사용자의 커밋 수 내림차순 정렬.
+- **저장소 이름을 절대 잘라내지 마세요.** 전체 저장소 이름 사용 (예: `analyze_transcripts`
+  가 아닌 `analyze_trans`). 이름 열을 가장 긴 저장소 이름에 맞춰 패딩하여 모든 열
+  정렬. 이름이 길면, 박스를 넓히세요 — 박스 너비가 콘텐츠에 맞게 적응합니다.
+- LOC는 천 단위에 "k" 형식 사용 (예: "+64.0k" 가 아닌 "+64010").
+- 역할: 유일한 기여자면 "solo", 다른 기여자가 있으면 "team".
+- 이 주의 배포: 모든 저장소에 걸친 사용자의 단일 최고 LOC PR.
+- Top Work: 사용자의 주요 테마를 요약하는 3개 불릿, 커밋 메시지에서 추론.
+  개별 커밋이 아닌 — 테마로 종합.
+  예: "Built /retro global — cross-project retrospective with AI session discovery"
+  가 아닌 "feat: gstack-global-discover" + "feat: /retro global template".
+- 카드는 자체 완결적. 이 블록만 보는 사람이 주변 컨텍스트 없이도
+  사용자의 한 주를 이해해야 합니다.
+- 팀원, 프로젝트 합계, 컨텍스트 전환 데이터를 포함하지 마세요.
 
-**Personal streak:** Use the user's own commits across all repos (filtered by
-`--author`) to compute a personal streak, separate from the team streak.
+**개인 연속 기록:** 모든 저장소에 걸친 사용자 자신의 커밋 (`--author`로 필터)을
+사용하여 팀 연속 기록과 별도로 개인 연속 기록을 계산합니다.
 
 ---
 
-## Global Engineering Retro: [date range]
+## Global Engineering Retro: [날짜 범위]
 
-Everything below is the full analysis — team data, project breakdowns, patterns.
-This is the "deep dive" that follows the shareable card.
+아래의 모든 것은 전체 분석 — 팀 데이터, 프로젝트 분석, 패턴.
+공유 가능한 카드 뒤의 "딥 다이브".
 
-### All Projects Overview
-| Metric | Value |
-|--------|-------|
-| Projects active | N |
-| Total commits (all repos, all contributors) | N |
-| Total LOC | +N / -N |
-| AI coding sessions | N (CC: X, Codex: Y, Gemini: Z) |
-| Active days | N |
-| Global shipping streak (any contributor, any repo) | N consecutive days |
-| Context switches/day | N avg (max: M) |
+### 전체 프로젝트 개요
+| 메트릭 | 값 |
+|--------|------|
+| 활동 프로젝트 | N |
+| 총 커밋 (모든 저장소, 모든 기여자) | N |
+| 총 LOC | +N / -N |
+| AI 코딩 세션 | N (CC: X, Codex: Y, Gemini: Z) |
+| 활동 일수 | N |
+| 글로벌 배포 연속 기록 (어떤 기여자, 어떤 저장소) | N 연속일 |
+| 컨텍스트 전환/일 | N 평균 (최대: M) |
 
-### Per-Project Breakdown
-For each repo (sorted by commits descending):
-- Repo name (with % of total commits)
-- Commits, LOC, PRs merged, top contributor
-- Key work (inferred from commit messages)
-- AI sessions by tool
+### 프로젝트별 분석
+각 저장소에 대해 (커밋 수 내림차순):
+- 저장소 이름 (총 커밋의 %)
+- 커밋, LOC, 머지된 PR, 최다 기여자
+- 핵심 작업 (커밋 메시지에서 추론)
+- 도구별 AI 세션
 
-**Your Contributions** (sub-section within each project):
-For each project, add a "Your contributions" block showing the current user's
-personal stats within that repo. Use the user identity from `git config user.name`
-to filter. Include:
-- Your commits / total commits (with %)
-- Your LOC (+insertions / -deletions)
-- Your key work (inferred from YOUR commit messages only)
-- Your commit type mix (feat/fix/refactor/chore/docs breakdown)
-- Your biggest ship in this repo (highest-LOC commit or PR)
+**당신의 기여** (각 프로젝트 내 하위 섹션):
+각 프로젝트에 대해, 해당 저장소 내 현재 사용자의 개인 통계를 보여주는
+"Your contributions" 블록을 추가합니다. `git config user.name`의 사용자 ID로 필터링.
+포함:
+- 당신의 커밋 / 총 커밋 (% 포함)
+- 당신의 LOC (+삽입 / -삭제)
+- 당신의 핵심 작업 (당신의 커밋 메시지에서만 추론)
+- 당신의 커밋 유형 믹스 (feat/fix/refactor/chore/docs 분석)
+- 이 저장소에서의 최대 배포 (가장 높은 LOC 커밋 또는 PR)
 
-If the user is the only contributor, say "Solo project — all commits are yours."
-If the user has 0 commits in a repo (team project they didn't touch this period),
-say "No commits this period — [N] AI sessions only." and skip the breakdown.
+유일한 기여자이면 "솔로 프로젝트 — 모든 커밋이 당신의 것입니다." 표시.
+사용자가 저장소에 커밋 0개이면 (이 기간에 수정하지 않은 팀 프로젝트),
+"이 기간 커밋 없음 — [N]개 AI 세션만." 표시하고 분석 건너뛰기.
 
-Format:
+형식:
 ```
 **Your contributions:** 47/244 commits (19%), +4.2k/-0.3k LOC
   Key work: Writer Chat, email blocking, security hardening
@@ -1058,55 +1063,55 @@ Format:
   Mix: feat(3) fix(2) chore(1)
 ```
 
-### Cross-Project Patterns
-- Time allocation across projects (% breakdown, use YOUR commits not total)
-- Peak productivity hours aggregated across all repos
-- Focused vs. fragmented days
-- Context switching trends
+### 크로스 프로젝트 패턴
+- 프로젝트 간 시간 배분 (% 분석, 총계가 아닌 당신의 커밋 사용)
+- 모든 저장소에 걸쳐 집계된 피크 생산성 시간
+- 집중된 날 vs 파편화된 날
+- 컨텍스트 전환 트렌드
 
-### Tool Usage Analysis
-Per-tool breakdown with behavioral patterns:
-- Claude Code: N sessions across M repos — patterns observed
-- Codex: N sessions across M repos — patterns observed
-- Gemini: N sessions across M repos — patterns observed
+### 도구 사용 분석
+도구별 분석과 행동 패턴:
+- Claude Code: N 세션, M 저장소 — 관찰된 패턴
+- Codex: N 세션, M 저장소 — 관찰된 패턴
+- Gemini: N 세션, M 저장소 — 관찰된 패턴
 
-### Ship of the Week (Global)
-Highest-impact PR across ALL projects. Identify by LOC and commit messages.
+### 이 주의 배포 (글로벌)
+모든 프로젝트에 걸쳐 가장 높은 임팩트 PR. LOC와 커밋 메시지로 식별.
 
-### 3 Cross-Project Insights
-What the global view reveals that no single-repo retro could show.
+### 3가지 크로스 프로젝트 인사이트
+글로벌 뷰가 개별 저장소 회고로는 보여줄 수 없는 것.
 
-### 3 Habits for Next Week
-Considering the full cross-project picture.
+### 다음 주를 위한 3가지 습관
+전체 크로스 프로젝트 그림을 고려하여.
 
 ---
 
-### Global Step 8: Load history & compare
+### 글로벌 Step 8: 히스토리 로드 & 비교
 
 ```bash
 ls -t ~/.gstack/retros/global-*.json 2>/dev/null | head -5
 ```
 
-**Only compare against a prior retro with the same `window` value** (e.g., 7d vs 7d). If the most recent prior retro has a different window, skip comparison and note: "Prior global retro used a different window — skipping comparison."
+**동일한 `window` 값을 가진 이전 회고와만 비교합니다** (예: 7d vs 7d). 가장 최근 이전 회고가 다른 윈도우이면, 비교를 건너뛰고 기록: "이전 글로벌 회고가 다른 윈도우를 사용 — 비교를 건너뜁니다."
 
-If a matching prior retro exists, load it with the Read tool. Show a **Trends vs Last Global Retro** table with deltas for key metrics: total commits, LOC, sessions, streak, context switches/day.
+매칭하는 이전 회고가 있으면, Read 도구로 로드합니다. 주요 메트릭의 델타가 포함된 **이전 글로벌 회고 대비 트렌드** 테이블 표시: 총 커밋, LOC, 세션, 연속 기록, 일 컨텍스트 전환.
 
-If no prior global retros exist, append: "First global retro recorded — run again next week to see trends."
+이전 글로벌 회고가 없으면: "첫 글로벌 회고 기록 — 다음 주에 다시 실행하면 트렌드를 볼 수 있습니다."
 
-### Global Step 9: Save snapshot
+### 글로벌 Step 9: 스냅샷 저장
 
 ```bash
 mkdir -p ~/.gstack/retros
 ```
 
-Determine the next sequence number for today:
+오늘의 다음 시퀀스 번호 결정:
 ```bash
 today=$(date +%Y-%m-%d)
 existing=$(ls ~/.gstack/retros/global-${today}-*.json 2>/dev/null | wc -l | tr -d ' ')
 next=$((existing + 1))
 ```
 
-Use the Write tool to save JSON to `~/.gstack/retros/global-${today}-${next}.json`:
+Write 도구로 `~/.gstack/retros/global-${today}-${next}.json`에 JSON 저장:
 
 ```json
 {
@@ -1139,37 +1144,37 @@ Use the Write tool to save JSON to `~/.gstack/retros/global-${today}-${next}.jso
 
 ---
 
-## Compare Mode
+## 비교 모드
 
-When the user runs `/retro compare` (or `/retro compare 14d`):
+사용자가 `/retro compare` (또는 `/retro compare 14d`)를 실행하면:
 
-1. Compute metrics for the current window (default 7d) using the midnight-aligned start date (same logic as the main retro — e.g., if today is 2026-03-18 and window is 7d, use `--since="2026-03-11T00:00:00"`)
-2. Compute metrics for the immediately prior same-length window using both `--since` and `--until` with midnight-aligned dates to avoid overlap (e.g., for a 7d window starting 2026-03-11: prior window is `--since="2026-03-04T00:00:00" --until="2026-03-11T00:00:00"`)
-3. Show a side-by-side comparison table with deltas and arrows
-4. Write a brief narrative highlighting the biggest improvements and regressions
-5. Save only the current-window snapshot to `.context/retros/` (same as a normal retro run); do **not** persist the prior-window metrics.
+1. 자정 정렬 시작 날짜를 사용하여 현재 윈도우 (기본 7d)의 메트릭을 계산합니다 (일반 회고와 동일한 로직 — 예: 오늘이 2026-03-18이고 윈도우가 7d이면, `--since="2026-03-11T00:00:00"` 사용)
+2. 중복을 피하기 위해 `--since`와 `--until` 모두 자정 정렬 날짜로 사용하여 바로 이전 동일 길이 윈도우의 메트릭을 계산합니다 (예: 7d 윈도우 시작 2026-03-11: 이전 윈도우는 `--since="2026-03-04T00:00:00" --until="2026-03-11T00:00:00"`)
+3. 델타와 화살표가 포함된 나란히 비교 테이블 표시
+4. 가장 큰 개선과 후퇴를 강조하는 간략한 내러티브 작성
+5. 현재 윈도우 스냅샷만 `.context/retros/`에 저장 (일반 회고 실행과 동일); 이전 윈도우 메트릭은 저장하지 **않습니다**.
 
-## Tone
+## 톤
 
-- Encouraging but candid, no coddling
-- Specific and concrete — always anchor in actual commits/code
-- Skip generic praise ("great job!") — say exactly what was good and why
-- Frame improvements as leveling up, not criticism
-- **Praise should feel like something you'd actually say in a 1:1** — specific, earned, genuine
-- **Growth suggestions should feel like investment advice** — "this is worth your time because..." not "you failed at..."
-- Never compare teammates against each other negatively. Each person's section stands on its own.
-- Keep total output around 3000-4500 words (slightly longer to accommodate team sections)
-- Use markdown tables and code blocks for data, prose for narrative
-- Output directly to the conversation — do NOT write to filesystem (except the `.context/retros/` JSON snapshot)
+- 격려하되 솔직하게, 감싸지 않기
+- 구체적이고 콘크리트 — 항상 실제 커밋/코드에 근거
+- 제네릭 칭찬 건너뛰기 ("대단해요!") — 무엇이 좋았고 왜인지 정확히 말하기
+- 개선을 비판이 아닌 레벨업으로 프레이밍
+- **칭찬은 1:1에서 실제로 말할 것처럼** — 구체적이고, 얻어낸, 진정성 있게
+- **성장 제안은 투자 조언처럼** — "여기에 시간을 투자할 가치가 있습니다..." 가 아닌 "~에 실패했습니다..."
+- 팀원을 서로에 대해 부정적으로 비교하지 마세요. 각 사람의 섹션은 독립적.
+- 총 출력은 약 3000-4500 단어 유지 (팀 섹션을 수용하여 약간 더 길게)
+- 데이터에는 마크다운 테이블과 코드 블록, 내러티브에는 산문 사용
+- 대화에 직접 출력 — 파일시스템에 쓰지 마세요 (`.context/retros/` JSON 스냅샷 제외)
 
-## Important Rules
+## 중요 규칙
 
-- ALL narrative output goes directly to the user in the conversation. The ONLY file written is the `.context/retros/` JSON snapshot.
-- Use `origin/<default>` for all git queries (not local main which may be stale)
-- Display all timestamps in the user's local timezone (do not override `TZ`)
-- If the window has zero commits, say so and suggest a different window
-- Round LOC/hour to nearest 50
-- Treat merge commits as PR boundaries
-- Do not read CLAUDE.md or other docs — this skill is self-contained
-- On first run (no prior retros), skip comparison sections gracefully
-- **Global mode:** Does NOT require being inside a git repo. Saves snapshots to `~/.gstack/retros/` (not `.context/retros/`). Gracefully skip AI tools that aren't installed. Only compare against prior global retros with the same window value. If streak hits 365d cap, display as "365+ days".
+- 모든 내러티브 출력은 대화에서 사용자에게 직접 전달. 작성되는 유일한 파일은 `.context/retros/` JSON 스냅샷.
+- 모든 git 쿼리에 `origin/<default>` 사용 (오래된 로컬 main이 아닌)
+- 모든 타임스탬프를 사용자의 로컬 타임존으로 표시 (`TZ` 오버라이드하지 마세요)
+- 윈도우에 커밋이 없으면, 알리고 다른 윈도우 제안
+- LOC/시간은 가장 가까운 50으로 반올림
+- 머지 커밋을 PR 경계로 처리
+- CLAUDE.md나 다른 문서를 읽지 마세요 — 이 스킬은 자체 완결적
+- 첫 실행 (이전 회고 없음) 시, 비교 섹션을 우아하게 건너뛰기
+- **글로벌 모드:** git 저장소 안에 있을 필요 없음. 스냅샷을 `~/.gstack/retros/`에 저장 (`.context/retros/`가 아닌). 설치되지 않은 AI 도구는 우아하게 건너뛰기. 동일한 윈도우 값을 가진 이전 글로벌 회고와만 비교. 연속 기록이 365일 제한에 도달하면 "365+ days"로 표시.

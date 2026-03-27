@@ -2,11 +2,11 @@
 name: guard
 version: 0.1.0
 description: |
-  Full safety mode: destructive command warnings + directory-scoped edits.
-  Combines /careful (warns before rm -rf, DROP TABLE, force-push, etc.) with
-  /freeze (blocks edits outside a specified directory). Use for maximum safety
-  when touching prod or debugging live systems. Use when asked to "guard mode",
-  "full safety", "lock it down", or "maximum safety".
+  전체 안전 모드: 파괴적 명령어 경고 + 디렉토리 범위 편집 제한.
+  /careful(rm -rf, DROP TABLE, force-push 등에 대한 경고)과
+  /freeze(지정된 디렉토리 외부 편집 차단)를 결합합니다. 프로덕션 환경 작업이나
+  라이브 시스템 디버깅 시 최대 안전을 위해 사용하세요. "guard mode",
+  "full safety", "lock it down", "maximum safety" 요청 시 사용합니다.
 allowed-tools:
   - Bash
   - Read
@@ -34,36 +34,36 @@ hooks:
 > **Safety Advisory:** This skill includes safety checks that check bash commands for destructive operations (rm -rf, DROP TABLE, force-push, git reset --hard, etc.) before execution, and verify file edits are within the allowed scope boundary before applying, and verify file writes are within the allowed scope boundary before applying. When using this skill, always pause and verify before executing potentially destructive operations. If uncertain about a command's safety, ask the user for confirmation before proceeding.
 
 
-# /guard — Full Safety Mode
+# /guard — 전체 안전 모드
 
-Activates both destructive command warnings and directory-scoped edit restrictions.
-This is the combination of `/careful` + `/freeze` in a single command.
+파괴적 명령어 경고와 디렉토리 범위 편집 제한을 동시에 활성화합니다.
+`/careful` + `/freeze`를 하나의 명령어로 결합한 것입니다.
 
-**Dependency note:** This skill references hook scripts from the sibling `/careful`
-and `/freeze` skill directories. Both must be installed (they are installed together
-by the gstack setup script).
+**의존성 참고:** 이 스킬은 `/careful`과 `/freeze` 스킬 디렉토리의 훅 스크립트를
+참조합니다. 둘 다 설치되어 있어야 합니다 (gstack 설정 스크립트에 의해 함께
+설치됩니다).
 
 ```bash
 mkdir -p ~/.gstack/analytics
 echo '{"skill":"guard","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
 ```
 
-## Setup
+## 설정
 
-Ask the user which directory to restrict edits to. Use AskUserQuestion:
+사용자에게 편집을 제한할 디렉토리를 물어보세요. AskUserQuestion을 사용합니다:
 
-- Question: "Guard mode: which directory should edits be restricted to? Destructive command warnings are always on. Files outside the chosen path will be blocked from editing."
-- Text input (not multiple choice) — the user types a path.
+- 질문: "Guard 모드: 편집을 제한할 디렉토리를 지정해주세요. 파괴적 명령어 경고는 항상 활성화됩니다. 선택한 경로 외부의 파일은 편집이 차단됩니다."
+- 텍스트 입력 (객관식 아님) — 사용자가 경로를 입력합니다.
 
-Once the user provides a directory path:
+사용자가 디렉토리 경로를 제공하면:
 
-1. Resolve it to an absolute path:
+1. 절대 경로로 변환합니다:
 ```bash
 FREEZE_DIR=$(cd "<user-provided-path>" 2>/dev/null && pwd)
 echo "$FREEZE_DIR"
 ```
 
-2. Ensure trailing slash and save to the freeze state file:
+2. 후행 슬래시를 추가하고 freeze 상태 파일에 저장합니다:
 ```bash
 FREEZE_DIR="${FREEZE_DIR%/}/"
 STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.gstack}"
@@ -72,13 +72,13 @@ echo "$FREEZE_DIR" > "$STATE_DIR/freeze-dir.txt"
 echo "Freeze boundary set: $FREEZE_DIR"
 ```
 
-Tell the user:
-- "**Guard mode active.** Two protections are now running:"
-- "1. **Destructive command warnings** — rm -rf, DROP TABLE, force-push, etc. will warn before executing (you can override)"
-- "2. **Edit boundary** — file edits restricted to `<path>/`. Edits outside this directory are blocked."
-- "To remove the edit boundary, run `/unfreeze`. To deactivate everything, end the session."
+사용자에게 알려주세요:
+- "**Guard 모드 활성화.** 두 가지 보호가 실행 중입니다:"
+- "1. **파괴적 명령어 경고** — rm -rf, DROP TABLE, force-push 등은 실행 전 경고가 표시됩니다 (재정의 가능)"
+- "2. **편집 경계** — 파일 편집이 `<path>/`로 제한됩니다. 이 디렉토리 외부의 편집은 차단됩니다."
+- "편집 경계를 제거하려면 `/unfreeze`를 실행하세요. 모든 보호를 비활성화하려면 세션을 종료하세요."
 
-## What's protected
+## 보호 대상
 
-See `/careful` for the full list of destructive command patterns and safe exceptions.
-See `/freeze` for how edit boundary enforcement works.
+파괴적 명령어 패턴 및 안전 예외의 전체 목록은 `/careful`을 참조하세요.
+편집 경계 적용 방식은 `/freeze`를 참조하세요.
