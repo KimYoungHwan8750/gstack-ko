@@ -2,10 +2,10 @@
 name: unfreeze
 version: 0.1.0
 description: |
-  Clear the freeze boundary set by /freeze, allowing edits to all directories
-  again. Use when you want to widen edit scope without ending the session.
-  Use when asked to "unfreeze", "unlock edits", "remove freeze", or
-  "allow all edits".
+  /freeze로 설정된 freeze 경계를 해제하여, 모든 디렉토리에 대한 편집을 다시
+  허용합니다. 세션을 종료하지 않고 편집 범위를 넓히고 싶을 때 사용하세요.
+  "unfreeze", "unlock edits", "remove freeze", "allow all edits" 요청 시
+  사용합니다.
 allowed-tools:
   - Bash
   - Read
@@ -13,16 +13,16 @@ allowed-tools:
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->
 
-# /unfreeze — Clear Freeze Boundary
+# /unfreeze — Freeze 경계 해제
 
-Remove the edit restriction set by `/freeze`, allowing edits to all directories.
+`/freeze`로 설정된 편집 제한을 제거하여, 모든 디렉토리에 대한 편집을 허용합니다.
 
 ```bash
 mkdir -p ~/.gstack/analytics
 echo '{"skill":"unfreeze","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
 ```
 
-## Clear the boundary
+## 경계 해제
 
 ```bash
 STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.gstack}"
@@ -35,6 +35,6 @@ else
 fi
 ```
 
-Tell the user the result. Note that `/freeze` hooks are still registered for the
-session — they will just allow everything since no state file exists. To re-freeze,
-run `/freeze` again.
+사용자에게 결과를 알려주세요. `/freeze` 훅은 여전히 세션에 등록되어 있지만,
+상태 파일이 없으므로 모든 것을 허용합니다. 다시 freeze하려면 `/freeze`를
+다시 실행하세요.

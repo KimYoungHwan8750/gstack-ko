@@ -3,11 +3,11 @@ name: document-release
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Post-ship documentation update. Reads all project docs, cross-references the
-  diff, updates README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md to match what shipped,
-  polishes CHANGELOG voice, cleans up TODOS, and optionally bumps VERSION. Use when
-  asked to "update the docs", "sync documentation", or "post-ship docs".
-  Proactively suggest after a PR is merged or code is shipped.
+  배포 후 문서 업데이트. 모든 프로젝트 문서를 읽고 diff와 교차 참조하여,
+  README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md를 배포된 내용에 맞게 업데이트하고,
+  CHANGELOG 문체를 다듬고, TODOS를 정리하며, 선택적으로 VERSION을 올립니다.
+  "update the docs", "sync documentation", "post-ship docs" 요청 시 사용합니다.
+  PR이 머지되거나 코드가 배포된 후 선제적으로 제안합니다.
 allowed-tools:
   - Bash
   - Read
@@ -41,6 +41,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -344,42 +350,42 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# Document Release: Post-Ship Documentation Update
+# Document Release: 배포 후 문서 업데이트
 
-You are running the `/document-release` workflow. This runs **after `/ship`** (code committed, PR
-exists or about to exist) but **before the PR merges**. Your job: ensure every documentation file
-in the project is accurate, up to date, and written in a friendly, user-forward voice.
+`/document-release` 워크플로우를 실행합니다. 이것은 `/ship` **이후** (코드 커밋 완료, PR이 존재하거나 생성 예정)
+**PR 머지 전에** 실행됩니다. 프로젝트의 모든 문서 파일이 정확하고, 최신이며,
+친근하고 사용자 중심적인 문체로 작성되었는지 확인하는 것이 목표입니다.
 
-You are mostly automated. Make obvious factual updates directly. Stop and ask only for risky or
-subjective decisions.
+대부분 자동화되어 있습니다. 명백한 사실적 업데이트는 직접 수행합니다. 위험하거나
+주관적인 결정에 대해서만 중지하고 물어봅니다.
 
-**Only stop for:**
-- Risky/questionable doc changes (narrative, philosophy, security, removals, large rewrites)
-- VERSION bump decision (if not already bumped)
-- New TODOS items to add
-- Cross-doc contradictions that are narrative (not factual)
+**중지하는 경우:**
+- 위험하거나 의심스러운 문서 변경 (서술, 철학, 보안, 삭제, 대규모 재작성)
+- VERSION 올리기 결정 (아직 올리지 않은 경우)
+- 추가할 새 TODOS 항목
+- 서술적(사실적이 아닌) 문서 간 모순
 
-**Never stop for:**
-- Factual corrections clearly from the diff
-- Adding items to tables/lists
-- Updating paths, counts, version numbers
-- Fixing stale cross-references
-- CHANGELOG voice polish (minor wording adjustments)
-- Marking TODOS complete
-- Cross-doc factual inconsistencies (e.g., version number mismatch)
+**절대 중지하지 않는 경우:**
+- diff에서 명확히 확인되는 사실적 수정
+- 테이블/목록에 항목 추가
+- 경로, 개수, 버전 번호 업데이트
+- 오래된 교차 참조 수정
+- CHANGELOG 문체 다듬기 (경미한 표현 수정)
+- TODOS 완료 표시
+- 문서 간 사실적 불일치 (예: 버전 번호 불일치)
 
-**NEVER do:**
-- Overwrite, replace, or regenerate CHANGELOG entries — polish wording only, preserve all content
-- Bump VERSION without asking — always use AskUserQuestion for version changes
-- Use `Write` tool on CHANGELOG.md — always use `Edit` with exact `old_string` matches
+**절대 하지 않는 것:**
+- CHANGELOG 항목을 덮어쓰거나, 교체하거나, 재생성하지 않습니다 — 문체만 다듬고, 모든 내용을 보존합니다
+- 묻지 않고 VERSION을 올리지 않습니다 — 항상 AskUserQuestion을 사용합니다
+- CHANGELOG.md에 `Write` 도구를 사용하지 않습니다 — 항상 정확한 `old_string` 매칭으로 `Edit`을 사용합니다
 
 ---
 
-## Step 1: Pre-flight & Diff Analysis
+## Step 1: 사전 점검 및 Diff 분석
 
-1. Check the current branch. If on the base branch, **abort**: "You're on the base branch. Run from a feature branch."
+1. 현재 브랜치를 확인합니다. 베이스 브랜치에 있으면 **중단**: "베이스 브랜치에 있습니다. 피처 브랜치에서 실행하세요."
 
-2. Gather context about what changed:
+2. 변경된 내용의 컨텍스트를 수집합니다:
 
 ```bash
 git diff <base>...HEAD --stat
@@ -393,210 +399,183 @@ git log <base>..HEAD --oneline
 git diff <base>...HEAD --name-only
 ```
 
-3. Discover all documentation files in the repo:
+3. 저장소의 모든 문서 파일을 탐색합니다:
 
 ```bash
 find . -maxdepth 2 -name "*.md" -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./.gstack/*" -not -path "./.context/*" | sort
 ```
 
-4. Classify the changes into categories relevant to documentation:
-   - **New features** — new files, new commands, new skills, new capabilities
-   - **Changed behavior** — modified services, updated APIs, config changes
-   - **Removed functionality** — deleted files, removed commands
-   - **Infrastructure** — build system, test infrastructure, CI
+4. 변경 사항을 문서에 관련된 카테고리로 분류합니다:
+   - **새 기능** — 새 파일, 새 명령, 새 스킬, 새 기능
+   - **동작 변경** — 수정된 서비스, 업데이트된 API, 설정 변경
+   - **제거된 기능** — 삭제된 파일, 제거된 명령
+   - **인프라** — 빌드 시스템, 테스트 인프라, CI
 
-5. Output a brief summary: "Analyzing N files changed across M commits. Found K documentation files to review."
+5. 간략한 요약을 출력합니다: "N개 파일이 M개 커밋에 걸쳐 변경되었습니다. 리뷰할 문서 파일 K개를 발견했습니다."
 
 ---
 
-## Step 2: Per-File Documentation Audit
+## Step 2: 파일별 문서 감사
 
-Read each documentation file and cross-reference it against the diff. Use these generic heuristics
-(adapt to whatever project you're in — these are not gstack-specific):
+각 문서 파일을 읽고 diff와 교차 참조합니다. 다음과 같은 범용 휴리스틱을 사용합니다
+(어떤 프로젝트에든 적용 가능 — gstack에 특화되지 않음):
 
 **README.md:**
-- Does it describe all features and capabilities visible in the diff?
-- Are install/setup instructions consistent with the changes?
-- Are examples, demos, and usage descriptions still valid?
-- Are troubleshooting steps still accurate?
+- diff에 보이는 모든 기능과 능력을 설명하고 있습니까?
+- 설치/설정 지침이 변경 사항과 일관됩니까?
+- 예제, 데모, 사용 설명이 여전히 유효합니까?
+- 문제 해결 단계가 여전히 정확합니까?
 
 **ARCHITECTURE.md:**
-- Do ASCII diagrams and component descriptions match the current code?
-- Are design decisions and "why" explanations still accurate?
-- Be conservative — only update things clearly contradicted by the diff. Architecture docs
-  describe things unlikely to change frequently.
+- ASCII 다이어그램과 컴포넌트 설명이 현재 코드와 일치합니까?
+- 설계 결정과 "이유" 설명이 여전히 정확합니까?
+- 보수적으로 접근합니다 — diff에 의해 명확히 모순되는 것만 업데이트합니다. 아키텍처 문서는 자주 변경되지 않는 내용을 설명합니다.
 
-**CONTRIBUTING.md — New contributor smoke test:**
-- Walk through the setup instructions as if you are a brand new contributor.
-- Are the listed commands accurate? Would each step succeed?
-- Do test tier descriptions match the current test infrastructure?
-- Are workflow descriptions (dev setup, contributor mode, etc.) current?
-- Flag anything that would fail or confuse a first-time contributor.
+**CONTRIBUTING.md — 새 기여자 스모크 테스트:**
+- 완전히 새로운 기여자인 것처럼 설정 지침을 따라가 봅니다.
+- 나열된 명령이 정확합니까? 각 단계가 성공할 수 있습니까?
+- 테스트 계층 설명이 현재 테스트 인프라와 일치합니까?
+- 워크플로우 설명(개발 설정, 기여자 모드 등)이 최신입니까?
+- 처음 기여하는 사람이 실패하거나 혼란스러워할 만한 것을 표시합니다.
 
-**CLAUDE.md / project instructions:**
-- Does the project structure section match the actual file tree?
-- Are listed commands and scripts accurate?
-- Do build/test instructions match what's in package.json (or equivalent)?
+**CLAUDE.md / 프로젝트 지침:**
+- 프로젝트 구조 섹션이 실제 파일 트리와 일치합니까?
+- 나열된 명령과 스크립트가 정확합니까?
+- 빌드/테스트 지침이 package.json(또는 동등한 파일)과 일치합니까?
 
-**Any other .md files:**
-- Read the file, determine its purpose and audience.
-- Cross-reference against the diff to check if it contradicts anything the file says.
+**기타 .md 파일:**
+- 파일을 읽고, 목적과 대상 독자를 파악합니다.
+- diff와 교차 참조하여 파일의 내용과 모순되는 것이 있는지 확인합니다.
 
-For each file, classify needed updates as:
+각 파일에 대해 필요한 업데이트를 다음과 같이 분류합니다:
 
-- **Auto-update** — Factual corrections clearly warranted by the diff: adding an item to a
-  table, updating a file path, fixing a count, updating a project structure tree.
-- **Ask user** — Narrative changes, section removal, security model changes, large rewrites
-  (more than ~10 lines in one section), ambiguous relevance, adding entirely new sections.
+- **자동 업데이트** — diff에 의해 명확히 보증되는 사실적 수정: 테이블에 항목 추가, 파일 경로 업데이트, 개수 수정, 프로젝트 구조 트리 업데이트.
+- **사용자에게 묻기** — 서술적 변경, 섹션 삭제, 보안 모델 변경, 대규모 재작성 (한 섹션에서 약 10줄 이상), 관련성이 모호한 것, 완전히 새로운 섹션 추가.
 
 ---
 
-## Step 3: Apply Auto-Updates
+## Step 3: 자동 업데이트 적용
 
-Make all clear, factual updates directly using the Edit tool.
+Edit 도구를 사용하여 명확하고 사실적인 모든 업데이트를 직접 수행합니다.
 
-For each file modified, output a one-line summary describing **what specifically changed** — not
-just "Updated README.md" but "README.md: added /new-skill to skills table, updated skill count
-from 9 to 10."
+수정된 각 파일에 대해 **구체적으로 무엇이 변경되었는지** 설명하는 한 줄 요약을 출력합니다 — 단순히 "README.md 업데이트됨"이 아니라 "README.md: 스킬 테이블에 /new-skill 추가, 스킬 수를 9에서 10으로 업데이트"와 같이.
 
-**Never auto-update:**
-- README introduction or project positioning
-- ARCHITECTURE philosophy or design rationale
-- Security model descriptions
-- Do not remove entire sections from any document
+**절대 자동 업데이트하지 않는 것:**
+- README 소개 또는 프로젝트 포지셔닝
+- ARCHITECTURE 철학 또는 설계 근거
+- 보안 모델 설명
+- 어떤 문서에서든 전체 섹션을 삭제하지 않습니다
 
 ---
 
-## Step 4: Ask About Risky/Questionable Changes
+## Step 4: 위험하거나 의심스러운 변경에 대해 묻기
 
-For each risky or questionable update identified in Step 2, use AskUserQuestion with:
-- Context: project name, branch, which doc file, what we're reviewing
-- The specific documentation decision
-- `RECOMMENDATION: Choose [X] because [one-line reason]`
-- Options including C) Skip — leave as-is
+Step 2에서 식별된 위험하거나 의심스러운 각 업데이트에 대해 AskUserQuestion을 사용합니다:
+- 컨텍스트: 프로젝트 이름, 브랜치, 어떤 문서 파일인지, 무엇을 리뷰 중인지
+- 구체적인 문서 결정 사항
+- `권장: [X]를 선택하세요. 이유: [한 줄 설명]`
+- C) 건너뛰기 — 그대로 두기를 포함한 옵션
 
-Apply approved changes immediately after each answer.
-
----
-
-## Step 5: CHANGELOG Voice Polish
-
-**CRITICAL — NEVER CLOBBER CHANGELOG ENTRIES.**
-
-This step polishes voice. It does NOT rewrite, replace, or regenerate CHANGELOG content.
-
-A real incident occurred where an agent replaced existing CHANGELOG entries when it should have
-preserved them. This skill must NEVER do that.
-
-**Rules:**
-1. Read the entire CHANGELOG.md first. Understand what is already there.
-2. Only modify wording within existing entries. Never delete, reorder, or replace entries.
-3. Never regenerate a CHANGELOG entry from scratch. The entry was written by `/ship` from the
-   actual diff and commit history. It is the source of truth. You are polishing prose, not
-   rewriting history.
-4. If an entry looks wrong or incomplete, use AskUserQuestion — do NOT silently fix it.
-5. Use Edit tool with exact `old_string` matches — never use Write to overwrite CHANGELOG.md.
-
-**If CHANGELOG was not modified in this branch:** skip this step.
-
-**If CHANGELOG was modified in this branch**, review the entry for voice:
-
-- **Sell test:** Would a user reading each bullet think "oh nice, I want to try that"? If not,
-  rewrite the wording (not the content).
-- Lead with what the user can now **do** — not implementation details.
-- "You can now..." not "Refactored the..."
-- Flag and rewrite any entry that reads like a commit message.
-- Internal/contributor changes belong in a separate "### For contributors" subsection.
-- Auto-fix minor voice adjustments. Use AskUserQuestion if a rewrite would alter meaning.
+각 답변 후 즉시 승인된 변경을 적용합니다.
 
 ---
 
-## Step 6: Cross-Doc Consistency & Discoverability Check
+## Step 5: CHANGELOG 문체 다듬기
 
-After auditing each file individually, do a cross-doc consistency pass:
+**중요 — CHANGELOG 항목을 절대 덮어쓰지 마세요.**
 
-1. Does the README's feature/capability list match what CLAUDE.md (or project instructions) describes?
-2. Does ARCHITECTURE's component list match CONTRIBUTING's project structure description?
-3. Does CHANGELOG's latest version match the VERSION file?
-4. **Discoverability:** Is every documentation file reachable from README.md or CLAUDE.md? If
-   ARCHITECTURE.md exists but neither README nor CLAUDE.md links to it, flag it. Every doc
-   should be discoverable from one of the two entry-point files.
-5. Flag any contradictions between documents. Auto-fix clear factual inconsistencies (e.g., a
-   version mismatch). Use AskUserQuestion for narrative contradictions.
+이 단계는 문체를 다듬습니다. CHANGELOG 내용을 재작성, 교체, 재생성하지 않습니다.
 
----
+에이전트가 기존 CHANGELOG 항목을 보존해야 할 때 교체한 실제 사고가 발생했습니다. 이 스킬은 절대 그렇게 해서는 안 됩니다.
 
-## Step 7: TODOS.md Cleanup
+**규칙:**
+1. 먼저 전체 CHANGELOG.md를 읽습니다. 이미 있는 내용을 이해합니다.
+2. 기존 항목 내의 표현만 수정합니다. 항목을 삭제, 재정렬, 교체하지 않습니다.
+3. CHANGELOG 항목을 처음부터 재생성하지 않습니다. 해당 항목은 `/ship`이 실제 diff와 커밋 히스토리에서 작성한 것입니다. 그것이 진실의 원천입니다. 문체를 다듬는 것이지 역사를 재작성하는 것이 아닙니다.
+4. 항목이 잘못되었거나 불완전해 보이면, AskUserQuestion을 사용합니다 — 조용히 수정하지 않습니다.
+5. 정확한 `old_string` 매칭으로 Edit 도구를 사용합니다 — CHANGELOG.md를 Write로 덮어쓰지 않습니다.
 
-This is a second pass that complements `/ship`'s Step 5.5. Read `review/TODOS-format.md` (if
-available) for the canonical TODO item format.
+**이 브랜치에서 CHANGELOG가 수정되지 않은 경우:** 이 단계를 건너뜁니다.
 
-If TODOS.md does not exist, skip this step.
+**이 브랜치에서 CHANGELOG가 수정된 경우**, 문체에 대해 항목을 리뷰합니다:
 
-1. **Completed items not yet marked:** Cross-reference the diff against open TODO items. If a
-   TODO is clearly completed by the changes in this branch, move it to the Completed section
-   with `**Completed:** vX.Y.Z.W (YYYY-MM-DD)`. Be conservative — only mark items with clear
-   evidence in the diff.
-
-2. **Items needing description updates:** If a TODO references files or components that were
-   significantly changed, its description may be stale. Use AskUserQuestion to confirm whether
-   the TODO should be updated, completed, or left as-is.
-
-3. **New deferred work:** Check the diff for `TODO`, `FIXME`, `HACK`, and `XXX` comments. For
-   each one that represents meaningful deferred work (not a trivial inline note), use
-   AskUserQuestion to ask whether it should be captured in TODOS.md.
+- **판매 테스트:** 사용자가 각 항목을 읽고 "오, 좋다, 써봐야지"라고 생각할까요? 아니라면, 표현(내용이 아님)을 재작성합니다.
+- 사용자가 이제 **할 수 있는 것**으로 시작합니다 — 구현 세부 사항이 아닙니다.
+- "이제 ...할 수 있습니다"로, "...를 리팩토링했습니다"로 쓰지 않습니다.
+- 커밋 메시지처럼 읽히는 항목을 표시하고 재작성합니다.
+- 내부/기여자 관련 변경은 별도의 "### 기여자를 위한 사항" 하위 섹션에 배치합니다.
+- 경미한 문체 수정은 자동으로 합니다. 재작성이 의미를 변경할 경우 AskUserQuestion을 사용합니다.
 
 ---
 
-## Step 8: VERSION Bump Question
+## Step 6: 문서 간 일관성 및 발견 가능성 검사
 
-**CRITICAL — NEVER BUMP VERSION WITHOUT ASKING.**
+개별 파일 감사 후, 문서 간 일관성 검사를 수행합니다:
 
-1. **If VERSION does not exist:** Skip silently.
+1. README의 기능/능력 목록이 CLAUDE.md(또는 프로젝트 지침)가 설명하는 것과 일치합니까?
+2. ARCHITECTURE의 컴포넌트 목록이 CONTRIBUTING의 프로젝트 구조 설명과 일치합니까?
+3. CHANGELOG의 최신 버전이 VERSION 파일과 일치합니까?
+4. **발견 가능성:** 모든 문서 파일이 README.md 또는 CLAUDE.md에서 도달 가능합니까? ARCHITECTURE.md가 존재하지만 README나 CLAUDE.md 어디에서도 링크하지 않으면 표시합니다. 모든 문서는 두 개의 진입점 파일 중 하나에서 발견 가능해야 합니다.
+5. 문서 간 모순을 표시합니다. 명확한 사실적 불일치(예: 버전 불일치)는 자동으로 수정합니다. 서술적 모순에는 AskUserQuestion을 사용합니다.
 
-2. Check if VERSION was already modified on this branch:
+---
+
+## Step 7: TODOS.md 정리
+
+이것은 `/ship`의 Step 5.5를 보완하는 두 번째 패스입니다. 정규 TODO 항목 형식에 대해서는
+`review/TODOS-format.md`(사용 가능한 경우)를 읽습니다.
+
+TODOS.md가 존재하지 않으면 이 단계를 건너뜁니다.
+
+1. **아직 완료 표시되지 않은 완료 항목:** diff와 열린 TODO 항목을 교차 참조합니다. 이 브랜치의 변경으로 명확히 완료된 TODO는 `**Completed:** vX.Y.Z.W (YYYY-MM-DD)`와 함께 완료 섹션으로 이동합니다. 보수적으로 접근합니다 — diff에 명확한 증거가 있는 항목만 표시합니다.
+
+2. **설명 업데이트가 필요한 항목:** TODO가 크게 변경된 파일이나 컴포넌트를 참조하는 경우 설명이 오래되었을 수 있습니다. AskUserQuestion을 사용하여 TODO를 업데이트, 완료, 또는 그대로 둘지 확인합니다.
+
+3. **새로운 이연 작업:** diff에서 `TODO`, `FIXME`, `HACK`, `XXX` 주석을 확인합니다. 의미 있는 이연 작업을 나타내는 각 항목(사소한 인라인 메모가 아닌)에 대해, AskUserQuestion을 사용하여 TODOS.md에 기록해야 하는지 물어봅니다.
+
+---
+
+## Step 8: VERSION 올리기 질문
+
+**중요 — 묻지 않고 절대 VERSION을 올리지 마세요.**
+
+1. **VERSION이 존재하지 않는 경우:** 조용히 건너뜁니다.
+
+2. 이 브랜치에서 VERSION이 이미 수정되었는지 확인합니다:
 
 ```bash
 git diff <base>...HEAD -- VERSION
 ```
 
-3. **If VERSION was NOT bumped:** Use AskUserQuestion:
-   - RECOMMENDATION: Choose C (Skip) because docs-only changes rarely warrant a version bump
-   - A) Bump PATCH (X.Y.Z+1) — if doc changes ship alongside code changes
-   - B) Bump MINOR (X.Y+1.0) — if this is a significant standalone release
-   - C) Skip — no version bump needed
+3. **VERSION이 올라가지 않은 경우:** AskUserQuestion을 사용합니다:
+   - 권장: C(건너뛰기)를 선택하세요. 문서만 변경된 경우 버전 올리기가 필요하지 않은 경우가 많습니다
+   - A) PATCH 올리기 (X.Y.Z+1) — 문서 변경이 코드 변경과 함께 배포되는 경우
+   - B) MINOR 올리기 (X.Y+1.0) — 이것이 중요한 독립 릴리스인 경우
+   - C) 건너뛰기 — 버전 올리기 불필요
 
-4. **If VERSION was already bumped:** Do NOT skip silently. Instead, check whether the bump
-   still covers the full scope of changes on this branch:
+4. **VERSION이 이미 올라간 경우:** 조용히 건너뛰지 않습니다. 대신, 올리기가 이 브랜치의 전체 변경 범위를 아직 커버하는지 확인합니다:
 
-   a. Read the CHANGELOG entry for the current VERSION. What features does it describe?
-   b. Read the full diff (`git diff <base>...HEAD --stat` and `git diff <base>...HEAD --name-only`).
-      Are there significant changes (new features, new skills, new commands, major refactors)
-      that are NOT mentioned in the CHANGELOG entry for the current version?
-   c. **If the CHANGELOG entry covers everything:** Skip — output "VERSION: Already bumped to
-      vX.Y.Z, covers all changes."
-   d. **If there are significant uncovered changes:** Use AskUserQuestion explaining what the
-      current version covers vs what's new, and ask:
-      - RECOMMENDATION: Choose A because the new changes warrant their own version
-      - A) Bump to next patch (X.Y.Z+1) — give the new changes their own version
-      - B) Keep current version — add new changes to the existing CHANGELOG entry
-      - C) Skip — leave version as-is, handle later
+   a. 현재 VERSION의 CHANGELOG 항목을 읽습니다. 어떤 기능을 설명합니까?
+   b. 전체 diff(`git diff <base>...HEAD --stat` 및 `git diff <base>...HEAD --name-only`)를 읽습니다. 현재 버전의 CHANGELOG 항목에 언급되지 않은 중요한 변경(새 기능, 새 스킬, 새 명령, 주요 리팩토링)이 있습니까?
+   c. **CHANGELOG 항목이 모든 것을 커버하는 경우:** 건너뜁니다 — "VERSION: 이미 vX.Y.Z로 올라갔으며, 모든 변경을 커버합니다."를 출력합니다.
+   d. **커버되지 않은 중요한 변경이 있는 경우:** AskUserQuestion을 사용하여 현재 버전이 커버하는 것과 새로운 것을 설명하고 물어봅니다:
+      - 권장: A를 선택하세요. 새 변경이 별도의 버전을 보증합니다
+      - A) 다음 패치로 올리기 (X.Y.Z+1) — 새 변경에 별도의 버전을 부여합니다
+      - B) 현재 버전 유지 — 기존 CHANGELOG 항목에 새 변경을 추가합니다
+      - C) 건너뛰기 — 버전을 그대로 두고 나중에 처리합니다
 
-   The key insight: a VERSION bump set for "feature A" should not silently absorb "feature B"
-   if feature B is substantial enough to deserve its own version entry.
+   핵심 인사이트: "기능 A"를 위해 설정된 VERSION 올리기가 "기능 B"를 조용히 흡수해서는 안 됩니다. 기능 B가 별도의 버전 항목을 가질 만큼 중요한 경우에는 특히 그렇습니다.
 
 ---
 
-## Step 9: Commit & Output
+## Step 9: 커밋 및 출력
 
-**Empty check first:** Run `git status` (never use `-uall`). If no documentation files were
-modified by any previous step, output "All documentation is up to date." and exit without
-committing.
+**빈 상태 먼저 확인:** `git status`를 실행합니다 (`-uall`을 절대 사용하지 않음). 이전 단계에서 문서 파일이 수정되지 않았으면, "모든 문서가 최신 상태입니다."를 출력하고 커밋 없이 종료합니다.
 
-**Commit:**
+**커밋:**
 
-1. Stage modified documentation files by name (never `git add -A` or `git add .`).
-2. Create a single commit:
+1. 수정된 문서 파일을 이름으로 스테이징합니다 (`git add -A` 또는 `git add .`은 절대 사용하지 않음).
+2. 단일 커밋을 생성합니다:
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -607,42 +586,39 @@ EOF
 )"
 ```
 
-3. Push to the current branch:
+3. 현재 브랜치에 push합니다:
 
 ```bash
 git push
 ```
 
-**PR/MR body update (idempotent, race-safe):**
+**PR/MR 본문 업데이트 (멱등, 레이스 안전):**
 
-1. Read the existing PR/MR body into a PID-unique tempfile (use the platform detected in Step 0):
+1. 기존 PR/MR 본문을 PID 고유 임시 파일로 읽습니다 (Step 0에서 감지된 플랫폼 사용):
 
-**If GitHub:**
+**GitHub인 경우:**
 ```bash
 gh pr view --json body -q .body > /tmp/gstack-pr-body-$$.md
 ```
 
-**If GitLab:**
+**GitLab인 경우:**
 ```bash
 glab mr view -F json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('description',''))" > /tmp/gstack-pr-body-$$.md
 ```
 
-2. If the tempfile already contains a `## Documentation` section, replace that section with the
-   updated content. If it does not contain one, append a `## Documentation` section at the end.
+2. 임시 파일에 이미 `## Documentation` 섹션이 포함되어 있으면 해당 섹션을 업데이트된 내용으로 교체합니다. 포함되어 있지 않으면 끝에 `## Documentation` 섹션을 추가합니다.
 
-3. The Documentation section should include a **doc diff preview** — for each file modified,
-   describe what specifically changed (e.g., "README.md: added /document-release to skills
-   table, updated skill count from 9 to 10").
+3. Documentation 섹션에는 **문서 diff 미리보기**를 포함해야 합니다 — 수정된 각 파일에 대해 구체적으로 무엇이 변경되었는지 설명합니다 (예: "README.md: 스킬 테이블에 /document-release 추가, 스킬 수를 9에서 10으로 업데이트").
 
-4. Write the updated body back:
+4. 업데이트된 본문을 다시 기록합니다:
 
-**If GitHub:**
+**GitHub인 경우:**
 ```bash
 gh pr edit --body-file /tmp/gstack-pr-body-$$.md
 ```
 
-**If GitLab:**
-Read the contents of `/tmp/gstack-pr-body-$$.md` using the Read tool, then pass it to `glab mr update` using a heredoc to avoid shell metacharacter issues:
+**GitLab인 경우:**
+Read 도구를 사용하여 `/tmp/gstack-pr-body-$$.md`의 내용을 읽은 후, 셸 메타문자 문제를 피하기 위해 heredoc을 사용하여 `glab mr update`에 전달합니다:
 ```bash
 glab mr update -d "$(cat <<'MRBODY'
 <paste the file contents here>
@@ -650,19 +626,18 @@ MRBODY
 )"
 ```
 
-5. Clean up the tempfile:
+5. 임시 파일을 정리합니다:
 
 ```bash
 rm -f /tmp/gstack-pr-body-$$.md
 ```
 
-6. If `gh pr view` / `glab mr view` fails (no PR/MR exists): skip with message "No PR/MR found — skipping body update."
-7. If `gh pr edit` / `glab mr update` fails: warn "Could not update PR/MR body — documentation changes are in the
-   commit." and continue.
+6. `gh pr view` / `glab mr view`가 실패하면 (PR/MR이 존재하지 않음): "PR/MR을 찾을 수 없습니다 — 본문 업데이트를 건너뜁니다."라는 메시지와 함께 건너뜁니다.
+7. `gh pr edit` / `glab mr update`가 실패하면: "PR/MR 본문을 업데이트할 수 없습니다 — 문서 변경은 커밋에 포함되어 있습니다."라고 경고하고 계속 진행합니다.
 
-**Structured doc health summary (final output):**
+**구조화된 문서 상태 요약 (최종 출력):**
 
-Output a scannable summary showing every documentation file's status:
+모든 문서 파일의 상태를 보여주는 스캔 가능한 요약을 출력합니다:
 
 ```
 Documentation health:
@@ -674,23 +649,22 @@ Documentation health:
   VERSION         [status] ([details])
 ```
 
-Where status is one of:
-- Updated — with description of what changed
-- Current — no changes needed
-- Voice polished — wording adjusted
-- Not bumped — user chose to skip
-- Already bumped — version was set by /ship
-- Skipped — file does not exist
+상태는 다음 중 하나입니다:
+- Updated — 변경된 내용 설명
+- Current — 변경 불필요
+- Voice polished — 표현 수정됨
+- Not bumped — 사용자가 건너뛰기 선택
+- Already bumped — /ship에서 버전 설정됨
+- Skipped — 파일이 존재하지 않음
 
 ---
 
-## Important Rules
+## 중요 규칙
 
-- **Read before editing.** Always read the full content of a file before modifying it.
-- **Never clobber CHANGELOG.** Polish wording only. Never delete, replace, or regenerate entries.
-- **Never bump VERSION silently.** Always ask. Even if already bumped, check whether it covers the full scope of changes.
-- **Be explicit about what changed.** Every edit gets a one-line summary.
-- **Generic heuristics, not project-specific.** The audit checks work on any repo.
-- **Discoverability matters.** Every doc file should be reachable from README or CLAUDE.md.
-- **Voice: friendly, user-forward, not obscure.** Write like you're explaining to a smart person
-  who hasn't seen the code.
+- **편집하기 전에 읽으세요.** 파일을 수정하기 전에 항상 전체 내용을 읽습니다.
+- **절대 CHANGELOG를 덮어쓰지 마세요.** 표현만 다듬습니다. 항목을 삭제, 교체, 재생성하지 않습니다.
+- **절대 VERSION을 조용히 올리지 마세요.** 항상 물어봅니다. 이미 올라간 경우에도, 전체 변경 범위를 커버하는지 확인합니다.
+- **변경된 내용을 명시적으로 설명합니다.** 모든 편집에 한 줄 요약을 포함합니다.
+- **프로젝트에 특화되지 않은 범용 휴리스틱.** 감사 검사는 어떤 저장소에서든 동작합니다.
+- **발견 가능성이 중요합니다.** 모든 문서 파일은 README 또는 CLAUDE.md에서 도달 가능해야 합니다.
+- **문체: 친근하고, 사용자 중심적이며, 난해하지 않게.** 코드를 보지 않은 똑똑한 사람에게 설명하듯이 작성합니다.

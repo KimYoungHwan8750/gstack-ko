@@ -31,6 +31,12 @@ REPO_MODE=\${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(${ctx.paths.binDir}/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -52,6 +58,37 @@ types (e.g., /qa, /ship). If you would have auto-invoked a skill, instead briefl
 The user opted out of proactive behavior.
 
 If output shows \`UPGRADE_AVAILABLE <old> <new>\`: read \`${ctx.paths.skillRoot}/gstack-upgrade/SKILL.md\` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If \`JUST_UPGRADED <from> <to>\`: tell user "Running gstack v{to} (just updated!)" and continue.`;
+}
+
+function generateYhlibSection(): string {
+  return `## yhlib 모노레포 통합
+
+\`YHLIB\`이 \`true\`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
+
+**확정 기술 스택 (프레임워크 선택 건너뛰기):**
+- Web: Next.js / App: Expo (React Native) / Backend: Supabase
+- 상태관리: Zustand / 데이터 패칭: Tanstack Query
+- 폼/검증: Zod + React Hook Form
+- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
+- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
+
+**아키텍처 참조 문서:**
+- \`.claude/CLAUDE.md\` — 전체 아키텍처 + DI 전략
+- \`.claude/web.md\` — Next.js 규칙
+- \`.claude/app.md\` — Expo/React Native 규칙
+- \`.claude/supabase.md\` — DB/Auth/Storage
+- \`.claude/form.md\` — 폼/입력/검증 패턴
+- \`.claude/theme.md\` — 테마/디자인 시스템
+- \`.claude/components.md\` — UI 컴포넌트 아키텍처
+- \`.claude/i18n.md\` — 다국어 구현
+
+**필수 동작:**
+- 프레임워크/기술 스택 질문을 건너뛰세요
+- AskUserQuestion으로 \`apps/\` 하위의 어떤 앱에서 작업하는지 물어보세요
+- 설계 문서는 \`apps/<앱이름>/plan/\`에 저장하세요
+- \`packages/shared\` → 공통 로직, \`packages/next\` → 웹 구현, \`packages/react-native\` → 앱 구현
+
+\`YHLIB\`이 \`false\`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.`;
 }
 
 function generateLakeIntro(): string {
@@ -475,7 +512,7 @@ export function generatePreamble(ctx: TemplateContext): string {
     generateProactivePrompt(ctx),
     generateVoiceDirective(tier),
     ...(tier >= 2 ? [generateAskUserFormat(ctx), generateCompletenessSection()] : []),
-    ...(tier >= 3 ? [generateRepoModeSection(), generateSearchBeforeBuildingSection(ctx)] : []),
+    ...(tier >= 3 ? [generateYhlibSection(), generateRepoModeSection(), generateSearchBeforeBuildingSection(ctx)] : []),
     generateContributorMode(),
     generateCompletionStatus(),
   ];

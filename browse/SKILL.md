@@ -3,12 +3,12 @@ name: browse
 preamble-tier: 1
 version: 1.1.0
 description: |
-  Fast headless browser for QA testing and site dogfooding. Navigate any URL, interact with
-  elements, verify page state, diff before/after actions, take annotated screenshots, check
-  responsive layouts, test forms and uploads, handle dialogs, and assert element states.
-  ~100ms per command. Use when you need to test a feature, verify a deployment, dogfood a
-  user flow, or file a bug with evidence. Use when asked to "open in browser", "test the
-  site", "take a screenshot", or "dogfood this".
+  QA 테스트 및 사이트 독포딩을 위한 빠른 헤드리스 브라우저. URL 탐색, 요소 상호작용,
+  페이지 상태 확인, 액션 전/후 diff, 주석이 달린 스크린샷 촬영, 반응형 레이아웃 확인,
+  폼 및 업로드 테스트, 다이얼로그 처리, 요소 상태 어설션을 수행합니다.
+  명령당 약 100ms. 기능 테스트, 배포 확인, 사용자 플로우 독포딩, 증거가 포함된
+  버그 리포트 작성 시 사용합니다. 다음 요청 시 사용: "open in browser", "test the
+  site", "take a screenshot", "dogfood this".
 allowed-tools:
   - Bash
   - Read
@@ -39,6 +39,12 @@ REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+# yhlib monorepo detection
+YHLIB_DETECTED="false"
+if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
+  YHLIB_DETECTED="true"
+fi
+echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -238,10 +244,10 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# browse: QA Testing & Dogfooding
+# browse: QA 테스트 및 독포딩
 
-Persistent headless Chromium. First call auto-starts (~3s), then ~100ms per command.
-State persists between calls (cookies, tabs, login sessions).
+영구 헤드리스 Chromium. 첫 호출 시 자동 시작 (약 3초), 이후 명령당 약 100ms.
+상태가 호출 간 유지됩니다 (쿠키, 탭, 로그인 세션).
 
 ## SETUP (run this check BEFORE any browse command)
 
@@ -262,49 +268,49 @@ If `NEEDS_SETUP`:
 2. Run: `cd <SKILL_DIR> && ./setup`
 3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
 
-## Core QA Patterns
+## 핵심 QA 패턴
 
-### 1. Verify a page loads correctly
+### 1. 페이지가 올바르게 로드되는지 확인
 ```bash
 $B goto https://yourapp.com
-$B text                          # content loads?
-$B console                       # JS errors?
-$B network                       # failed requests?
-$B is visible ".main-content"    # key elements present?
+$B text                          # 콘텐츠가 로드되나?
+$B console                       # JS 에러?
+$B network                       # 실패한 요청?
+$B is visible ".main-content"    # 핵심 요소가 존재하나?
 ```
 
-### 2. Test a user flow
+### 2. 사용자 플로우 테스트
 ```bash
 $B goto https://app.com/login
-$B snapshot -i                   # see all interactive elements
+$B snapshot -i                   # 모든 인터랙티브 요소 확인
 $B fill @e3 "user@test.com"
 $B fill @e4 "password"
-$B click @e5                     # submit
-$B snapshot -D                   # diff: what changed after submit?
-$B is visible ".dashboard"       # success state present?
+$B click @e5                     # 제출
+$B snapshot -D                   # diff: 제출 후 무엇이 변경되었나?
+$B is visible ".dashboard"       # 성공 상태가 존재하나?
 ```
 
-### 3. Verify an action worked
+### 3. 액션이 작동했는지 확인
 ```bash
-$B snapshot                      # baseline
-$B click @e3                     # do something
-$B snapshot -D                   # unified diff shows exactly what changed
+$B snapshot                      # 기준선
+$B click @e3                     # 무언가 수행
+$B snapshot -D                   # 통합 diff로 정확히 무엇이 변경되었는지 표시
 ```
 
-### 4. Visual evidence for bug reports
+### 4. 버그 리포트를 위한 시각적 증거
 ```bash
-$B snapshot -i -a -o /tmp/annotated.png   # labeled screenshot
-$B screenshot /tmp/bug.png                # plain screenshot
-$B console                                # error log
+$B snapshot -i -a -o /tmp/annotated.png   # 레이블이 달린 스크린샷
+$B screenshot /tmp/bug.png                # 일반 스크린샷
+$B console                                # 에러 로그
 ```
 
-### 5. Find all clickable elements (including non-ARIA)
+### 5. 클릭 가능한 모든 요소 찾기 (비 ARIA 포함)
 ```bash
-$B snapshot -C                   # finds divs with cursor:pointer, onclick, tabindex
-$B click @c1                     # interact with them
+$B snapshot -C                   # cursor:pointer, onclick, tabindex가 있는 div를 찾음
+$B click @c1                     # 상호작용
 ```
 
-### 6. Assert element states
+### 6. 요소 상태 어설션
 ```bash
 $B is visible ".modal"
 $B is enabled "#submit-btn"
@@ -315,62 +321,62 @@ $B is focused "#search-input"
 $B js "document.body.textContent.includes('Success')"
 ```
 
-### 7. Test responsive layouts
+### 7. 반응형 레이아웃 테스트
 ```bash
-$B responsive /tmp/layout        # mobile + tablet + desktop screenshots
-$B viewport 375x812              # or set specific viewport
+$B responsive /tmp/layout        # 모바일 + 태블릿 + 데스크톱 스크린샷
+$B viewport 375x812              # 또는 특정 뷰포트 설정
 $B screenshot /tmp/mobile.png
 ```
 
-### 8. Test file uploads
+### 8. 파일 업로드 테스트
 ```bash
 $B upload "#file-input" /path/to/file.pdf
 $B is visible ".upload-success"
 ```
 
-### 9. Test dialogs
+### 9. 다이얼로그 테스트
 ```bash
-$B dialog-accept "yes"           # set up handler
-$B click "#delete-button"        # trigger dialog
-$B dialog                        # see what appeared
-$B snapshot -D                   # verify deletion happened
+$B dialog-accept "yes"           # 핸들러 설정
+$B click "#delete-button"        # 다이얼로그 트리거
+$B dialog                        # 무엇이 나타났는지 확인
+$B snapshot -D                   # 삭제가 수행되었는지 확인
 ```
 
-### 10. Compare environments
+### 10. 환경 비교
 ```bash
 $B diff https://staging.app.com https://prod.app.com
 ```
 
-### 11. Show screenshots to the user
-After `$B screenshot`, `$B snapshot -a -o`, or `$B responsive`, always use the Read tool on the output PNG(s) so the user can see them. Without this, screenshots are invisible.
+### 11. 사용자에게 스크린샷 표시
+`$B screenshot`, `$B snapshot -a -o`, 또는 `$B responsive` 후에는 항상 Read 도구로 출력 PNG를 읽어 사용자가 볼 수 있게 합니다. 이 작업 없이는 스크린샷이 보이지 않습니다.
 
-## User Handoff
+## 사용자 핸드오프
 
-When you hit something you can't handle in headless mode (CAPTCHA, complex auth, multi-factor
-login), hand off to the user:
+헤드리스 모드에서 처리할 수 없는 상황에 부딪혔을 때 (CAPTCHA, 복잡한 인증, 다중 인증
+로그인), 사용자에게 핸드오프합니다:
 
 ```bash
-# 1. Open a visible Chrome at the current page
+# 1. 현재 페이지에서 보이는 Chrome을 엽니다
 $B handoff "Stuck on CAPTCHA at login page"
 
-# 2. Tell the user what happened (via AskUserQuestion)
-#    "I've opened Chrome at the login page. Please solve the CAPTCHA
-#     and let me know when you're done."
+# 2. 사용자에게 무슨 일이 일어났는지 알립니다 (AskUserQuestion 통해)
+#    "로그인 페이지에서 Chrome을 열었습니다. CAPTCHA를 해결하고
+#     완료되면 알려주세요."
 
-# 3. When user says "done", re-snapshot and continue
+# 3. 사용자가 "완료"라고 하면, 다시 스냅샷을 찍고 계속합니다
 $B resume
 ```
 
-**When to use handoff:**
-- CAPTCHAs or bot detection
-- Multi-factor authentication (SMS, authenticator app)
-- OAuth flows that require user interaction
-- Complex interactions the AI can't handle after 3 attempts
+**핸드오프를 사용할 때:**
+- CAPTCHA 또는 봇 감지
+- 다중 인증 (SMS, 인증 앱)
+- 사용자 상호작용이 필요한 OAuth 플로우
+- AI가 3회 시도 후에도 처리할 수 없는 복잡한 상호작용
 
-The browser preserves all state (cookies, localStorage, tabs) across the handoff.
-After `resume`, you get a fresh snapshot of wherever the user left off.
+브라우저는 핸드오프 전후로 모든 상태 (쿠키, localStorage, 탭)를 보존합니다.
+`resume` 후에는 사용자가 마지막으로 작업한 위치의 새로운 스냅샷을 받습니다.
 
-## Snapshot Flags
+## 스냅샷 플래그
 
 The snapshot is your primary tool for understanding and interacting with pages.
 
@@ -407,7 +413,7 @@ $B click @c1       # cursor-interactive ref (from -C)
 
 Refs are invalidated on navigation — run `snapshot` again after `goto`.
 
-## Full Command List
+## 전체 명령 목록
 
 ### Navigation
 | Command | Description |
