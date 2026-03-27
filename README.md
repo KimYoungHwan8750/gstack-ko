@@ -1,245 +1,92 @@
-# gstack
+# gstack-ko
 
-> "I don't think I've typed like a line of code probably since December, basically, which is an extremely large change." — [Andrej Karpathy](https://fortune.com/2026/03/21/andrej-karpathy-openai-cofounder-ai-agents-coding-state-of-psychosis-openclaw/), No Priors podcast, March 2026
+[garrytan/gstack](https://github.com/garrytan/gstack)의 한국어 fork.
 
-When I heard Karpathy say this, I wanted to find out how. How does one person ship like a team of twenty? Peter Steinberger built [OpenClaw](https://github.com/openclaw/openclaw) — 247K GitHub stars — essentially solo with AI agents. The revolution is here. A single builder with the right tooling can move faster than a traditional team.
+gstack은 Claude Code를 가상 엔지니어링 팀으로 만들어주는 스킬 모음입니다. CEO가 제품을 재정의하고, 엔지니어링 매니저가 아키텍처를 확정하고, 디자이너가 AI slop을 잡아내고, 리뷰어가 프로덕션 버그를 찾고, QA가 실제 브라우저를 열고, 보안 책임자가 OWASP + STRIDE 감사를 돌리고, 릴리스 엔지니어가 PR을 배포합니다. 전부 슬래시 커맨드, 전부 Markdown, 전부 무료, MIT 라이선스.
 
-I'm [Garry Tan](https://x.com/garrytan), President & CEO of [Y Combinator](https://www.ycombinator.com/). I've worked with thousands of startups — Coinbase, Instacart, Rippling — when they were one or two people in a garage. Before YC, I was one of the first eng/PM/designers at Palantir, cofounded Posterous (sold to Twitter), and built Bookface, YC's internal social network.
+## 원본과 다른 점
 
-**gstack is my answer.** I've been building products for twenty years, and right now I'm shipping more code than I ever have. In the last 60 days: **600,000+ lines of production code** (35% tests), **10,000-20,000 lines per day**, part-time, while running YC full-time. Here's my last `/retro` across 3 projects: **140,751 lines added, 362 commits, ~115k net LOC** in one week.
+| 항목 | 내용 |
+|------|------|
+| **한글화** | 28개 스킬 전체 + 지원 파일 6개 한글 번역. 고유명사/개발용어/코드블록은 원문 유지. |
+| **yhlib 통합** | yhlib 모노레포 자동 감지 시 프레임워크 선택 건너뛰기, 확정 스택 참조, `apps/` 앱 선택 안내. 미감지 시 기존 동작 유지. |
+| **한국 규제/문화** | CSO에 개인정보 보호법/정보통신망법 점검, benchmark에 한국 기업 성능 기준, office-hours/plan-ceo-review에 한국 스타트업 생태계 컨텍스트 추가. |
+| **업그레이드** | `git reset --hard` 대신 three-way merge로 한글화 보존하며 upstream 병합. |
 
-**2026 — 1,237 contributions and counting:**
-
-![GitHub contributions 2026 — 1,237 contributions, massive acceleration in Jan-Mar](docs/images/github-2026.png)
-
-**2013 — when I built Bookface at YC (772 contributions):**
-
-![GitHub contributions 2013 — 772 contributions building Bookface at YC](docs/images/github-2013.png)
-
-Same person. Different era. The difference is the tooling.
-
-**gstack is how I do it.** It turns Claude Code into a virtual engineering team — a CEO who rethinks the product, an eng manager who locks architecture, a designer who catches AI slop, a reviewer who finds production bugs, a QA lead who opens a real browser, a security officer who runs OWASP + STRIDE audits, and a release engineer who ships the PR. Twenty specialists and eight power tools, all slash commands, all Markdown, all free, MIT license.
-
-This is my open source software factory. I use it every day. I'm sharing it because these tools should be available to everyone.
-
-Fork it. Improve it. Make it yours. And if you want to hate on free open source software — you're welcome to, but I'd rather you just try it first.
-
-**Who this is for:**
-- **Founders and CEOs** — especially technical ones who still want to ship
-- **First-time Claude Code users** — structured roles instead of a blank prompt
-- **Tech leads and staff engineers** — rigorous review, QA, and release automation on every PR
-
-## Quick start
-
-1. Install gstack (30 seconds — see below)
-2. Run `/office-hours` — describe what you're building
-3. Run `/plan-ceo-review` on any feature idea
-4. Run `/review` on any branch with changes
-5. Run `/qa` on your staging URL
-6. Stop there. You'll know if this is for you.
-
-## Install — 30 seconds
-
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Git](https://git-scm.com/), [Bun](https://bun.sh/) v1.0+, [Node.js](https://nodejs.org/) (Windows only)
-
-### Step 1: Install on your machine
-
-Open Claude Code and paste this. Claude does the rest.
-
-> Install gstack: run **`git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack && cd ~/.claude/skills/gstack && ./setup`** then add a "gstack" section to CLAUDE.md that says to use the /browse skill from gstack for all web browsing, never use mcp\_\_claude-in-chrome\_\_\* tools, and lists the available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review, /design-consultation, /review, /ship, /land-and-deploy, /canary, /benchmark, /browse, /qa, /qa-only, /design-review, /setup-browser-cookies, /setup-deploy, /retro, /investigate, /document-release, /codex, /cso, /autoplan, /careful, /freeze, /guard, /unfreeze, /gstack-upgrade. Then ask the user if they also want to add gstack to the current project so teammates get it.
-
-### Step 2: Add to your repo so teammates get it (optional)
-
-> Add gstack to this project: run **`cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup`** then add a "gstack" section to this project's CLAUDE.md that says to use the /browse skill from gstack for all web browsing, never use mcp\_\_claude-in-chrome\_\_\* tools, lists the available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review, /design-consultation, /review, /ship, /land-and-deploy, /canary, /benchmark, /browse, /qa, /qa-only, /design-review, /setup-browser-cookies, /setup-deploy, /retro, /investigate, /document-release, /codex, /cso, /careful, /freeze, /guard, /unfreeze, /gstack-upgrade, and tells Claude that if gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
-
-Real files get committed to your repo (not a submodule), so `git clone` just works. Everything lives inside `.claude/`. Nothing touches your PATH or runs in the background.
-
-### Codex, Gemini CLI, or Cursor
-
-gstack works on any agent that supports the [SKILL.md standard](https://github.com/anthropics/claude-code). Skills live in `.agents/skills/` and are discovered automatically.
-
-Install to one repo:
+## 빠른 시작
 
 ```bash
-git clone https://github.com/garrytan/gstack.git .agents/skills/gstack
-cd .agents/skills/gstack && ./setup --host codex
+# clone
+git clone -b ko https://github.com/KimYoungHwan8750/gstack-ko.git ~/.claude/skills/gstack
+
+# upstream 등록 (업그레이드용)
+cd ~/.claude/skills/gstack
+git remote add upstream https://github.com/garrytan/gstack.git
 ```
 
-When setup runs from `.agents/skills/gstack`, it installs the generated Codex skills next to it in the same repo and does not write to `~/.codex/skills`.
+Claude Code 재시작하면 스킬이 활성화됩니다. 상세 설치 가이드는 [SETUP.md](SETUP.md)를 참조하세요.
 
-Install once for your user account:
+### browse 스킬 활성화 (선택)
+
+`/browse`, `/qa`, `/design-review` 등 브라우저 기반 스킬을 쓰려면:
 
 ```bash
-git clone https://github.com/garrytan/gstack.git ~/gstack
-cd ~/gstack && ./setup --host codex
+cd ~/.claude/skills/gstack
+bun install && bun run build && ./setup
 ```
 
-`setup --host codex` creates the runtime root at `~/.codex/skills/gstack` and
-links the generated Codex skills at the top level. This avoids duplicate skill
-discovery from the source repo checkout.
+## 스킬 목록
 
-Or let setup auto-detect which agents you have installed:
+### 스프린트 워크플로우
+
+**생각 → 계획 → 구현 → 리뷰 → 테스트 → 배포 → 회고**
+
+| 스킬 | 역할 | 설명 |
+|------|------|------|
+| `/office-hours` | YC 오피스 아워 | 아이디어 브레인스토밍 + 디자인 문서 작성. 스타트업/빌더 모드. |
+| `/plan-ceo-review` | CEO / 창업자 | 문제 재정의, 10-star 제품 찾기. 범위 확장/유지/축소 모드. |
+| `/plan-eng-review` | 엔지니어링 매니저 | 아키텍처, 데이터 흐름, 다이어그램, 엣지 케이스, 테스트 커버리지. |
+| `/plan-design-review` | 시니어 디자이너 | 디자인 차원별 0-10 평가 + 개선. AI Slop 감지. |
+| `/design-consultation` | 디자인 파트너 | 디자인 시스템 구축, DESIGN.md 생성. |
+| `/review` | 스태프 엔지니어 | PR diff 분석, SQL 안전성, LLM 신뢰 경계, 조건부 부작용 검출. |
+| `/investigate` | 디버거 | 근본 원인 조사. 철칙: 근본 원인 없이 수정하지 않는다. |
+| `/design-review` | 코딩하는 디자이너 | 시각적 QA + 소스 코드 수정. 원자적 커밋 + 전후 스크린샷. |
+| `/qa` | QA 리드 | 실제 브라우저로 테스트, 버그 찾기, 수정, 재검증. |
+| `/qa-only` | QA 리포터 | 테스트만, 수정 없음. 버그 리포트 생성. |
+| `/cso` | 보안 책임자 | OWASP Top 10 + STRIDE + 한국 개인정보 보호법 점검. |
+| `/ship` | 릴리스 엔지니어 | 테스트 → 리뷰 → VERSION 범프 → CHANGELOG → PR 생성. |
+| `/land-and-deploy` | 릴리스 엔지니어 | PR merge → CI 대기 → 프로덕션 검증. |
+| `/canary` | SRE | 배포 후 모니터링. 콘솔 에러, 성능 회귀, 페이지 장애 감시. |
+| `/benchmark` | 성능 엔지니어 | Core Web Vitals 기준선 + PR별 전후 비교. 한국 기업 벤치마크 포함. |
+| `/document-release` | 테크니컬 라이터 | 배포 후 README/CHANGELOG/CLAUDE.md 자동 업데이트. |
+| `/retro` | 엔지니어링 매니저 | 주간 회고. 커밋 분석, 코드 품질 추세, 개인별 기여도. |
+| `/browse` | QA 엔지니어 | 헤드리스 Chromium. 명령당 ~100ms. |
+| `/autoplan` | 리뷰 파이프라인 | CEO → 디자인 → 엔지니어링 리뷰 자동 실행. |
+
+### 유틸리티
+
+| 스킬 | 설명 |
+|------|------|
+| `/codex` | Codex 세컨드 오피니언 — 독립적 코드 리뷰, 적대적 챌린지, 상담 모드. |
+| `/careful` | 파괴적 명령어 경고 (rm -rf, DROP TABLE, force-push 등). |
+| `/freeze` | 편집을 특정 디렉토리로 제한. |
+| `/guard` | `/careful` + `/freeze` 결합. 프로덕션 작업용 최대 안전 모드. |
+| `/unfreeze` | freeze 해제. |
+| `/setup-deploy` | `/land-and-deploy`용 배포 설정 (Vercel, Fly.io, Render 등). |
+| `/setup-browser-cookies` | 실제 브라우저 쿠키를 헤드리스 세션으로 가져오기. |
+| `/gstack-upgrade` | gstack 업그레이드. three-way merge로 한글화 보존. |
+
+## 업그레이드
+
+Claude Code에서 `/gstack-upgrade` 실행. 또는 수동:
 
 ```bash
-git clone https://github.com/garrytan/gstack.git ~/gstack
-cd ~/gstack && ./setup --host auto
+cd ~/.claude/skills/gstack
+git fetch upstream
+git merge upstream/main
+bun run gen:skill-docs && ./setup
 ```
 
-For Codex-compatible hosts, setup now supports both repo-local installs from `.agents/skills/gstack` and user-global installs from `~/.codex/skills/gstack`. All 28 skills work across all supported agents. Hook-based safety skills (careful, freeze, guard) use inline safety advisory prose on non-Claude hosts.
+## 라이선스
 
-## See it work
-
-```
-You:    I want to build a daily briefing app for my calendar.
-You:    /office-hours
-Claude: [asks about the pain — specific examples, not hypotheticals]
-
-You:    Multiple Google calendars, events with stale info, wrong locations.
-        Prep takes forever and the results aren't good enough...
-
-Claude: I'm going to push back on the framing. You said "daily briefing
-        app." But what you actually described is a personal chief of
-        staff AI.
-        [extracts 5 capabilities you didn't realize you were describing]
-        [challenges 4 premises — you agree, disagree, or adjust]
-        [generates 3 implementation approaches with effort estimates]
-        RECOMMENDATION: Ship the narrowest wedge tomorrow, learn from
-        real usage. The full vision is a 3-month project — start with
-        the daily briefing that actually works.
-        [writes design doc → feeds into downstream skills automatically]
-
-You:    /plan-ceo-review
-        [reads the design doc, challenges scope, runs 10-section review]
-
-You:    /plan-eng-review
-        [ASCII diagrams for data flow, state machines, error paths]
-        [test matrix, failure modes, security concerns]
-
-You:    Approve plan. Exit plan mode.
-        [writes 2,400 lines across 11 files. ~8 minutes.]
-
-You:    /review
-        [AUTO-FIXED] 2 issues. [ASK] Race condition → you approve fix.
-
-You:    /qa https://staging.myapp.com
-        [opens real browser, clicks through flows, finds and fixes a bug]
-
-You:    /ship
-        Tests: 42 → 51 (+9 new). PR: github.com/you/app/pull/42
-```
-
-You said "daily briefing app." The agent said "you're building a chief of staff AI" — because it listened to your pain, not your feature request. Eight commands, end to end. That is not a copilot. That is a team.
-
-## The sprint
-
-gstack is a process, not a collection of tools. The skills run in the order a sprint runs:
-
-**Think → Plan → Build → Review → Test → Ship → Reflect**
-
-Each skill feeds into the next. `/office-hours` writes a design doc that `/plan-ceo-review` reads. `/plan-eng-review` writes a test plan that `/qa` picks up. `/review` catches bugs that `/ship` verifies are fixed. Nothing falls through the cracks because every step knows what came before it.
-
-| Skill | Your specialist | What they do |
-|-------|----------------|--------------|
-| `/office-hours` | **YC Office Hours** | Start here. Six forcing questions that reframe your product before you write code. Pushes back on your framing, challenges premises, generates implementation alternatives. Design doc feeds into every downstream skill. |
-| `/plan-ceo-review` | **CEO / Founder** | Rethink the problem. Find the 10-star product hiding inside the request. Four modes: Expansion, Selective Expansion, Hold Scope, Reduction. |
-| `/plan-eng-review` | **Eng Manager** | Lock in architecture, data flow, diagrams, edge cases, and tests. Forces hidden assumptions into the open. |
-| `/plan-design-review` | **Senior Designer** | Rates each design dimension 0-10, explains what a 10 looks like, then edits the plan to get there. AI Slop detection. Interactive — one AskUserQuestion per design choice. |
-| `/design-consultation` | **Design Partner** | Build a complete design system from scratch. Researches the landscape, proposes creative risks, generates realistic product mockups. |
-| `/review` | **Staff Engineer** | Find the bugs that pass CI but blow up in production. Auto-fixes the obvious ones. Flags completeness gaps. |
-| `/investigate` | **Debugger** | Systematic root-cause debugging. Iron Law: no fixes without investigation. Traces data flow, tests hypotheses, stops after 3 failed fixes. |
-| `/design-review` | **Designer Who Codes** | Same audit as /plan-design-review, then fixes what it finds. Atomic commits, before/after screenshots. |
-| `/qa` | **QA Lead** | Test your app, find bugs, fix them with atomic commits, re-verify. Auto-generates regression tests for every fix. |
-| `/qa-only` | **QA Reporter** | Same methodology as /qa but report only. Pure bug report without code changes. |
-| `/cso` | **Chief Security Officer** | OWASP Top 10 + STRIDE threat model. Zero-noise: 17 false positive exclusions, 8/10+ confidence gate, independent finding verification. Each finding includes a concrete exploit scenario. |
-| `/ship` | **Release Engineer** | Sync main, run tests, audit coverage, push, open PR. Bootstraps test frameworks if you don't have one. |
-| `/land-and-deploy` | **Release Engineer** | Merge the PR, wait for CI and deploy, verify production health. One command from "approved" to "verified in production." |
-| `/canary` | **SRE** | Post-deploy monitoring loop. Watches for console errors, performance regressions, and page failures. |
-| `/benchmark` | **Performance Engineer** | Baseline page load times, Core Web Vitals, and resource sizes. Compare before/after on every PR. |
-| `/document-release` | **Technical Writer** | Update all project docs to match what you just shipped. Catches stale READMEs automatically. |
-| `/retro` | **Eng Manager** | Team-aware weekly retro. Per-person breakdowns, shipping streaks, test health trends, growth opportunities. `/retro global` runs across all your projects and AI tools (Claude Code, Codex, Gemini). |
-| `/browse` | **QA Engineer** | Real Chromium browser, real clicks, real screenshots. ~100ms per command. |
-| `/setup-browser-cookies` | **Session Manager** | Import cookies from your real browser (Chrome, Arc, Brave, Edge) into the headless session. Test authenticated pages. |
-| `/autoplan` | **Review Pipeline** | One command, fully reviewed plan. Runs CEO → design → eng review automatically with encoded decision principles. Surfaces only taste decisions for your approval. |
-
-### Power tools
-
-| Skill | What it does |
-|-------|-------------|
-| `/codex` | **Second Opinion** — independent code review from OpenAI Codex CLI. Three modes: review (pass/fail gate), adversarial challenge, and open consultation. Cross-model analysis when both `/review` and `/codex` have run. |
-| `/careful` | **Safety Guardrails** — warns before destructive commands (rm -rf, DROP TABLE, force-push). Say "be careful" to activate. Override any warning. |
-| `/freeze` | **Edit Lock** — restrict file edits to one directory. Prevents accidental changes outside scope while debugging. |
-| `/guard` | **Full Safety** — `/careful` + `/freeze` in one command. Maximum safety for prod work. |
-| `/unfreeze` | **Unlock** — remove the `/freeze` boundary. |
-| `/setup-deploy` | **Deploy Configurator** — one-time setup for `/land-and-deploy`. Detects your platform, production URL, and deploy commands. |
-| `/gstack-upgrade` | **Self-Updater** — upgrade gstack to latest. Detects global vs vendored install, syncs both, shows what changed. |
-
-**[Deep dives with examples and philosophy for every skill →](docs/skills.md)**
-
-## Parallel sprints
-
-gstack works well with one sprint. It gets interesting with ten running at once.
-
-[Conductor](https://conductor.build) runs multiple Claude Code sessions in parallel — each in its own isolated workspace. One session on `/office-hours`, another on `/review`, a third implementing a feature, a fourth running `/qa`. All at the same time. The sprint structure is what makes parallelism work — without a process, ten agents is ten sources of chaos. With a process, each agent knows exactly what to do and when to stop.
-
----
-
-Free, MIT licensed, open source. No premium tier, no waitlist.
-
-I open sourced how I build software. You can fork it and make it your own.
-
-> **We're hiring.** Want to ship 10K+ LOC/day and help harden gstack?
-> Come work at YC — [ycombinator.com/software](https://ycombinator.com/software)
-> Extremely competitive salary and equity. San Francisco, Dogpatch District.
-
-## Docs
-
-| Doc | What it covers |
-|-----|---------------|
-| [Skill Deep Dives](docs/skills.md) | Philosophy, examples, and workflow for every skill (includes Greptile integration) |
-| [Builder Ethos](ETHOS.md) | Builder philosophy: Boil the Lake, Search Before Building, three layers of knowledge |
-| [Architecture](ARCHITECTURE.md) | Design decisions and system internals |
-| [Browser Reference](BROWSER.md) | Full command reference for `/browse` |
-| [Contributing](CONTRIBUTING.md) | Dev setup, testing, contributor mode, and dev mode |
-| [Changelog](CHANGELOG.md) | What's new in every version |
-
-## Privacy & Telemetry
-
-gstack includes **opt-in** usage telemetry to help improve the project. Here's exactly what happens:
-
-- **Default is off.** Nothing is sent anywhere unless you explicitly say yes.
-- **On first run,** gstack asks if you want to share anonymous usage data. You can say no.
-- **What's sent (if you opt in):** skill name, duration, success/fail, gstack version, OS. That's it.
-- **What's never sent:** code, file paths, repo names, branch names, prompts, or any user-generated content.
-- **Change anytime:** `gstack-config set telemetry off` disables everything instantly.
-
-Data is stored in [Supabase](https://supabase.com) (open source Firebase alternative). The schema is in [`supabase/migrations/`](supabase/migrations/) — you can verify exactly what's collected. The Supabase publishable key in the repo is a public key (like a Firebase API key) — row-level security policies deny all direct access. Telemetry flows through validated edge functions that enforce schema checks, event type allowlists, and field length limits.
-
-**Local analytics are always available.** Run `gstack-analytics` to see your personal usage dashboard from the local JSONL file — no remote data needed.
-
-## Troubleshooting
-
-**Skill not showing up?** `cd ~/.claude/skills/gstack && ./setup`
-
-**`/browse` fails?** `cd ~/.claude/skills/gstack && bun install && bun run build`
-
-**Stale install?** Run `/gstack-upgrade` — or set `auto_upgrade: true` in `~/.gstack/config.yaml`
-
-**Codex says "Skipped loading skill(s) due to invalid SKILL.md"?** Your Codex skill descriptions are stale. Fix: `cd ~/.codex/skills/gstack && git pull && ./setup --host codex` — or for repo-local installs: `cd "$(readlink -f .agents/skills/gstack)" && git pull && ./setup --host codex`
-
-**Windows users:** gstack works on Windows 11 via Git Bash or WSL. Node.js is required in addition to Bun — Bun has a known bug with Playwright's pipe transport on Windows ([bun#4253](https://github.com/oven-sh/bun/issues/4253)). The browse server automatically falls back to Node.js. Make sure both `bun` and `node` are on your PATH.
-
-**Claude says it can't see the skills?** Make sure your project's `CLAUDE.md` has a gstack section. Add this:
-
-```
-## gstack
-Use /browse from gstack for all web browsing. Never use mcp__claude-in-chrome__* tools.
-Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review,
-/design-consultation, /review, /ship, /land-and-deploy, /canary, /benchmark, /browse,
-/qa, /qa-only, /design-review, /setup-browser-cookies, /setup-deploy, /retro,
-/investigate, /document-release, /codex, /cso, /autoplan, /careful, /freeze, /guard,
-/unfreeze, /gstack-upgrade.
-```
-
-## License
-
-MIT. Free forever. Go build something.
+MIT. 원본: [garrytan/gstack](https://github.com/garrytan/gstack).
