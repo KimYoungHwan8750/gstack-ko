@@ -17,3 +17,4 @@ bun.lock
 !.env.example
 supabase/.temp/
 *.exe
+bin/gstack-global-discover.exe
