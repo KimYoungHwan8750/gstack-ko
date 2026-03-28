@@ -49,6 +49,10 @@ if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
   YHLIB_DETECTED="true"
 fi
 echo "YHLIB: $YHLIB_DETECTED"
+if [ "$YHLIB_DETECTED" = "true" ]; then
+  YHLIB_APPS=$(ls -d apps/*/ 2>/dev/null | xargs -I{} basename {} | tr '\n' ',' | sed 's/,$//')
+  echo "YHLIB_APPS: $YHLIB_APPS"
+fi
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -229,8 +233,10 @@ Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3
 
 **필수 동작:**
 - 프레임워크/기술 스택 질문을 건너뛰세요
-- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
+- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요 (`YHLIB_APPS` 값 참조)
 - 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
+- gstack 프로젝트 문서는 `~/.gstack/projects/$SLUG/<앱이름>/`에 저장하세요 (앱별 서브디렉토리)
+- 문서 발견 시 `find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f`로 서브디렉토리를 재귀 탐색하세요
 - `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
 
 `YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
@@ -408,8 +414,8 @@ plan's living status.
 ```bash
 SLUG=$(~/.claude/skills/gstack/browse/bin/remote-slug 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' || echo 'no-branch')
-DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
-[ -z "$DESIGN" ] && DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1)
+DESIGN=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-design-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
+[ -z "$DESIGN" ] && DESIGN=$(find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1)
 [ -n "$DESIGN" ] && echo "Design doc found: $DESIGN" || echo "No design doc found"
 ```
 설계 문서가 존재하면 읽으세요. 문제 정의, 제약 조건, 선택한 접근 방식의 기준 문서로 사용하세요. `Supersedes:` 필드가 있다면, 이것이 수정된 설계임을 인지하고 — 이전 버전에서 무엇이 왜 변경되었는지 맥락을 확인하세요.
@@ -457,8 +463,8 @@ After /office-hours completes, re-run the design doc check:
 ```bash
 SLUG=$(~/.claude/skills/gstack/browse/bin/remote-slug 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' || echo 'no-branch')
-DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
-[ -z "$DESIGN" ] && DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1)
+DESIGN=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-design-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
+[ -z "$DESIGN" ] && DESIGN=$(find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1)
 [ -n "$DESIGN" ] && echo "Design doc found: $DESIGN" || echo "No design doc found"
 ```
 

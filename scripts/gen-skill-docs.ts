@@ -2050,8 +2050,8 @@ After /${first} completes, re-run the design doc check:
 \`\`\`bash
 SLUG=$(~/.claude/skills/gstack/browse/bin/remote-slug 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' || echo 'no-branch')
-DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
-[ -z "$DESIGN" ] && DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1)
+DESIGN=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-design-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
+[ -z "$DESIGN" ] && DESIGN=$(find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1)
 [ -n "$DESIGN" ] && echo "Design doc found: $DESIGN" || echo "No design doc found"
 \`\`\`
 

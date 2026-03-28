@@ -107,15 +107,15 @@ git log --since=30.days --name-only --format="" | sort | uniq -c | sort -rn | he
 ```bash
 SLUG=$(~/.claude/skills/gstack/browse/bin/remote-slug 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' || echo 'no-branch')
-DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head -1)
-[ -z "$DESIGN" ] && DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1)
+DESIGN=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-design-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
+[ -z "$DESIGN" ] && DESIGN=$(find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1)
 [ -n "$DESIGN" ] && echo "Design doc found: $DESIGN" || echo "No design doc found"
 ```
 디자인 문서가 존재하면 (`/office-hours`에서 생성된), 읽으세요. 문제 진술, 제약 조건, 선택된 접근법의 출처로 사용하세요. `Supersedes:` 필드가 있으면 이것이 수정된 디자인임을 메모하세요.
 
 **핸드오프 노트 확인** (위의 디자인 문서 확인에서 $SLUG와 $BRANCH를 재사용):
 ```bash
-HANDOFF=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-ceo-handoff-*.md 2>/dev/null | head -1)
+HANDOFF=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-ceo-handoff-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
 [ -n "$HANDOFF" ] && echo "HANDOFF_FOUND: $HANDOFF" || echo "NO_HANDOFF"
 ```
 이 블록이 디자인 문서 확인과 별도의 셸에서 실행되면 해당 블록의 동일한 명령어를 사용하여 먼저 $SLUG와 $BRANCH를 재계산하세요.
@@ -697,7 +697,7 @@ AskUserQuestion에 답변이 없으면 여기에 메모하세요. 자동으로 �
 
 ```bash
 {{SLUG_EVAL}}
-rm -f ~/.gstack/projects/$SLUG/*-$BRANCH-ceo-handoff-*.md 2>/dev/null || true
+find ~/.gstack/projects/$SLUG -name "*-$BRANCH-ceo-handoff-*.md" -type f -delete 2>/dev/null || true
 ```
 
 ## 리뷰 로그

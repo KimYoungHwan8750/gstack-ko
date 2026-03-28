@@ -50,6 +50,10 @@ if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
   YHLIB_DETECTED="true"
 fi
 echo "YHLIB: $YHLIB_DETECTED"
+if [ "$YHLIB_DETECTED" = "true" ]; then
+  YHLIB_APPS=$(ls -d apps/*/ 2>/dev/null | xargs -I{} basename {} | tr '\n' ',' | sed 's/,$//')
+  echo "YHLIB_APPS: $YHLIB_APPS"
+fi
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -230,8 +234,10 @@ Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3
 
 **필수 동작:**
 - 프레임워크/기술 스택 질문을 건너뛰세요
-- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
+- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요 (`YHLIB_APPS` 값 참조)
 - 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
+- gstack 프로젝트 문서는 `~/.gstack/projects/$SLUG/<앱이름>/`에 저장하세요 (앱별 서브디렉토리)
+- 문서 발견 시 `find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f`로 서브디렉토리를 재귀 탐색하세요
 - `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
 
 `YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
@@ -392,7 +398,7 @@ office-hours 출력 찾기:
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
-ls ~/.gstack/projects/$SLUG/*office-hours* 2>/dev/null | head -5
+find ~/.gstack/projects/$SLUG -name '*office-hours*' -type f 2>/dev/null | head -5
 ls .context/*office-hours* .context/attachments/*office-hours* 2>/dev/null | head -5
 ```
 

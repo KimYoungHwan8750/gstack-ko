@@ -45,6 +45,10 @@ if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
   YHLIB_DETECTED="true"
 fi
 echo "YHLIB: $YHLIB_DETECTED"
+if [ "$YHLIB_DETECTED" = "true" ]; then
+  YHLIB_APPS=$(ls -d apps/*/ 2>/dev/null | xargs -I{} basename {} | tr '\n' ',' | sed 's/,$//')
+  echo "YHLIB_APPS: $YHLIB_APPS"
+fi
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -785,7 +789,7 @@ Week of Mar 1: 47 commits (3 contributors), 3.2k LOC, 38% tests, 12 PRs, peak: 1
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
-cat ~/.gstack/projects/$SLUG/*-reviews.jsonl 2>/dev/null | grep '"skill":"ship"' | grep '"plan_items_total"' || echo "NO_PLAN_DATA"
+find ~/.gstack/projects/$SLUG -name '*-reviews.jsonl' -type f -exec cat {} + 2>/dev/null | grep '"skill":"ship"' | grep '"plan_items_total"' || echo "NO_PLAN_DATA"
 ```
 
 플랜 완성도 데이터가 회고 시간 윈도우 내에 존재하면:

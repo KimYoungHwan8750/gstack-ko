@@ -96,7 +96,7 @@ git diff 휴리스틱으로 폴백하기 전에, 더 풍부한 테스트 계획 
 1. **프로젝트 범위 테스트 계획:** `~/.gstack/projects/`에서 이 저장소의 최근 `*-test-plan-*.md` 파일을 확인합니다
    ```bash
    {{SLUG_EVAL}}
-   ls -t ~/.gstack/projects/$SLUG/*-test-plan-*.md 2>/dev/null | head -1
+   find ~/.gstack/projects/$SLUG -name '*-test-plan-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1
    ```
 2. **대화 컨텍스트:** 이전 `/plan-eng-review` 또는 `/plan-ceo-review`가 이 대화에서 테스트 계획 출력을 생성했는지 확인합니다
 3. **더 풍부한 소스를 사용합니다.** 두 소스 모두 사용할 수 없는 경우에만 git diff 분석으로 폴백합니다.

@@ -54,7 +54,7 @@ office-hours 출력 찾기:
 
 ```bash
 {{SLUG_EVAL}}
-ls ~/.gstack/projects/$SLUG/*office-hours* 2>/dev/null | head -5
+find ~/.gstack/projects/$SLUG -name '*office-hours*' -type f 2>/dev/null | head -5
 ls .context/*office-hours* .context/attachments/*office-hours* 2>/dev/null | head -5
 ```
 

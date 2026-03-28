@@ -143,7 +143,7 @@ Captured: [timestamp] | Branch: [branch] | Commit: [short hash]
 ### 단계 2: 컨텍스트 읽기
 
 - CLAUDE.md, TODOS.md, git log -30, git diff against the base branch --stat 읽기
-- 디자인 문서 발견: `ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1`
+- 디자인 문서 발견: `find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1`
 - UI 범위 감지: 플랜에서 뷰/렌더링 관련 용어(component, screen, form,
   button, modal, layout, dashboard, sidebar, nav, dialog) grep. 2개 이상 일치 필요.
   오탐 제외 ("page" 단독, 약어의 "UI").
