@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-design-consultation"
-  short_description: ""
+  short_description: "디자인 컨설테이션: 제품을 이해하고, 시장을 조사하며, 완전한 디자인 시스템(미적 방향, 타이포그래피, 색상, 레이아웃, 간격, 모션)을 제안하고, 폰트+색상 미리보기 페이지를 생성합니다. DESIGN.md를..."
   default_prompt: "Use gstack-design-consultation for this task."
 policy:
   allow_implicit_invocation: true

@@ -1,14 +1,10 @@
 ---
 name: unfreeze
-version: 0.1.0
 description: |
   /freeze로 설정된 freeze 경계를 해제하여, 모든 디렉토리에 대한 편집을 다시
   허용합니다. 세션을 종료하지 않고 편집 범위를 넓히고 싶을 때 사용하세요.
   "unfreeze", "unlock edits", "remove freeze", "allow all edits" 요청 시
-  사용합니다.
-allowed-tools:
-  - Bash
-  - Read
+  사용합니다. (gstack)
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->

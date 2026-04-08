@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-review"
-  short_description: ""
+  short_description: "사전 착륙(pre-landing) PR 리뷰. base 브랜치 대비 diff를 분석하여 SQL 안전성, LLM 신뢰 경계 위반, 조건부 부작용, 기타 구조적 문제를 검출합니다. \"review this PR\",..."
   default_prompt: "Use gstack-review for this task."
 policy:
   allow_implicit_invocation: true

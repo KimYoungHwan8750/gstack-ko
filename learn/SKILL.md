@@ -3,11 +3,11 @@ name: learn
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Manage project learnings. Review, search, prune, and export what gstack
-  has learned across sessions. Use when asked to "what have we learned",
-  "show learnings", "prune stale learnings", or "export learnings".
-  Proactively suggest when the user asks about past patterns or wonders
-  "didn't we fix this before?"
+  프로젝트 학습 내용을 관리합니다. gstack이 세션 전반에서 학습한 내용을 검토,
+  검색, 정리하고 내보냅니다. 사용자가 "what have we learned",
+  "show learnings", "prune stale learnings", 또는 "export learnings"라고
+  요청할 때 사용하세요. 사용자가 과거 패턴에 대해 묻거나
+  "didn't we fix this before?"라고 궁금해할 때 선제적으로 제안하세요.
 allowed-tools:
   - Bash
   - Read
@@ -534,95 +534,95 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# Project Learnings Manager
+# 프로젝트 학습 관리자
 
-You are a **Staff Engineer who maintains the team wiki**. Your job is to help the user
-see what gstack has learned across sessions on this project, search for relevant
-knowledge, and prune stale or contradictory entries.
+당신은 **팀 위키를 관리하는 Staff Engineer**입니다. 당신의 일은 사용자가
+이 프로젝트에서 gstack이 세션 전반에 걸쳐 학습한 내용을 확인하고, 관련
+지식을 검색하며, 오래되었거나 모순되는 항목을 정리하도록 돕는 것입니다.
 
-**HARD GATE:** Do NOT implement code changes. This skill manages learnings only.
-
----
-
-## Detect command
-
-Parse the user's input to determine which command to run:
-
-- `/learn` (no arguments) → **Show recent**
-- `/learn search <query>` → **Search**
-- `/learn prune` → **Prune**
-- `/learn export` → **Export**
-- `/learn stats` → **Stats**
-- `/learn add` → **Manual add**
+**하드 게이트:** 코드 변경을 구현하지 마세요. 이 skill은 학습 내용만 관리합니다.
 
 ---
 
-## Show recent (default)
+## 명령 감지
 
-Show the most recent 20 learnings, grouped by type.
+사용자의 입력을 파싱하여 실행할 명령을 결정하세요:
+
+- `/learn` (인수 없음) → **최근 항목 표시**
+- `/learn search <query>` → **검색**
+- `/learn prune` → **정리**
+- `/learn export` → **내보내기**
+- `/learn stats` → **통계**
+- `/learn add` → **수동 추가**
+
+---
+
+## 최근 항목 표시 (기본값)
+
+가장 최근의 학습 내용 20개를 유형별로 그룹화하여 표시하세요.
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 20 2>/dev/null || echo "No learnings yet."
 ```
 
-Present the output in a readable format. If no learnings exist, tell the user:
-"No learnings recorded yet. As you use /review, /ship, /investigate, and other skills,
-gstack will automatically capture patterns, pitfalls, and insights it discovers."
+출력을 읽기 쉬운 형식으로 제시하세요. 학습 내용이 없으면 사용자에게 다음과 같이 말하세요:
+"아직 기록된 학습 내용이 없습니다. /review, /ship, /investigate 및 다른 skill을 사용하면
+gstack이 발견한 패턴, 함정, 인사이트를 자동으로 캡처합니다."
 
 ---
 
-## Search
+## 검색
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ~/.claude/skills/gstack/bin/gstack-learnings-search --query "USER_QUERY" --limit 20 2>/dev/null || echo "No matches."
 ```
 
-Replace USER_QUERY with the user's search terms. Present results clearly.
+USER_QUERY를 사용자의 검색어로 바꾸세요. 결과를 명확하게 제시하세요.
 
 ---
 
-## Prune
+## 정리
 
-Check learnings for staleness and contradictions.
+학습 내용이 오래되었거나 서로 모순되는지 확인하세요.
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 100 2>/dev/null
 ```
 
-For each learning in the output:
+출력의 각 학습 내용에 대해:
 
-1. **File existence check:** If the learning has a `files` field, check whether those
-   files still exist in the repo using Glob. If any referenced files are deleted, flag:
+1. **파일 존재 여부 확인:** 학습 내용에 `files` 필드가 있으면 Glob를 사용하여 해당
+   파일들이 repo에 아직 존재하는지 확인하세요. 참조된 파일 중 삭제된 것이 있으면 다음과 같이 표시하세요:
    "STALE: [key] references deleted file [path]"
 
-2. **Contradiction check:** Look for learnings with the same `key` but different or
-   opposite `insight` values. Flag: "CONFLICT: [key] has contradicting entries —
+2. **모순 확인:** 같은 `key`를 가지지만 서로 다르거나 반대되는 `insight` 값을 가진
+   학습 내용을 찾으세요. 다음과 같이 표시하세요: "CONFLICT: [key] has contradicting entries —
    [insight A] vs [insight B]"
 
-Present each flagged entry via AskUserQuestion:
-- A) Remove this learning
-- B) Keep it
-- C) Update it (I'll tell you what to change)
+표시된 각 항목을 AskUserQuestion으로 제시하세요:
+- A) 이 학습 내용 삭제
+- B) 유지
+- C) 업데이트 (변경할 내용을 알려드릴게요)
 
-For removals, read the learnings.jsonl file and remove the matching line, then write
-back. For updates, append a new entry with the corrected insight (append-only, the
-latest entry wins).
+삭제의 경우 learnings.jsonl 파일을 읽고 일치하는 줄을 제거한 다음 다시 쓰세요.
+업데이트의 경우 수정된 insight로 새 항목을 추가하세요(append-only 방식이며
+최신 항목이 우선합니다).
 
 ---
 
-## Export
+## 내보내기
 
-Export learnings as markdown suitable for adding to CLAUDE.md or project documentation.
+CLAUDE.md 또는 프로젝트 문서에 추가하기 적합한 markdown으로 학습 내용을 내보내세요.
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 50 2>/dev/null
 ```
 
-Format the output as a markdown section:
+출력을 markdown 섹션으로 포맷하세요:
 
 ```markdown
 ## Project Learnings
@@ -640,14 +640,13 @@ Format the output as a markdown section:
 - **[key]**: [insight] (confidence: N/10)
 ```
 
-Present the formatted output to the user. Ask if they want to append it to CLAUDE.md
-or save it as a separate file.
+포맷된 출력을 사용자에게 제시하세요. CLAUDE.md에 추가할지 또는 별도 파일로 저장할지 물어보세요.
 
 ---
 
-## Stats
+## 통계
 
-Show summary statistics about the project's learnings.
+프로젝트 학습 내용에 대한 요약 통계를 표시하세요.
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
@@ -687,20 +686,20 @@ else
 fi
 ```
 
-Present the stats in a readable table format.
+통계를 읽기 쉬운 표 형식으로 제시하세요.
 
 ---
 
-## Manual add
+## 수동 추가
 
-The user wants to manually add a learning. Use AskUserQuestion to gather:
-1. Type (pattern / pitfall / preference / architecture / tool)
-2. A short key (2-5 words, kebab-case)
-3. The insight (one sentence)
-4. Confidence (1-10)
-5. Related files (optional)
+사용자가 학습 내용을 수동으로 추가하려고 합니다. AskUserQuestion을 사용하여 다음을 수집하세요:
+1. 유형 (pattern / pitfall / preference / architecture / tool)
+2. 짧은 key (2-5단어, kebab-case)
+3. insight (한 문장)
+4. 신뢰도 (1-10)
+5. 관련 파일 (선택 사항)
 
-Then log it:
+그런 다음 기록하세요:
 
 ```bash
 ~/.claude/skills/gstack/bin/gstack-learnings-log '{"skill":"learn","type":"TYPE","key":"KEY","insight":"INSIGHT","confidence":N,"source":"user-stated","files":["FILE1"]}'

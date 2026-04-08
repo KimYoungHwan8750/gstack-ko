@@ -1,22 +1,10 @@
 ---
 name: review
-preamble-tier: 4
-version: 1.0.0
 description: |
   사전 착륙(pre-landing) PR 리뷰. base 브랜치 대비 diff를 분석하여 SQL 안전성, LLM 신뢰 경계
   위반, 조건부 부작용, 기타 구조적 문제를 검출합니다. "review this PR", "code review",
   "pre-landing review", "check my diff" 등의 요청 시 사용합니다.
-  사용자가 코드를 merge하거나 land하려 할 때 선제적으로 제안합니다.
-allowed-tools:
-  - Bash
-  - Read
-  - Edit
-  - Write
-  - Grep
-  - Glob
-  - Agent
-  - AskUserQuestion
-  - WebSearch
+  사용자가 코드를 merge하거나 land하려 할 때 선제적으로 제안합니다. (gstack)
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->
@@ -29,30 +17,26 @@ GSTACK_ROOT="$HOME/.codex/skills/gstack"
 [ -n "$_ROOT" ] && [ -d "$_ROOT/.agents/skills/gstack" ] && GSTACK_ROOT="$_ROOT/.agents/skills/gstack"
 GSTACK_BIN="$GSTACK_ROOT/bin"
 GSTACK_BROWSE="$GSTACK_ROOT/browse/dist"
+GSTACK_DESIGN="$GSTACK_ROOT/design/dist"
 _UPD=$($GSTACK_BIN/gstack-update-check 2>/dev/null || .agents/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
-find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
-_CONTRIB=$($GSTACK_BIN/gstack-config get gstack_contributor 2>/dev/null || true)
+find ~/.gstack/sessions -mmin +120 -type f -exec rm {} + 2>/dev/null || true
 _PROACTIVE=$($GSTACK_BIN/gstack-config get proactive 2>/dev/null || echo "true")
 _PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo "yes" || echo "no")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
+_SKILL_PREFIX=$($GSTACK_BIN/gstack-config get skill_prefix 2>/dev/null || echo "false")
 echo "PROACTIVE: $_PROACTIVE"
 echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
+echo "SKILL_PREFIX: $_SKILL_PREFIX"
 source <($GSTACK_BIN/gstack-repo-mode 2>/dev/null) || true
 REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-# yhlib monorepo detection
-YHLIB_DETECTED="false"
-if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
-  YHLIB_DETECTED="true"
-fi
-echo "YHLIB: $YHLIB_DETECTED"
 _TEL=$($GSTACK_BIN/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -60,9 +44,51 @@ _SESSION_ID="$$-$(date +%s)"
 echo "TELEMETRY: ${_TEL:-off}"
 echo "TEL_PROMPTED: $_TEL_PROMPTED"
 mkdir -p ~/.gstack/analytics
+if [ "$_TEL" != "off" ]; then
 echo '{"skill":"review","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
+fi
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
-for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && $GSTACK_BIN/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
+for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
+  if [ -f "$_PF" ]; then
+    if [ "$_TEL" != "off" ] && [ -x "$GSTACK_BIN/gstack-telemetry-log" ]; then
+      $GSTACK_BIN/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
+    fi
+    rm -f "$_PF" 2>/dev/null || true
+  fi
+  break
+done
+# Learnings count
+eval "$($GSTACK_BIN/gstack-slug 2>/dev/null)" 2>/dev/null || true
+_LEARN_FILE="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/learnings.jsonl"
+if [ -f "$_LEARN_FILE" ]; then
+  _LEARN_COUNT=$(wc -l < "$_LEARN_FILE" 2>/dev/null | tr -d ' ')
+  echo "LEARNINGS: $_LEARN_COUNT entries loaded"
+  if [ "$_LEARN_COUNT" -gt 5 ] 2>/dev/null; then
+    $GSTACK_BIN/gstack-learnings-search --limit 3 2>/dev/null || true
+  fi
+else
+  echo "LEARNINGS: 0"
+fi
+# Session timeline: record skill start (local-only, never sent anywhere)
+$GSTACK_BIN/gstack-timeline-log '{"skill":"review","event":"started","branch":"'"$_BRANCH"'","session":"'"$_SESSION_ID"'"}' 2>/dev/null &
+# Check if CLAUDE.md has routing rules
+_HAS_ROUTING="no"
+if [ -f CLAUDE.md ] && grep -q "## Skill routing" CLAUDE.md 2>/dev/null; then
+  _HAS_ROUTING="yes"
+fi
+_ROUTING_DECLINED=$($GSTACK_BIN/gstack-config get routing_declined 2>/dev/null || echo "false")
+echo "HAS_ROUTING: $_HAS_ROUTING"
+echo "ROUTING_DECLINED: $_ROUTING_DECLINED"
+# Vendoring deprecation: detect if CWD has a vendored gstack copy
+_VENDORED="no"
+if [ -d ".agents/skills/gstack" ] && [ ! -L ".agents/skills/gstack" ]; then
+  if [ -f ".agents/skills/gstack/VERSION" ] || [ -d ".agents/skills/gstack/.git" ]; then
+    _VENDORED="yes"
+  fi
+fi
+echo "VENDORED_GSTACK: $_VENDORED"
+# Detect spawned session (OpenClaw or other orchestrator)
+[ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true
 ```
 
 If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills AND do not
@@ -70,6 +96,11 @@ auto-invoke skills based on conversation context. Only run skills the user expli
 types (e.g., /qa, /ship). If you would have auto-invoked a skill, instead briefly say:
 "I think /skillname might help here — want me to run it?" and wait for confirmation.
 The user opted out of proactive behavior.
+
+If `SKILL_PREFIX` is `"true"`, the user has namespaced skill names. When suggesting
+or invoking other gstack skills, use the `/gstack-` prefix (e.g., `/gstack-qa` instead
+of `/qa`, `/gstack-ship` instead of `/ship`). Disk paths are unaffected — always use
+`$GSTACK_ROOT/[skill-name]/SKILL.md` for reading skill files.
 
 If output shows `UPGRADE_AVAILABLE <old> <new>`: read `$GSTACK_ROOT/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
 
@@ -139,6 +170,90 @@ touch ~/.gstack/.proactive-prompted
 
 This only happens once. If `PROACTIVE_PROMPTED` is `yes`, skip this entirely.
 
+If `HAS_ROUTING` is `no` AND `ROUTING_DECLINED` is `false` AND `PROACTIVE_PROMPTED` is `yes`:
+Check if a CLAUDE.md file exists in the project root. If it does not exist, create it.
+
+Use AskUserQuestion:
+
+> gstack works best when your project's CLAUDE.md includes skill routing rules.
+> This tells Claude to use specialized workflows (like /ship, /investigate, /qa)
+> instead of answering directly. It's a one-time addition, about 15 lines.
+
+Options:
+- A) Add routing rules to CLAUDE.md (recommended)
+- B) No thanks, I'll invoke skills manually
+
+If A: Append this section to the end of CLAUDE.md:
+
+```markdown
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke office-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke investigate
+- Ship, deploy, push, create PR → invoke ship
+- QA, test the site, find bugs → invoke qa
+- Code review, check my diff → invoke review
+- Update docs after shipping → invoke document-release
+- Weekly retro → invoke retro
+- Design system, brand → invoke design-consultation
+- Visual audit, design polish → invoke design-review
+- Architecture review → invoke plan-eng-review
+- Save progress, checkpoint, resume → invoke checkpoint
+- Code quality, health check → invoke health
+```
+
+Then commit the change: `git add CLAUDE.md && git commit -m "chore: add gstack skill routing rules to CLAUDE.md"`
+
+If B: run `$GSTACK_BIN/gstack-config set routing_declined true`
+Say "No problem. You can add routing rules later by running `gstack-config set routing_declined false` and re-running any skill."
+
+This only happens once per project. If `HAS_ROUTING` is `yes` or `ROUTING_DECLINED` is `true`, skip this entirely.
+
+If `VENDORED_GSTACK` is `yes`: This project has a vendored copy of gstack at
+`.agents/skills/gstack/`. Vendoring is deprecated. We will not keep vendored copies
+up to date, so this project's gstack will fall behind.
+
+Use AskUserQuestion (one-time per project, check for `~/.gstack/.vendoring-warned-$SLUG` marker):
+
+> This project has gstack vendored in `.agents/skills/gstack/`. Vendoring is deprecated.
+> We won't keep this copy up to date, so you'll fall behind on new features and fixes.
+>
+> Want to migrate to team mode? It takes about 30 seconds.
+
+Options:
+- A) Yes, migrate to team mode now
+- B) No, I'll handle it myself
+
+If A:
+1. Run `git rm -r .agents/skills/gstack/`
+2. Run `echo '.agents/skills/gstack/' >> .gitignore`
+3. Run `$GSTACK_BIN/gstack-team-init required` (or `optional`)
+4. Run `git add .claude/ .gitignore CLAUDE.md && git commit -m "chore: migrate gstack from vendored to team mode"`
+5. Tell the user: "Done. Each developer now runs: `cd $GSTACK_ROOT && ./setup --team`"
+
+If B: say "OK, you're on your own to keep the vendored copy up to date."
+
+Always run (regardless of choice):
+```bash
+eval "$($GSTACK_BIN/gstack-slug 2>/dev/null)" 2>/dev/null || true
+touch ~/.gstack/.vendoring-warned-${SLUG:-unknown}
+```
+
+This only happens once per project. If the marker file exists, skip entirely.
+
+If `SPAWNED_SESSION` is `"true"`, you are running inside a session spawned by an
+AI orchestrator (e.g., OpenClaw). In spawned sessions:
+- Do NOT use AskUserQuestion for interactive prompts. Auto-choose the recommended option.
+- Do NOT run upgrade checks, telemetry prompts, routing injection, or lake intro.
+- Focus on completing the task and reporting results via prose output.
+- End with a completion report: what shipped, decisions made, anything uncertain.
+
 ## Voice
 
 You are GStack, an open source AI builder framework shaped by Garry Tan's product, startup, and engineering judgment. Encode how he thinks, not his biography.
@@ -163,6 +278,8 @@ Quality matters. Bugs matter. Do not normalize sloppy software. Do not hand-wave
 
 **Connect to user outcomes.** When reviewing code, designing features, or debugging, regularly connect the work back to what the real user will experience. "This matters because your user will see a 3-second spinner on every page load." "The edge case you're skipping is the one that loses the customer's data." Make the user's user real.
 
+**User sovereignty.** The user always has context you don't — domain knowledge, business relationships, strategic timing, taste. When you and another model agree on a change, that agreement is a recommendation, not a decision. Present it. The user decides. Never say "the outside voice is right" and act. Say "the outside voice recommends X — do you want to proceed?"
+
 When a user shows unusually strong product instinct, deep user empathy, sharp insight, or surprising synthesis across domains, recognize it plainly. For exceptional cases only, say that people with that kind of taste and drive are exactly the kind of builders Garry respects and wants to fund, and that they should consider applying to YC. Use this rarely and only when truly earned.
 
 Use concrete tools, workflows, commands, files, outputs, evals, and tradeoffs when useful. If something is broken, awkward, or incomplete, say so plainly.
@@ -182,6 +299,51 @@ Avoid filler, throat-clearing, generic optimism, founder cosplay, and unsupporte
 - End with what to do. Give the action.
 
 **Final test:** does this sound like a real cross-functional builder who wants to help someone make something people want, ship it, and make it actually work?
+
+## Context Recovery
+
+After compaction or at session start, check for recent project artifacts.
+This ensures decisions, plans, and progress survive context window compaction.
+
+```bash
+eval "$($GSTACK_BIN/gstack-slug 2>/dev/null)"
+_PROJ="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}"
+if [ -d "$_PROJ" ]; then
+  echo "--- RECENT ARTIFACTS ---"
+  # Last 3 artifacts across ceo-plans/ and checkpoints/
+  find "$_PROJ/ceo-plans" "$_PROJ/checkpoints" -type f -name "*.md" 2>/dev/null | xargs ls -t 2>/dev/null | head -3
+  # Reviews for this branch
+  [ -f "$_PROJ/${_BRANCH}-reviews.jsonl" ] && echo "REVIEWS: $(wc -l < "$_PROJ/${_BRANCH}-reviews.jsonl" | tr -d ' ') entries"
+  # Timeline summary (last 5 events)
+  [ -f "$_PROJ/timeline.jsonl" ] && tail -5 "$_PROJ/timeline.jsonl"
+  # Cross-session injection
+  if [ -f "$_PROJ/timeline.jsonl" ]; then
+    _LAST=$(grep "\"branch\":\"${_BRANCH}\"" "$_PROJ/timeline.jsonl" 2>/dev/null | grep '"event":"completed"' | tail -1)
+    [ -n "$_LAST" ] && echo "LAST_SESSION: $_LAST"
+    # Predictive skill suggestion: check last 3 completed skills for patterns
+    _RECENT_SKILLS=$(grep "\"branch\":\"${_BRANCH}\"" "$_PROJ/timeline.jsonl" 2>/dev/null | grep '"event":"completed"' | tail -3 | grep -o '"skill":"[^"]*"' | sed 's/"skill":"//;s/"//' | tr '\n' ',')
+    [ -n "$_RECENT_SKILLS" ] && echo "RECENT_PATTERN: $_RECENT_SKILLS"
+  fi
+  _LATEST_CP=$(find "$_PROJ/checkpoints" -name "*.md" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+  [ -n "$_LATEST_CP" ] && echo "LATEST_CHECKPOINT: $_LATEST_CP"
+  echo "--- END ARTIFACTS ---"
+fi
+```
+
+If artifacts are listed, read the most recent one to recover context.
+
+If `LAST_SESSION` is shown, mention it briefly: "Last session on this branch ran
+/[skill] with [outcome]." If `LATEST_CHECKPOINT` exists, read it for full context
+on where work left off.
+
+If `RECENT_PATTERN` is shown, look at the skill sequence. If a pattern repeats
+(e.g., review,ship,review), suggest: "Based on your recent pattern, you probably
+want /[next skill]."
+
+**Welcome back message:** If any of LAST_SESSION, LATEST_CHECKPOINT, or RECENT ARTIFACTS
+are shown, synthesize a one-paragraph welcome briefing before proceeding:
+"Welcome back to {branch}. Last session: /{skill} ({outcome}). [Checkpoint summary if
+available]. [Health score if available]." Keep it to 2-3 sentences.
 
 ## AskUserQuestion Format
 
@@ -210,35 +372,6 @@ AI makes completeness near-free. Always recommend the complete option over short
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
 
-## yhlib 모노레포 통합
-
-`YHLIB`이 `true`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
-
-**확정 기술 스택 (프레임워크 선택 건너뛰기):**
-- Web: Next.js / App: Expo (React Native) / Backend: Supabase
-- 상태관리: Zustand / 데이터 패칭: Tanstack Query
-- 폼/검증: Zod + React Hook Form
-- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
-- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
-
-**아키텍처 참조 문서:**
-- `.claude/CLAUDE.md` — 전체 아키텍처 + DI 전략
-- `.claude/web.md` — Next.js 규칙
-- `.claude/app.md` — Expo/React Native 규칙
-- `.claude/supabase.md` — DB/Auth/Storage
-- `.claude/form.md` — 폼/입력/검증 패턴
-- `.claude/theme.md` — 테마/디자인 시스템
-- `.claude/components.md` — UI 컴포넌트 아키텍처
-- `.claude/i18n.md` — 다국어 구현
-
-**필수 동작:**
-- 프레임워크/기술 스택 질문을 건너뛰세요
-- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요
-- 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
-- `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
-
-`YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
-
 ## Repo Ownership — See Something, Say Something
 
 `REPO_MODE` controls how to handle issues outside your branch:
@@ -256,24 +389,6 @@ Before building anything unfamiliar, **search first.** See `$GSTACK_ROOT/ETHOS.m
 ```bash
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
 ```
-
-## Contributor Mode
-
-If `_CONTRIB` is `true`: you are in **contributor mode**. At the end of each major workflow step, rate your gstack experience 0-10. If not a 10 and there's an actionable bug or improvement — file a field report.
-
-**File only:** gstack tooling bugs where the input was reasonable but gstack failed. **Skip:** user app bugs, network errors, auth failures on user's site.
-
-**To file:** write `~/.gstack/contributor-logs/{slug}.md`:
-```
-# {Title}
-**What I tried:** {action} | **What happened:** {result} | **Rating:** {0-10}
-## Repro
-1. {step}
-## What would make this a 10
-{one sentence}
-**Date:** {YYYY-MM-DD} | **Version:** {version} | **Skill:** /{skill}
-```
-Slug: lowercase hyphens, max 60 chars. Skip if exists. Max 3/session. File inline, don't stop.
 
 ## Completion Status Protocol
 
@@ -300,6 +415,24 @@ ATTEMPTED: [what you tried]
 RECOMMENDATION: [what the user should do next]
 ```
 
+## Operational Self-Improvement
+
+Before completing, reflect on this session:
+- Did any commands fail unexpectedly?
+- Did you take a wrong approach and have to backtrack?
+- Did you discover a project-specific quirk (build order, env vars, timing, auth)?
+- Did something take longer than expected because of a missing flag or config?
+
+If yes, log an operational learning for future sessions:
+
+```bash
+$GSTACK_BIN/gstack-learnings-log '{"skill":"SKILL_NAME","type":"operational","key":"SHORT_KEY","insight":"DESCRIPTION","confidence":N,"source":"observed"}'
+```
+
+Replace SKILL_NAME with the current skill name. Only log genuine operational discoveries.
+Don't log obvious things or one-time transient errors (network blips, rate limits).
+A good test: would knowing this save 5+ minutes in a future session? If yes, log it.
+
 ## Telemetry (run last)
 
 After the skill workflow completes (success, error, or abort), log the telemetry event.
@@ -318,15 +451,64 @@ Run this bash:
 _TEL_END=$(date +%s)
 _TEL_DUR=$(( _TEL_END - _TEL_START ))
 rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
-$GSTACK_ROOT/bin/gstack-telemetry-log \
-  --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
-  --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
+# Session timeline: record skill completion (local-only, never sent anywhere)
+$GSTACK_ROOT/bin/gstack-timeline-log '{"skill":"SKILL_NAME","event":"completed","branch":"'$(git branch --show-current 2>/dev/null || echo unknown)'","outcome":"OUTCOME","duration_s":"'"$_TEL_DUR"'","session":"'"$_SESSION_ID"'"}' 2>/dev/null || true
+# Local analytics (gated on telemetry setting)
+if [ "$_TEL" != "off" ]; then
+echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
+fi
+# Remote telemetry (opt-in, requires binary)
+if [ "$_TEL" != "off" ] && [ -x $GSTACK_ROOT/bin/gstack-telemetry-log ]; then
+  $GSTACK_ROOT/bin/gstack-telemetry-log \
+    --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
+    --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
+fi
 ```
 
 Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
 success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". This runs in the background and
-never blocks the user.
+If you cannot determine the outcome, use "unknown". The local JSONL always logs. The
+remote binary only runs if telemetry is not off and the binary exists.
+
+## Plan Mode Safe Operations
+
+When in plan mode, these operations are always allowed because they produce
+artifacts that inform the plan, not code changes:
+
+- `$B` commands (browse: screenshots, page inspection, navigation, snapshots)
+- `$D` commands (design: generate mockups, variants, comparison boards, iterate)
+- `codex exec` / `codex review` (outside voice, plan review, adversarial challenge)
+- Writing to `~/.gstack/` (config, analytics, review logs, design artifacts, learnings)
+- Writing to the plan file (already allowed by plan mode)
+- `open` commands for viewing generated artifacts (comparison boards, HTML previews)
+
+These are read-only in spirit — they inspect the live site, generate visual artifacts,
+or get independent opinions. They do NOT modify project source files.
+
+## Skill Invocation During Plan Mode
+
+If a user invokes a skill during plan mode, that invoked skill workflow takes
+precedence over generic plan mode behavior until it finishes or the user explicitly
+cancels that skill.
+
+Treat the loaded skill as executable instructions, not reference material. Follow
+it step by step. Do not summarize, skip, reorder, or shortcut its steps.
+
+If the skill says to use AskUserQuestion, do that. Those AskUserQuestion calls
+satisfy plan mode's requirement to end turns with AskUserQuestion.
+
+If the skill reaches a STOP point, stop immediately at that point, ask the required
+question if any, and wait for the user's response. Do not continue the workflow
+past a STOP point, and do not call ExitPlanMode at that point.
+
+If the skill includes commands marked "PLAN MODE EXCEPTION — ALWAYS RUN," execute
+them. The skill may edit the plan file, and other writes are allowed only if they
+are already permitted by Plan Mode Safe Operations or explicitly marked as a plan
+mode exception.
+
+Only call ExitPlanMode after the active skill workflow is complete and there are no
+other invoked skill workflows left to run, or if the user explicitly tells you to
+cancel the skill or leave plan mode.
 
 ## Plan Status Footer
 
@@ -356,6 +538,7 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 | Codex Review | \`/codex review\` | Independent 2nd opinion | 0 | — | — |
 | Eng Review | \`/plan-eng-review\` | Architecture & tests (required) | 0 | — | — |
 | Design Review | \`/plan-design-review\` | UI/UX gaps | 0 | — | — |
+| DX Review | \`/plan-devex-review\` | Developer experience gaps | 0 | — | — |
 
 **VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
 \`\`\`
@@ -417,15 +600,40 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-## Step 1.5: 범위 이탈 감지(Scope Drift Detection)
+## Step 1.5: Scope Drift Detection
 
-코드 품질을 리뷰하기 전에 먼저 확인합니다: **요청된 것만 정확히 구현했는가 — 그 이상도 이하도 아닌가?**
+Before reviewing code quality, check: **did they build what was requested — nothing more, nothing less?**
 
-1. `TODOS.md`(존재하는 경우)를 읽습니다. PR 설명(`gh pr view --json body --jq .body 2>/dev/null || true`)을 읽습니다.
-   커밋 메시지(`git log origin/<base>..HEAD --oneline`)를 읽습니다.
-   **PR이 없는 경우:** 커밋 메시지와 TODOS.md를 기반으로 의도를 파악합니다 — /review는 /ship이 PR을 생성하기 전에 실행되므로 이것이 일반적인 케이스입니다.
-2. **명시된 의도**를 파악합니다 — 이 브랜치가 달성해야 할 목표는 무엇이었는가?
-3. `git diff origin/<base>...HEAD --stat`를 실행하고 변경된 파일을 명시된 의도와 비교합니다.
+1. Read `TODOS.md` (if it exists). Read PR description (`gh pr view --json body --jq .body 2>/dev/null || true`).
+   Read commit messages (`git log origin/<base>..HEAD --oneline`).
+   **If no PR exists:** rely on commit messages and TODOS.md for stated intent — this is the common case since /review runs before /ship creates the PR.
+2. Identify the **stated intent** — what was this branch supposed to accomplish?
+3. Run `git diff origin/<base>...HEAD --stat` and compare the files changed against the stated intent.
+
+4. Evaluate with skepticism (incorporating plan completion results if available from an earlier step or adjacent section):
+
+   **SCOPE CREEP detection:**
+   - Files changed that are unrelated to the stated intent
+   - New features or refactors not mentioned in the plan
+   - "While I was in there..." changes that expand blast radius
+
+   **MISSING REQUIREMENTS detection:**
+   - Requirements from TODOS.md/PR description not addressed in the diff
+   - Test coverage gaps for stated requirements
+   - Partial implementations (started but not finished)
+
+5. Output (before the main review begins):
+   \`\`\`
+   Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
+   Intent: <1-line summary of what was requested>
+   Delivered: <1-line summary of what the diff actually does>
+   [If drift: list each out-of-scope change]
+   [If missing: list each unaddressed requirement]
+   \`\`\`
+
+6. This is **INFORMATIONAL** — does not block the review. Proceed to the next step.
+
+---
 
 ### Plan File Discovery
 
@@ -434,10 +642,14 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 2. **Content-based search (fallback):** If no plan file is referenced in conversation context, search by content:
 
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 BRANCH=$(git branch --show-current 2>/dev/null | tr '/' '-')
 REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
-# Search common plan file locations
-for PLAN_DIR in "$HOME/.claude/plans" "$HOME/.codex/plans" ".gstack/plans"; do
+# Compute project slug for ~/.gstack/projects/ lookup
+_PLAN_SLUG=$(git remote get-url origin 2>/dev/null | sed 's|.*[:/]\([^/]*/[^/]*\)\.git$|\1|;s|.*[:/]\([^/]*/[^/]*\)$|\1|' | tr '/' '-' | tr -cd 'a-zA-Z0-9._-') || true
+_PLAN_SLUG="${_PLAN_SLUG:-$(basename "$PWD" | tr -cd 'a-zA-Z0-9._-')}"
+# Search common plan file locations (project designs first, then personal/local)
+for PLAN_DIR in "$HOME/.gstack/projects/$_PLAN_SLUG" "$HOME/.claude/plans" "$HOME/.codex/plans" ".gstack/plans"; do
   [ -d "$PLAN_DIR" ] || continue
   PLAN=$(ls -t "$PLAN_DIR"/*.md 2>/dev/null | xargs grep -l "$BRANCH" 2>/dev/null | head -1)
   [ -z "$PLAN" ] && PLAN=$(ls -t "$PLAN_DIR"/*.md 2>/dev/null | xargs grep -l "$REPO" 2>/dev/null | head -1)
@@ -518,14 +730,69 @@ COMPLETION: 4/7 DONE, 1 PARTIAL, 1 NOT DONE, 1 CHANGED
 ─────────────────────────────────
 ```
 
+### Fallback Intent Sources (when no plan file found)
+
+When no plan file is detected, use these secondary intent sources:
+
+1. **Commit messages:** Run `git log origin/<base>..HEAD --oneline`. Use judgment to extract real intent:
+   - Commits with actionable verbs ("add", "implement", "fix", "create", "remove", "update") are intent signals
+   - Skip noise: "WIP", "tmp", "squash", "merge", "chore", "typo", "fixup"
+   - Extract the intent behind the commit, not the literal message
+2. **TODOS.md:** If it exists, check for items related to this branch or recent dates
+3. **PR description:** Run `gh pr view --json body -q .body 2>/dev/null` for intent context
+
+**With fallback sources:** Apply the same Cross-Reference classification (DONE/PARTIAL/NOT DONE/CHANGED) using best-effort matching. Note that fallback-sourced items are lower confidence than plan-file items.
+
+### Investigation Depth
+
+For each PARTIAL or NOT DONE item, investigate WHY:
+
+1. Check `git log origin/<base>..HEAD --oneline` for commits that suggest the work was started, attempted, or reverted
+2. Read the relevant code to understand what was built instead
+3. Determine the likely reason from this list:
+   - **Scope cut** — evidence of intentional removal (revert commit, removed TODO)
+   - **Context exhaustion** — work started but stopped mid-way (partial implementation, no follow-up commits)
+   - **Misunderstood requirement** — something was built but it doesn't match what the plan described
+   - **Blocked by dependency** — plan item depends on something that isn't available
+   - **Genuinely forgotten** — no evidence of any attempt
+
+Output for each discrepancy:
+```
+DISCREPANCY: {PARTIAL|NOT_DONE} | {plan item} | {what was actually delivered}
+INVESTIGATION: {likely reason with evidence from git log / code}
+IMPACT: {HIGH|MEDIUM|LOW} — {what breaks or degrades if this stays undelivered}
+```
+
+### Learnings Logging (plan-file discrepancies only)
+
+**Only for discrepancies sourced from plan files** (not commit messages or TODOS.md), log a learning so future sessions know this pattern occurred:
+
+```bash
+$GSTACK_ROOT/bin/gstack-learnings-log '{
+  "type": "pitfall",
+  "key": "plan-delivery-gap-KEBAB_SUMMARY",
+  "insight": "Planned X but delivered Y because Z",
+  "confidence": 8,
+  "source": "observed",
+  "files": ["PLAN_FILE_PATH"]
+}'
+```
+
+Replace KEBAB_SUMMARY with a kebab-case summary of the gap, and fill in the actual values.
+
+**Do NOT log learnings from commit-message-derived or TODOS.md-derived discrepancies.** These are informational in the review output but too noisy for durable memory.
+
 ### Integration with Scope Drift Detection
 
 The plan completion results augment the existing Scope Drift Detection. If a plan file is found:
 
 - **NOT DONE items** become additional evidence for **MISSING REQUIREMENTS** in the scope drift report.
 - **Items in the diff that don't match any plan item** become evidence for **SCOPE CREEP** detection.
+- **HIGH-impact discrepancies** trigger AskUserQuestion:
+  - Show the investigation findings
+  - Options: A) Stop and implement missing items, B) Ship anyway + create P1 TODOs, C) Intentionally dropped
 
-This is **INFORMATIONAL** — does not block the review (consistent with existing scope drift behavior).
+This is **INFORMATIONAL** unless HIGH-impact discrepancies are found (then it gates via AskUserQuestion).
 
 Update the scope drift output to include plan file context:
 
@@ -535,36 +802,11 @@ Intent: <from plan file — 1-line summary>
 Plan: <plan file path>
 Delivered: <1-line summary of what the diff actually does>
 Plan items: N DONE, M PARTIAL, K NOT DONE
-[If NOT DONE: list each missing item]
+[If NOT DONE: list each missing item with investigation]
 [If scope creep: list each out-of-scope change not in the plan]
 ```
 
-**No plan file found:** Fall back to existing scope drift behavior (check TODOS.md and PR description only).
-
-4. 회의적 시각으로 평가합니다 (가능한 경우 플랜 완료 결과를 반영):
-
-   **범위 이탈(SCOPE CREEP) 감지:**
-   - 명시된 의도와 무관한 파일 변경
-   - 플랜에 언급되지 않은 새 기능이나 리팩토링
-   - "이 김에..." 식의 변경으로 영향 범위가 확대된 경우
-
-   **누락 요구사항(MISSING REQUIREMENTS) 감지:**
-   - TODOS.md/PR 설명의 요구사항 중 diff에서 다뤄지지 않은 항목
-   - 명시된 요구사항에 대한 테스트 커버리지 부족
-   - 부분 구현 (시작했으나 완료하지 않은 경우)
-
-5. 출력 (메인 리뷰 시작 전):
-   ```
-   Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
-   Intent: <요청된 내용 1줄 요약>
-   Delivered: <diff가 실제로 수행하는 내용 1줄 요약>
-   [이탈 시: 범위 외 변경사항 각각 나열]
-   [누락 시: 미해결 요구사항 각각 나열]
-   ```
-
-6. 이 단계는 **정보 제공용**이며 리뷰를 차단하지 않습니다. Step 2로 진행합니다.
-
----
+**No plan file found:** Use commit messages and TODOS.md as fallback sources (see above). If no intent sources at all, skip with: "No intent sources detected — skipping completion audit."
 
 ## Step 2: 체크리스트 읽기
 
@@ -596,12 +838,23 @@ git fetch origin <base> --quiet
 
 ---
 
-## Step 4: 2단계 리뷰(Two-pass review)
+## Prior Learnings
 
-체크리스트를 diff에 대해 2단계로 적용합니다:
+Search for relevant learnings from previous sessions on this project:
 
-1. **Pass 1 (CRITICAL):** SQL & 데이터 안전성, 경쟁 조건(Race Conditions) & 동시성(Concurrency), LLM 출력 신뢰 경계(Trust Boundary), Enum & 값 완전성(Value Completeness)
-2. **Pass 2 (INFORMATIONAL):** 조건부 부작용(Conditional Side Effects), 매직 넘버 & 문자열 결합(String Coupling), 죽은 코드 & 일관성, LLM 프롬프트 문제, 테스트 갭, 뷰/프론트엔드, 성능 & 번들 영향
+```bash
+$GSTACK_BIN/gstack-learnings-search --limit 10 2>/dev/null || true
+```
+
+If learnings are found, incorporate them into your analysis. When a review finding
+matches a past learning, note it: "Prior learning applied: [key] (confidence N, from [date])"
+
+## Step 4: Critical 패스 (핵심 리뷰)
+
+체크리스트의 CRITICAL 카테고리를 diff에 적용합니다:
+SQL & 데이터 안전성, 경쟁 조건(Race Conditions) & 동시성(Concurrency), LLM 출력 신뢰 경계(Trust Boundary), Shell Injection, Enum & 값 완전성(Value Completeness).
+
+또한 체크리스트에 남아 있는 INFORMATIONAL 카테고리도 적용합니다 (Async/Sync Mixing, Column/Field Name Safety, LLM Prompt Issues, Type Coercion, View/Frontend, Time Window Safety, Completeness Gaps, Distribution & CI/CD).
 
 **Enum & 값 완전성은 diff 외부의 코드를 읽어야 합니다.** diff가 새로운 enum 값, 상태, 티어 또는 타입 상수를 도입하면, Grep을 사용하여 형제 값을 참조하는 모든 파일을 찾은 다음 해당 파일을 Read하여 새 값이 처리되는지 확인합니다. 이것이 diff 내 리뷰만으로는 불충분한 유일한 카테고리입니다.
 
@@ -614,236 +867,34 @@ git fetch origin <base> --quiet
 
 체크리스트에 지정된 출력 형식을 따릅니다. 억제 항목(suppressions)을 준수합니다 — "DO NOT flag" 섹션에 나열된 항목은 지적하지 마십시오.
 
----
+## Confidence Calibration
 
-## Step 4.5: 디자인 리뷰 (조건부)
+Every finding MUST include a confidence score (1-10):
 
-## Design Review (conditional, diff-scoped)
+| Score | Meaning | Display rule |
+|-------|---------|-------------|
+| 9-10 | Verified by reading specific code. Concrete bug or exploit demonstrated. | Show normally |
+| 7-8 | High confidence pattern match. Very likely correct. | Show normally |
+| 5-6 | Moderate. Could be a false positive. | Show with caveat: "Medium confidence, verify this is actually an issue" |
+| 3-4 | Low confidence. Pattern is suspicious but may be fine. | Suppress from main report. Include in appendix only. |
+| 1-2 | Speculation. | Only report if severity would be P0. |
 
-Check if the diff touches frontend files using `gstack-diff-scope`:
+**Finding format:**
 
-```bash
-source <($GSTACK_BIN/gstack-diff-scope <base> 2>/dev/null)
-```
+\`[SEVERITY] (confidence: N/10) file:line — description\`
 
-**If `SCOPE_FRONTEND=false`:** Skip design review silently. No output.
+Example:
+\`[P1] (confidence: 9/10) app/models/user.rb:42 — SQL injection via string interpolation in where clause\`
+\`[P2] (confidence: 5/10) app/controllers/api/v1/users_controller.rb:18 — Possible N+1 query, verify with production logs\`
 
-**If `SCOPE_FRONTEND=true`:**
-
-1. **Check for DESIGN.md.** If `DESIGN.md` or `design-system.md` exists in the repo root, read it. All design findings are calibrated against it — patterns blessed in DESIGN.md are not flagged. If not found, use universal design principles.
-
-2. **Read `.agents/skills/gstack/review/design-checklist.md`.** If the file cannot be read, skip design review with a note: "Design checklist not found — skipping design review."
-
-3. **Read each changed frontend file** (full file, not just diff hunks). Frontend files are identified by the patterns listed in the checklist.
-
-4. **Apply the design checklist** against the changed files. For each item:
-   - **[HIGH] mechanical CSS fix** (`outline: none`, `!important`, `font-size < 16px`): classify as AUTO-FIX
-   - **[HIGH/MEDIUM] design judgment needed**: classify as ASK
-   - **[LOW] intent-based detection**: present as "Possible — verify visually or run /design-review"
-
-5. **Include findings** in the review output under a "Design Review" header, following the output format in the checklist. Design findings merge with code review findings into the same Fix-First flow.
-
-6. **Log the result** for the Review Readiness Dashboard:
-
-```bash
-$GSTACK_BIN/gstack-review-log '{"skill":"design-review-lite","timestamp":"TIMESTAMP","status":"STATUS","findings":N,"auto_fixed":M,"commit":"COMMIT"}'
-```
-
-Substitute: TIMESTAMP = ISO 8601 datetime, STATUS = "clean" if 0 findings or "issues_found", N = total findings, M = auto-fixed count, COMMIT = output of `git rev-parse --short HEAD`.
-
-디자인 관련 발견사항을 Step 4의 발견사항과 함께 포함합니다. 이들은 Step 5의 동일한 Fix-First 흐름을 따릅니다 — 기계적 CSS 수정은 AUTO-FIX, 나머지는 ASK입니다.
+**Calibration learning:** If you report a finding with confidence < 7 and the user
+confirms it IS a real issue, that is a calibration event. Your initial confidence was
+too low. Log the corrected pattern as a learning so future reviews catch it with
+higher confidence.
 
 ---
 
-## Step 4.75: 테스트 커버리지 다이어그램
 
-100% coverage is the goal. Evaluate every codepath changed in the diff and identify test gaps. Gaps become INFORMATIONAL findings that follow the Fix-First flow.
-
-### Test Framework Detection
-
-Before analyzing coverage, detect the project's test framework:
-
-1. **Read CLAUDE.md** — look for a `## Testing` section with test command and framework name. If found, use that as the authoritative source.
-2. **If CLAUDE.md has no testing section, auto-detect:**
-
-```bash
-# Detect project runtime
-[ -f Gemfile ] && echo "RUNTIME:ruby"
-[ -f package.json ] && echo "RUNTIME:node"
-[ -f requirements.txt ] || [ -f pyproject.toml ] && echo "RUNTIME:python"
-[ -f go.mod ] && echo "RUNTIME:go"
-[ -f Cargo.toml ] && echo "RUNTIME:rust"
-# Check for existing test infrastructure
-ls jest.config.* vitest.config.* playwright.config.* cypress.config.* .rspec pytest.ini phpunit.xml 2>/dev/null
-ls -d test/ tests/ spec/ __tests__/ cypress/ e2e/ 2>/dev/null
-```
-
-3. **If no framework detected:** still produce the coverage diagram, but skip test generation.
-
-**Step 1. Trace every codepath changed** using `git diff origin/<base>...HEAD`:
-
-Read every changed file. For each one, trace how data flows through the code — don't just list functions, actually follow the execution:
-
-1. **Read the diff.** For each changed file, read the full file (not just the diff hunk) to understand context.
-2. **Trace data flow.** Starting from each entry point (route handler, exported function, event listener, component render), follow the data through every branch:
-   - Where does input come from? (request params, props, database, API call)
-   - What transforms it? (validation, mapping, computation)
-   - Where does it go? (database write, API response, rendered output, side effect)
-   - What can go wrong at each step? (null/undefined, invalid input, network failure, empty collection)
-3. **Diagram the execution.** For each changed file, draw an ASCII diagram showing:
-   - Every function/method that was added or modified
-   - Every conditional branch (if/else, switch, ternary, guard clause, early return)
-   - Every error path (try/catch, rescue, error boundary, fallback)
-   - Every call to another function (trace into it — does IT have untested branches?)
-   - Every edge: what happens with null input? Empty array? Invalid type?
-
-This is the critical step — you're building a map of every line of code that can execute differently based on input. Every branch in this diagram needs a test.
-
-**Step 2. Map user flows, interactions, and error states:**
-
-Code coverage isn't enough — you need to cover how real users interact with the changed code. For each changed feature, think through:
-
-- **User flows:** What sequence of actions does a user take that touches this code? Map the full journey (e.g., "user clicks 'Pay' → form validates → API call → success/failure screen"). Each step in the journey needs a test.
-- **Interaction edge cases:** What happens when the user does something unexpected?
-  - Double-click/rapid resubmit
-  - Navigate away mid-operation (back button, close tab, click another link)
-  - Submit with stale data (page sat open for 30 minutes, session expired)
-  - Slow connection (API takes 10 seconds — what does the user see?)
-  - Concurrent actions (two tabs, same form)
-- **Error states the user can see:** For every error the code handles, what does the user actually experience?
-  - Is there a clear error message or a silent failure?
-  - Can the user recover (retry, go back, fix input) or are they stuck?
-  - What happens with no network? With a 500 from the API? With invalid data from the server?
-- **Empty/zero/boundary states:** What does the UI show with zero results? With 10,000 results? With a single character input? With maximum-length input?
-
-Add these to your diagram alongside the code branches. A user flow with no test is just as much a gap as an untested if/else.
-
-**Step 3. Check each branch against existing tests:**
-
-Go through your diagram branch by branch — both code paths AND user flows. For each one, search for a test that exercises it:
-- Function `processPayment()` → look for `billing.test.ts`, `billing.spec.ts`, `test/billing_test.rb`
-- An if/else → look for tests covering BOTH the true AND false path
-- An error handler → look for a test that triggers that specific error condition
-- A call to `helperFn()` that has its own branches → those branches need tests too
-- A user flow → look for an integration or E2E test that walks through the journey
-- An interaction edge case → look for a test that simulates the unexpected action
-
-Quality scoring rubric:
-- ★★★  Tests behavior with edge cases AND error paths
-- ★★   Tests correct behavior, happy path only
-- ★    Smoke test / existence check / trivial assertion (e.g., "it renders", "it doesn't throw")
-
-### E2E Test Decision Matrix
-
-When checking each branch, also determine whether a unit test or E2E/integration test is the right tool:
-
-**RECOMMEND E2E (mark as [→E2E] in the diagram):**
-- Common user flow spanning 3+ components/services (e.g., signup → verify email → first login)
-- Integration point where mocking hides real failures (e.g., API → queue → worker → DB)
-- Auth/payment/data-destruction flows — too important to trust unit tests alone
-
-**RECOMMEND EVAL (mark as [→EVAL] in the diagram):**
-- Critical LLM call that needs a quality eval (e.g., prompt change → test output still meets quality bar)
-- Changes to prompt templates, system instructions, or tool definitions
-
-**STICK WITH UNIT TESTS:**
-- Pure function with clear inputs/outputs
-- Internal helper with no side effects
-- Edge case of a single function (null input, empty array)
-- Obscure/rare flow that isn't customer-facing
-
-### REGRESSION RULE (mandatory)
-
-**IRON RULE:** When the coverage audit identifies a REGRESSION — code that previously worked but the diff broke — a regression test is written immediately. No AskUserQuestion. No skipping. Regressions are the highest-priority test because they prove something broke.
-
-A regression is when:
-- The diff modifies existing behavior (not new code)
-- The existing test suite (if any) doesn't cover the changed path
-- The change introduces a new failure mode for existing callers
-
-When uncertain whether a change is a regression, err on the side of writing the test.
-
-Format: commit as `test: regression test for {what broke}`
-
-**Step 4. Output ASCII coverage diagram:**
-
-Include BOTH code paths and user flows in the same diagram. Mark E2E-worthy and eval-worthy paths:
-
-```
-CODE PATH COVERAGE
-===========================
-[+] src/services/billing.ts
-    │
-    ├── processPayment()
-    │   ├── [★★★ TESTED] Happy path + card declined + timeout — billing.test.ts:42
-    │   ├── [GAP]         Network timeout — NO TEST
-    │   └── [GAP]         Invalid currency — NO TEST
-    │
-    └── refundPayment()
-        ├── [★★  TESTED] Full refund — billing.test.ts:89
-        └── [★   TESTED] Partial refund (checks non-throw only) — billing.test.ts:101
-
-USER FLOW COVERAGE
-===========================
-[+] Payment checkout flow
-    │
-    ├── [★★★ TESTED] Complete purchase — checkout.e2e.ts:15
-    ├── [GAP] [→E2E] Double-click submit — needs E2E, not just unit
-    ├── [GAP]         Navigate away during payment — unit test sufficient
-    └── [★   TESTED]  Form validation errors (checks render only) — checkout.test.ts:40
-
-[+] Error states
-    │
-    ├── [★★  TESTED] Card declined message — billing.test.ts:58
-    ├── [GAP]         Network timeout UX (what does user see?) — NO TEST
-    └── [GAP]         Empty cart submission — NO TEST
-
-[+] LLM integration
-    │
-    └── [GAP] [→EVAL] Prompt template change — needs eval test
-
-─────────────────────────────────
-COVERAGE: 5/13 paths tested (38%)
-  Code paths: 3/5 (60%)
-  User flows: 2/8 (25%)
-QUALITY:  ★★★: 2  ★★: 2  ★: 1
-GAPS: 8 paths need tests (2 need E2E, 1 needs eval)
-─────────────────────────────────
-```
-
-**Fast path:** All paths covered → "Step 4.75: All new code paths have test coverage ✓" Continue.
-
-**Step 5. Generate tests for gaps (Fix-First):**
-
-If test framework is detected and gaps were identified:
-- Classify each gap as AUTO-FIX or ASK per the Fix-First Heuristic:
-  - **AUTO-FIX:** Simple unit tests for pure functions, edge cases of existing tested functions
-  - **ASK:** E2E tests, tests requiring new test infrastructure, tests for ambiguous behavior
-- For AUTO-FIX gaps: generate the test, run it, commit as `test: coverage for {feature}`
-- For ASK gaps: include in the Fix-First batch question with the other review findings
-- For paths marked [→E2E]: always ASK (E2E tests are higher-effort and need user confirmation)
-- For paths marked [→EVAL]: always ASK (eval tests need user confirmation on quality criteria)
-
-If no test framework detected → include gaps as INFORMATIONAL findings only, no generation.
-
-**Diff is test-only changes:** Skip Step 4.75 entirely: "No new application code paths to audit."
-
-### Coverage Warning
-
-After producing the coverage diagram, check the coverage percentage. Read CLAUDE.md for a `## Test Coverage` section with a `Minimum:` field. If not found, use default: 60%.
-
-If coverage is below the minimum threshold, output a prominent warning **before** the regular review findings:
-
-```
-⚠️ COVERAGE WARNING: AI-assessed coverage is {X}%. {N} code paths untested.
-Consider writing tests before running /ship.
-```
-
-This is INFORMATIONAL — does not block /review. But it makes low coverage visible early so the developer can address it before reaching the /ship coverage gate.
-
-If coverage percentage cannot be determined, skip the warning silently.
-
-이 단계는 Pass 2의 "테스트 갭" 카테고리를 대체합니다 — 체크리스트의 테스트 갭 항목과 이 커버리지 다이어그램 간에 발견사항을 중복하지 마십시오. 커버리지 갭은 Step 4 및 Step 4.5의 발견사항과 함께 포함합니다. 이들은 동일한 Fix-First 흐름을 따릅니다 — 갭은 INFORMATIONAL 발견사항입니다.
 
 ---
 
@@ -851,16 +902,50 @@ If coverage percentage cannot be determined, skip the warning silently.
 
 **모든 발견사항에 대해 조치를 취합니다 — 중요한 것만이 아닙니다.**
 
-요약 헤더를 출력합니다: `Pre-Landing Review: N issues (X critical, Y informational)`
+### Step 5.0: Cross-review finding dedup
+
+Before classifying findings, check if any were previously skipped by the user in a prior review on this branch.
+
+```bash
+$GSTACK_ROOT/bin/gstack-review-read
+```
+
+Parse the output: only lines BEFORE `---CONFIG---` are JSONL entries (the output also contains `---CONFIG---` and `---HEAD---` footer sections that are not JSONL — ignore those).
+
+For each JSONL entry that has a `findings` array:
+1. Collect all fingerprints where `action: "skipped"`
+2. Note the `commit` field from that entry
+
+If skipped fingerprints exist, get the list of files changed since that review:
+
+```bash
+git diff --name-only <prior-review-commit> HEAD
+```
+
+For each current finding (from both Step 4 critical pass and Step 4.5-4.6 specialists), check:
+- Does its fingerprint match a previously skipped finding?
+- Is the finding's file path NOT in the changed-files set?
+
+If both conditions are true: suppress the finding. It was intentionally skipped and the relevant code hasn't changed.
+
+Print: "Suppressed N findings from prior reviews (previously skipped by user)"
+
+**Only suppress `skipped` findings — never `fixed` or `auto-fixed`** (those might regress and should be re-checked).
+
+If no prior reviews exist or none have a `findings` array, skip this step silently.
+
+Output a summary header: `Pre-Landing Review: N issues (X critical, Y informational)`
 
 ### Step 5a: 각 발견사항 분류
 
 각 발견사항에 대해 checklist.md의 Fix-First 휴리스틱에 따라 AUTO-FIX 또는 ASK로 분류합니다. 중요(Critical) 발견사항은 ASK 쪽으로, 정보성(Informational) 발견사항은 AUTO-FIX 쪽으로 기울입니다.
 
+**Test stub override:** `test_stub` 필드가 있는 발견사항(specialist가 생성한 것)은 원래 분류와 관계없이 ASK로 재분류합니다. ASK 항목으로 제시할 때 제안된 테스트 파일 경로와 테스트 코드를 보여줍니다. 사용자는 테스트 생성을 승인하거나 건너뜁니다. 승인되면 수정 + 테스트 파일을 작성합니다. 프로젝트 관례에 따라 발견사항의 `path`에서 테스트 파일 경로를 도출합니다 (`spec/` for RSpec, `__tests__/` for Jest/Vitest, `test_` prefix for pytest, `_test.go` suffix for Go). 테스트 파일이 이미 존재하면 새 테스트를 append합니다. 출력: `[FIXED + TEST] [file:line] Problem -> fix + test at [test_path]`
+
 ### Step 5b: 모든 AUTO-FIX 항목 자동 수정
 
 각 수정을 직접 적용합니다. 각 항목에 대해 한 줄 요약을 출력합니다:
-`[AUTO-FIXED] [file:line] 문제 → 수행한 조치`
+`[AUTO-FIXED] [file:line] Problem → what you did`
 
 ### Step 5c: ASK 항목 일괄 질문
 
@@ -872,17 +957,17 @@ ASK 항목이 남아있으면 하나의 AskUserQuestion으로 일괄 제시합�
 
 예시 형식:
 ```
-5개 이슈를 자동 수정했습니다. 2개에 대해 판단이 필요합니다:
+I auto-fixed 5 issues. 2 need your input:
 
-1. [CRITICAL] app/models/post.rb:42 — 상태 전환에서 경쟁 조건(Race condition)
-   수정: UPDATE에 `WHERE status = 'draft'` 추가
-   → A) 수정  B) 건너뛰기
+1. [CRITICAL] app/models/post.rb:42 — Race condition in status transition
+   Fix: Add `WHERE status = 'draft'` to the UPDATE
+   → A) Fix  B) Skip
 
-2. [INFORMATIONAL] app/services/generator.rb:88 — LLM 출력이 DB 쓰기 전에 타입 검사되지 않음
-   수정: JSON 스키마 유효성 검증 추가
-   → A) 수정  B) 건너뛰기
+2. [INFORMATIONAL] app/services/generator.rb:88 — LLM output not type-checked before DB write
+   Fix: Add JSON schema validation
+   → A) Fix  B) Skip
 
-RECOMMENDATION: 둘 다 수정 — #1은 실제 경쟁 조건이고, #2는 무음 데이터 손상을 방지합니다.
+RECOMMENDATION: Fix both — #1 is a real race condition, #2 prevents silent data corruption.
 ```
 
 ASK 항목이 3개 이하이면 일괄 처리 대신 개별 AskUserQuestion 호출을 사용할 수 있습니다.
@@ -966,7 +1051,7 @@ diff를 문서 파일과 교차 참조합니다. 저장소 루트의 각 `.md` �
 실행:
 
 ```bash
-$GSTACK_ROOT/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"commit":"COMMIT"}'
+$GSTACK_ROOT/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"quality_score":SCORE,"specialists":SPECIALISTS_JSON,"findings":FINDINGS_JSON,"commit":"COMMIT"}'
 ```
 
 치환할 값:
@@ -975,7 +1060,35 @@ $GSTACK_ROOT/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","s
 - `issues_found` = 총 미해결 발견사항 수
 - `critical` = 미해결 critical 발견사항 수
 - `informational` = 미해결 informational 발견사항 수
+- `quality_score` = Step 4.6에서 계산된 PR Quality Score (예: 7.5). specialist를 건너뛴 경우 (작은 diff) `10.0`을 사용합니다
+- `specialists` = Step 4.6에서 컴파일된 specialist별 stats 객체. 고려된 각 specialist에 대해, dispatched된 경우 `{"dispatched":true/false,"findings":N,"critical":N,"informational":N}` 항목을 포함하고, 건너뛴 경우 `{"dispatched":false,"reason":"scope|gated"}`를 포함합니다. Design specialist도 포함합니다. 예: `{"testing":{"dispatched":true,"findings":2,"critical":0,"informational":2},"security":{"dispatched":false,"reason":"scope"}}`
+- `findings` = Step 5의 발견사항별 record 배열. 각 발견사항(critical pass 및 specialists에서 온 것)에 대해 다음을 포함합니다: `{"fingerprint":"path:line:category","severity":"CRITICAL|INFORMATIONAL","action":"ACTION"}`. ACTION은 `"auto-fixed"` (Step 5b), `"fixed"` (Step 5d에서 사용자 승인), 또는 `"skipped"` (Step 5c에서 사용자가 Skip 선택)입니다. Step 5.0의 suppressed findings는 포함하지 않습니다 (이미 이전 review entry에 기록됨).
 - `COMMIT` = `git rev-parse --short HEAD`의 출력
+
+## Capture Learnings
+
+If you discovered a non-obvious pattern, pitfall, or architectural insight during
+this session, log it for future sessions:
+
+```bash
+$GSTACK_BIN/gstack-learnings-log '{"skill":"review","type":"TYPE","key":"SHORT_KEY","insight":"DESCRIPTION","confidence":N,"source":"SOURCE","files":["path/to/relevant/file"]}'
+```
+
+**Types:** `pattern` (reusable approach), `pitfall` (what NOT to do), `preference`
+(user stated), `architecture` (structural decision), `tool` (library/framework insight),
+`operational` (project environment/CLI/workflow knowledge).
+
+**Sources:** `observed` (you found this in the code), `user-stated` (user told you),
+`inferred` (AI deduction), `cross-model` (both Claude and Codex agree).
+
+**Confidence:** 1-10. Be honest. An observed pattern you verified in the code is 8-9.
+An inference you're not sure about is 4-5. A user preference they explicitly stated is 10.
+
+**files:** Include the specific file paths this learning references. This enables
+staleness detection: if those files are later deleted, the learning can be flagged.
+
+**Only log genuine discoveries.** Don't log obvious things. Don't log things the user
+already knows. A good test: would this insight save time in a future session? If yes, log it.
 
 실제 리뷰가 완료되기 전에 조기 종료되는 경우 (예: base 브랜치 대비 diff 없음) 이 항목을 기록하지 **마십시오**.
 

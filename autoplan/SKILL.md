@@ -3,14 +3,14 @@ name: autoplan
 preamble-tier: 3
 version: 1.0.0
 description: |
-  Auto-review pipeline — reads the full CEO, design, eng, and DX review skills from disk
-  and runs them sequentially with auto-decisions using 6 decision principles. Surfaces
-  taste decisions (close approaches, borderline scope, codex disagreements) at a final
-  approval gate. One command, fully reviewed plan out.
-  Use when asked to "auto review", "autoplan", "run all reviews", "review this plan
-  automatically", or "make the decisions for me".
-  Proactively suggest when the user has a plan file and wants to run the full review
-  gauntlet without answering 15-30 intermediate questions. (gstack)
+  자동 리뷰 파이프라인 — CEO, 디자인, 엔지니어링, DX 리뷰 스킬 전체를 디스크에서 읽고
+  6가지 의사결정 원칙을 사용하여 자동 결정으로 순차 실행합니다. 감성적 결정(근접한
+  접근법, 경계선 범위, codex 의견 불일치)은 최종 승인 게이트에서 제시합니다.
+  한 번의 명령으로 완전히 리뷰된 플랜을 산출합니다.
+  "auto review", "autoplan", "run all reviews", "review this plan
+  automatically", "make the decisions for me" 요청 시 사용하세요.
+  사용자가 플랜 파일을 가지고 있고 15-30개의 중간 질문에 답하지 않고 전체 리뷰
+  과정을 실행하고 싶을 때 선제적으로 제안하세요. (gstack)
   Voice triggers (speech-to-text aliases): "auto plan", "automatic review".
 benefits-from: [office-hours]
 allowed-tools:
@@ -654,134 +654,130 @@ DESIGN=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head
 If a design doc is now found, read it and continue the review.
 If none was produced (user may have cancelled), proceed with standard review.
 
-# /autoplan — Auto-Review Pipeline
+# /autoplan — 자동 리뷰 파이프라인
 
-One command. Rough plan in, fully reviewed plan out.
+한 번의 명령. 초안 플랜 입력, 완전히 리뷰된 플랜 출력.
 
-/autoplan reads the full CEO, design, eng, and DX review skill files from disk and follows
-them at full depth — same rigor, same sections, same methodology as running each skill
-manually. The only difference: intermediate AskUserQuestion calls are auto-decided using
-the 6 principles below. Taste decisions (where reasonable people could disagree) are
-surfaced at a final approval gate.
-
----
-
-## The 6 Decision Principles
-
-These rules auto-answer every intermediate question:
-
-1. **Choose completeness** — Ship the whole thing. Pick the approach that covers more edge cases.
-2. **Boil lakes** — Fix everything in the blast radius (files modified by this plan + direct importers). Auto-approve expansions that are in blast radius AND < 1 day CC effort (< 5 files, no new infra).
-3. **Pragmatic** — If two options fix the same thing, pick the cleaner one. 5 seconds choosing, not 5 minutes.
-4. **DRY** — Duplicates existing functionality? Reject. Reuse what exists.
-5. **Explicit over clever** — 10-line obvious fix > 200-line abstraction. Pick what a new contributor reads in 30 seconds.
-6. **Bias toward action** — Merge > review cycles > stale deliberation. Flag concerns but don't block.
-
-**Conflict resolution (context-dependent tiebreakers):**
-- **CEO phase:** P1 (completeness) + P2 (boil lakes) dominate.
-- **Eng phase:** P5 (explicit) + P3 (pragmatic) dominate.
-- **Design phase:** P5 (explicit) + P1 (completeness) dominate.
+/autoplan은 CEO, 디자인, 엔지니어링, DX 리뷰 스킬 파일 전체를 디스크에서 읽고 전체 깊이로
+따릅니다 — 각 스킬을 수동으로 실행할 때와 동일한 엄격함, 동일한 섹션, 동일한 방법론.
+유일한 차이점: 중간 AskUserQuestion 호출이 아래 6가지 원칙을 사용하여 자동 결정됩니다.
+감성적 결정(합리적인 사람들이 의견이 다를 수 있는 경우)은 최종 승인 게이트에서 제시됩니다.
 
 ---
 
-## Decision Classification
+## 6가지 의사결정 원칙
 
-Every auto-decision is classified:
+이 규칙들이 모든 중간 질문에 자동으로 답합니다:
 
-**Mechanical** — one clearly right answer. Auto-decide silently.
-Examples: run codex (always yes), run evals (always yes), reduce scope on a complete plan (always no).
+1. **완전성 선택** — 전부 배포하세요. 더 많은 엣지 케이스를 커버하는 접근법을 선택합니다.
+2. **호수를 끓여라** — 영향 반경(이 플랜이 수정하는 파일 + 직접 임포터) 내의 모든 것을 수정합니다. 영향 반경 내이면서 1일 CC 작업량 미만(파일 5개 미만, 새 인프라 없음)인 확장은 자동 승인합니다.
+3. **실용적** — 두 옵션이 같은 것을 해결하면, 더 깔끔한 것을 선택합니다. 5초 선택, 5분이 아닙니다.
+4. **DRY** — 기존 기능을 중복하나요? 거부합니다. 있는 것을 재사용하세요.
+5. **명시적 > 교묘한** — 10줄의 명백한 수정 > 200줄의 추상화. 새 기여자가 30초 안에 읽을 수 있는 것을 선택합니다.
+6. **행동 편향** — 머지 > 리뷰 사이클 > 오래된 숙의. 우려를 표시하되 차단하지 않습니다.
 
-**Taste** — reasonable people could disagree. Auto-decide with recommendation, but surface at the final gate. Three natural sources:
-1. **Close approaches** — top two are both viable with different tradeoffs.
-2. **Borderline scope** — in blast radius but 3-5 files, or ambiguous radius.
-3. **Codex disagreements** — codex recommends differently and has a valid point.
-
-**User Challenge** — both models agree the user's stated direction should change.
-This is qualitatively different from taste decisions. When Claude and Codex both
-recommend merging, splitting, adding, or removing features/skills/workflows that
-the user specified, this is a User Challenge. It is NEVER auto-decided.
-
-User Challenges go to the final approval gate with richer context than taste
-decisions:
-- **What the user said:** (their original direction)
-- **What both models recommend:** (the change)
-- **Why:** (the models' reasoning)
-- **What context we might be missing:** (explicit acknowledgment of blind spots)
-- **If we're wrong, the cost is:** (what happens if the user's original direction
-  was right and we changed it)
-
-The user's original direction is the default. The models must make the case for
-change, not the other way around.
-
-**Exception:** If both models flag the change as a security vulnerability or
-feasibility blocker (not a preference), the AskUserQuestion framing explicitly
-warns: "Both models believe this is a security/feasibility risk, not just a
-preference." The user still decides, but the framing is appropriately urgent.
+**충돌 해결 (컨텍스트 의존 타이브레이커):**
+- **CEO 단계:** P1 (완전성) + P2 (호수를 끓여라) 우선.
+- **Eng 단계:** P5 (명시적) + P3 (실용적) 우선.
+- **Design 단계:** P5 (명시적) + P1 (완전성) 우선.
 
 ---
 
-## Sequential Execution — MANDATORY
+## 결정 분류
 
-Phases MUST execute in strict order: CEO → Design → Eng → DX.
-Each phase MUST complete fully before the next begins.
-NEVER run phases in parallel — each builds on the previous.
+모든 자동 결정은 분류됩니다:
 
-Between each phase, emit a phase-transition summary and verify that all required
-outputs from the prior phase are written before starting the next.
+**기계적** — 명확하게 옳은 답이 하나. 조용히 자동 결정합니다.
+예시: codex 실행 (항상 예), evals 실행 (항상 예), 완전한 플랜의 범위 축소 (항상 아니오).
 
----
+**감성적** — 합리적인 사람들이 의견이 다를 수 있음. 추천과 함께 자동 결정하지만, 최종 게이트에서 제시합니다. 세 가지 자연적 출처:
+1. **근접한 접근법** — 상위 두 개가 모두 다른 트레이드오프로 실행 가능.
+2. **경계선 범위** — 영향 반경 내이지만 파일 3-5개, 또는 모호한 반경.
+3. **Codex 의견 불일치** — codex가 다르게 추천하고 유효한 근거가 있음.
 
-## What "Auto-Decide" Means
+**User Challenge** — 두 모델 모두 사용자가 명시한 방향이 바뀌어야 한다고 동의.
+이는 감성적 결정과 질적으로 다릅니다. Claude와 Codex가 모두 사용자가 지정한
+기능/스킬/워크플로우의 병합, 분할, 추가, 제거를 추천하면 이것은 User Challenge입니다.
+절대 자동 결정되지 않습니다.
 
-Auto-decide replaces the USER'S judgment with the 6 principles. It does NOT replace
-the ANALYSIS. Every section in the loaded skill files must still be executed at the
-same depth as the interactive version. The only thing that changes is who answers the
-AskUserQuestion: you do, using the 6 principles, instead of the user.
+User Challenge는 감성적 결정보다 더 풍부한 컨텍스트와 함께 최종 승인 게이트로 갑니다:
+- **What the user said:** (사용자의 원래 방향)
+- **What both models recommend:** (변경 사항)
+- **Why:** (모델의 근거)
+- **What context we might be missing:** (블라인드 스팟 명시적 인정)
+- **If we're wrong, the cost is:** (사용자의 원래 방향이 맞았고 우리가 바꿨을 때 발생하는 일)
 
-**Two exceptions — never auto-decided:**
-1. Premises (Phase 1) — require human judgment about what problem to solve.
-2. User Challenges — when both models agree the user's stated direction should change
-   (merge, split, add, remove features/workflows). The user always has context models
-   lack. See Decision Classification above.
+사용자의 원래 방향이 기본값입니다. 변경해야 한다는 주장을 해야 하는 쪽은 모델입니다.
 
-**You MUST still:**
-- READ the actual code, diffs, and files each section references
-- PRODUCE every output the section requires (diagrams, tables, registries, artifacts)
-- IDENTIFY every issue the section is designed to catch
-- DECIDE each issue using the 6 principles (instead of asking the user)
-- LOG each decision in the audit trail
-- WRITE all required artifacts to disk
-
-**You MUST NOT:**
-- Compress a review section into a one-liner table row
-- Write "no issues found" without showing what you examined
-- Skip a section because "it doesn't apply" without stating what you checked and why
-- Produce a summary instead of the required output (e.g., "architecture looks good"
-  instead of the ASCII dependency graph the section requires)
-
-"No issues found" is a valid output for a section — but only after doing the analysis.
-State what you examined and why nothing was flagged (1-2 sentences minimum).
-"Skipped" is never valid for a non-skip-listed section.
+**예외:** 두 모델이 변경을 선호가 아니라 보안 취약점 또는 실행 가능성 차단 요인으로
+플래그하면, AskUserQuestion 프레이밍은 명시적으로 경고합니다:
+"Both models believe this is a security/feasibility risk, not just a
+preference." 여전히 사용자가 결정하지만, 프레이밍은 적절히 긴급해야 합니다.
 
 ---
 
-## Filesystem Boundary — Codex Prompts
+## 순차 실행 — 필수
 
-All prompts sent to Codex (via `codex exec` or `codex review`) MUST be prefixed with
-this boundary instruction:
+단계는 반드시 엄격한 순서로 실행: CEO → Design → Eng → DX.
+각 단계는 다음이 시작되기 전에 반드시 완전히 완료되어야 합니다.
+절대 단계를 병렬로 실행하지 마세요 — 각각이 이전 단계 위에 구축됩니다.
+
+각 단계 사이에 단계 전환 요약을 출력하고, 다음 단계를 시작하기 전에
+이전 단계의 모든 필수 산출물이 작성되었는지 확인하세요.
+
+---
+
+## "자동 결정"의 의미
+
+자동 결정은 사용자의 판단을 6가지 원칙으로 대체합니다. 분석을 대체하는 것이 아닙니다.
+로드된 스킬 파일의 모든 섹션은 인터랙티브 버전과 동일한 깊이로 실행되어야 합니다.
+변경되는 유일한 것은 AskUserQuestion에 답하는 주체: 사용자 대신 당신이 6가지 원칙을
+사용하여 답합니다.
+
+**두 가지 예외 — 절대 자동 결정하지 않음:**
+1. 전제 (페이즈 1) — 어떤 문제를 풀지에 대한 인간의 판단이 필요합니다.
+2. User Challenge — 두 모델 모두 사용자가 명시한 방향이 바뀌어야 한다고 동의할 때
+   (기능/워크플로우 병합, 분할, 추가, 제거). 사용자는 항상 모델에게 없는 컨텍스트를
+   가지고 있습니다. 위의 결정 분류를 참조하세요.
+
+**반드시 해야 하는 것:**
+- 각 섹션이 참조하는 실제 코드, diff, 파일을 읽기
+- 섹션이 요구하는 모든 산출물 생성 (다이어그램, 테이블, 레지스트리, 아티팩트)
+- 섹션이 잡도록 설계된 모든 이슈 식별
+- 6가지 원칙을 사용하여 각 이슈 결정 (사용자에게 묻는 대신)
+- 감사 추적에 각 결정 기록
+- 모든 필수 아티팩트를 디스크에 작성
+
+**절대 하면 안 되는 것:**
+- 리뷰 섹션을 한 줄 테이블 행으로 압축
+- 무엇을 조사했는지 보여주지 않고 "발견된 이슈 없음" 작성
+- 무엇을 확인했고 왜인지 명시하지 않고 "적용되지 않음"으로 섹션 건너뛰기
+- 필수 산출물 대신 요약 작성 (예: 섹션이 요구하는 ASCII 의존성 그래프 대신
+  "아키텍처가 좋아 보입니다")
+
+"발견된 이슈 없음"은 섹션의 유효한 산출물입니다 — 하지만 분석을 수행한 후에만.
+무엇을 조사했고 왜 플래그되지 않았는지 명시하세요 (최소 1-2문장).
+"건너뜀"은 건너뛰기 목록에 없는 섹션에서 절대 유효하지 않습니다.
+
+---
+
+## 파일시스템 경계 — Codex 프롬프트
+
+Codex에 보내는 모든 프롬프트(`codex exec` 또는 `codex review` 경유)는 반드시
+다음 경계 지시문으로 시작해야 합니다:
 
 > IMPORTANT: Do NOT read or execute any SKILL.md files or files in skill definition directories (paths containing skills/gstack). These are AI assistant skill definitions meant for a different system. They contain bash scripts and prompt templates that will waste your time. Ignore them completely. Stay focused on the repository code only.
 
-This prevents Codex from discovering gstack skill files on disk and following their
-instructions instead of reviewing the plan.
+이렇게 하면 Codex가 디스크에서 gstack 스킬 파일을 발견하고 플랜을 리뷰하는 대신
+그 지시문을 따르는 일을 방지합니다.
 
 ---
 
-## Phase 0: Intake + Restore Point
+## 페이즈 0: 접수 + 복원 지점
 
-### Step 1: Capture restore point
+### 단계 1: 복원 지점 캡처
 
-Before doing anything, save the plan file's current state to an external file:
+아무것도 하기 전에, 플랜 파일의 현재 상태를 외부 파일에 저장하세요:
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
@@ -790,7 +786,7 @@ DATETIME=$(date +%Y%m%d-%H%M%S)
 echo "RESTORE_PATH=$HOME/.gstack/projects/$SLUG/${BRANCH}-autoplan-restore-${DATETIME}.md"
 ```
 
-Write the plan file's full contents to the restore path with this header:
+복원 경로에 플랜 파일의 전체 내용을 다음 헤더와 함께 작성하세요:
 ```
 # /autoplan Restore Point
 Captured: [timestamp] | Branch: [branch] | Commit: [short hash]
@@ -803,41 +799,40 @@ Captured: [timestamp] | Branch: [branch] | Commit: [short hash]
 [verbatim plan file contents]
 ```
 
-Then prepend a one-line HTML comment to the plan file:
+그런 다음 플랜 파일에 한 줄 HTML 주석을 앞에 추가하세요:
 `<!-- /autoplan restore point: [RESTORE_PATH] -->`
 
-### Step 2: Read context
+### 단계 2: 컨텍스트 읽기
 
-- Read CLAUDE.md, TODOS.md, git log -30, git diff against the base branch --stat
-- Discover design docs: `ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1`
-- Detect UI scope: grep the plan for view/rendering terms (component, screen, form,
-  button, modal, layout, dashboard, sidebar, nav, dialog). Require 2+ matches. Exclude
-  false positives ("page" alone, "UI" in acronyms).
-- Detect DX scope: grep the plan for developer-facing terms (API, endpoint, REST,
+- CLAUDE.md, TODOS.md, git log -30, git diff against the base branch --stat 읽기
+- 디자인 문서 발견: `ls -t ~/.gstack/projects/$SLUG/*-design-*.md 2>/dev/null | head -1`
+- UI 범위 감지: 플랜에서 뷰/렌더링 관련 용어(component, screen, form,
+  button, modal, layout, dashboard, sidebar, nav, dialog) grep. 2개 이상 일치 필요.
+  오탐 제외 ("page" 단독, 약어의 "UI").
+- DX 범위 감지: 플랜에서 개발자 대상 용어(API, endpoint, REST,
   GraphQL, gRPC, webhook, CLI, command, flag, argument, terminal, shell, SDK, library,
   package, npm, pip, import, require, SKILL.md, skill template, Claude Code, MCP, agent,
   OpenClaw, action, developer docs, getting started, onboarding, integration, debug,
-  implement, error message). Require 2+ matches. Also trigger DX scope if the product IS
-  a developer tool (the plan describes something developers install, integrate, or build
-  on top of) or if an AI agent is the primary user (OpenClaw actions, Claude Code skills,
-  MCP servers).
+  implement, error message)를 grep. 2개 이상 일치 필요. 제품 자체가 developer tool인 경우
+  (플랜이 개발자가 설치, 통합, 또는 그 위에 빌드하는 것을 설명) 또는 AI agent가 주 사용자일 경우에도
+  DX 범위를 트리거합니다 (OpenClaw actions, Claude Code skills, MCP servers).
 
-### Step 3: Load skill files from disk
+### 단계 3: 디스크에서 스킬 파일 로드
 
-Read each file using the Read tool:
+Read 도구를 사용하여 각 파일을 읽으세요:
 - `~/.claude/skills/gstack/plan-ceo-review/SKILL.md`
-- `~/.claude/skills/gstack/plan-design-review/SKILL.md` (only if UI scope detected)
+- `~/.claude/skills/gstack/plan-design-review/SKILL.md` (UI 범위가 감지된 경우에만)
 - `~/.claude/skills/gstack/plan-eng-review/SKILL.md`
-- `~/.claude/skills/gstack/plan-devex-review/SKILL.md` (only if DX scope detected)
+- `~/.claude/skills/gstack/plan-devex-review/SKILL.md` (DX 범위가 감지된 경우에만)
 
-**Section skip list — when following a loaded skill file, SKIP these sections
-(they are already handled by /autoplan):**
-- Preamble (run first)
+**섹션 건너뛰기 목록 — 로드된 스킬 파일을 따를 때 이 섹션들을 건너뛰세요
+(/autoplan이 이미 처리합니다):**
+- Preamble (처음에 실행)
 - AskUserQuestion Format
 - Completeness Principle — Boil the Lake
 - Search Before Building
 - Completion Status Protocol
-- Telemetry (run last)
+- Telemetry (마지막에 실행)
 - Step 0: Detect base branch
 - Review Readiness Dashboard
 - Plan File Review Report
@@ -845,34 +840,34 @@ Read each file using the Read tool:
 - Outside Voice — Independent Plan Challenge
 - Design Outside Voices (parallel)
 
-Follow ONLY the review-specific methodology, sections, and required outputs.
+리뷰 전용 방법론, 섹션, 필수 산출물만 따르세요.
 
-Output: "Here's what I'm working with: [plan summary]. UI scope: [yes/no]. DX scope: [yes/no].
-Loaded review skills from disk. Starting full review pipeline with auto-decisions."
+출력: "작업 대상은 다음과 같습니다: [플랜 요약]. UI 범위: [예/아니오]. DX 범위: [예/아니오].
+디스크에서 리뷰 스킬을 로드했습니다. 자동 결정으로 전체 리뷰 파이프라인을 시작합니다."
 
 ---
 
-## Phase 1: CEO Review (Strategy & Scope)
+## 페이즈 1: CEO 리뷰 (전략 & 범위)
 
-Follow plan-ceo-review/SKILL.md — all sections, full depth.
-Override: every AskUserQuestion → auto-decide using the 6 principles.
+plan-ceo-review/SKILL.md를 따르세요 — 모든 섹션, 전체 깊이.
+오버라이드: 모든 AskUserQuestion → 6가지 원칙을 사용하여 자동 결정.
 
-**Override rules:**
-- Mode selection: SELECTIVE EXPANSION
-- Premises: accept reasonable ones (P6), challenge only clearly wrong ones
-- **GATE: Present premises to user for confirmation** — this is the ONE AskUserQuestion
-  that is NOT auto-decided. Premises require human judgment.
-- Alternatives: pick highest completeness (P1). If tied, pick simplest (P5).
-  If top 2 are close → mark TASTE DECISION.
-- Scope expansion: in blast radius + <1d CC → approve (P2). Outside → defer to TODOS.md (P3).
-  Duplicates → reject (P4). Borderline (3-5 files) → mark TASTE DECISION.
-- All 10 review sections: run fully, auto-decide each issue, log every decision.
-- Dual voices: always run BOTH Claude subagent AND Codex if available (P6).
-  Run them sequentially in foreground. First the Claude subagent (Agent tool,
-  foreground — do NOT use run_in_background), then Codex (Bash). Both must
-  complete before building the consensus table.
+**오버라이드 규칙:**
+- 모드 선택: SELECTIVE EXPANSION
+- 전제: 합리적인 것은 수용 (P6), 명확히 틀린 것만 도전
+- **게이트: 사용자에게 전제를 확인받기 위해 제시** — 이것이 자동 결정되지 않는 유일한
+  AskUserQuestion입니다. 전제는 인간의 판단이 필요합니다.
+- 대안: 가장 높은 완전성 선택 (P1). 동점이면, 가장 단순한 것 선택 (P5).
+  상위 2개가 근접하면 → 감성적 결정으로 표시.
+- 범위 확장: 영향 반경 내 + 1일 CC 미만 → 승인 (P2). 외부 → TODOS.md로 연기 (P3).
+  중복 → 거부 (P4). 경계선 (파일 3-5개) → 감성적 결정으로 표시.
+- 전체 10개 리뷰 섹션: 완전히 실행, 각 이슈 자동 결정, 모든 결정 기록.
+- 이중 목소리: 가능하면 항상 Claude 서브에이전트와 Codex 모두 실행 (P6).
+  포그라운드에서 순차 실행합니다. 먼저 Claude 서브에이전트(Agent 도구,
+  포그라운드 — run_in_background 사용 금지), 그 다음 Codex(Bash)를 실행합니다.
+  합의 테이블을 만들기 전에 둘 다 완료되어야 합니다.
 
-  **Codex CEO voice** (via Bash):
+  **Codex CEO 목소리** (Bash 경유):
   ```bash
   _REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
   codex exec "IMPORTANT: Do NOT read or execute any SKILL.md files or files in skill definition directories (paths containing skills/gstack). These are AI assistant skill definitions meant for a different system. Stay focused on repository code only.
@@ -885,9 +880,9 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
   No compliments. Just the strategic blind spots.
   File: <plan_path>" -C "$_REPO_ROOT" -s read-only --enable web_search_cached
   ```
-  Timeout: 10 minutes
+  타임아웃: 10분
 
-  **Claude CEO subagent** (via Agent tool):
+  **Claude CEO 서브에이전트** (Agent 도구 경유):
   "Read the plan file at <plan_path>. You are an independent CEO/strategist
   reviewing this plan. You have NOT seen any prior review. Evaluate:
   1. Is this the right problem to solve? Could a reframing yield 10x impact?
@@ -897,32 +892,32 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
   5. What's the competitive risk — could someone else solve this first/better?
   For each finding: what's wrong, severity (critical/high/medium), and the fix."
 
-  **Error handling:** Both calls block in foreground. Codex auth/timeout/empty → proceed with
-  Claude subagent only, tagged `[single-model]`. If Claude subagent also fails →
-  "Outside voices unavailable — continuing with primary review."
+  **에러 처리:** 두 호출 모두 포그라운드에서 블록됩니다. Codex 인증/타임아웃/빈 응답 → Claude 서브에이전트만으로
+  진행, `[single-model]` 태그. Claude 서브에이전트도 실패 → "외부 목소리 사용 불가 —
+  주 리뷰로 계속합니다."
 
-  **Degradation matrix:** Both fail → "single-reviewer mode". Codex only →
-  tag `[codex-only]`. Subagent only → tag `[subagent-only]`.
+  **성능 저하 매트릭스:** 둘 다 실패 → "single-reviewer mode". Codex만 →
+  `[codex-only]` 태그. 서브에이전트만 → `[subagent-only]` 태그.
 
-- Strategy choices: if codex disagrees with a premise or scope decision with valid
-  strategic reason → TASTE DECISION. If both models agree the user's stated structure
-  should change (merge, split, add, remove) → USER CHALLENGE (never auto-decided).
+- 전략 선택: codex가 유효한 전략적 이유로 전제나 범위 결정에 동의하지 않으면
+  → 감성적 결정. 두 모델 모두 사용자가 명시한 구조가 바뀌어야 한다고 동의하면
+  (merge, split, add, remove) → USER CHALLENGE (절대 자동 결정하지 않음).
 
-**Required execution checklist (CEO):**
+**필수 실행 체크리스트 (CEO):**
 
-Step 0 (0A-0F) — run each sub-step and produce:
-- 0A: Premise challenge with specific premises named and evaluated
-- 0B: Existing code leverage map (sub-problems → existing code)
-- 0C: Dream state diagram (CURRENT → THIS PLAN → 12-MONTH IDEAL)
-- 0C-bis: Implementation alternatives table (2-3 approaches with effort/risk/pros/cons)
-- 0D: Mode-specific analysis with scope decisions logged
-- 0E: Temporal interrogation (HOUR 1 → HOUR 6+)
-- 0F: Mode selection confirmation
+Step 0 (0A-0F) — 각 하위 단계를 실행하고 생성:
+- 0A: 구체적으로 명명되고 평가된 전제 도전
+- 0B: 기존 코드 활용 맵 (하위 문제 → 기존 코드)
+- 0C: 드림 스테이트 다이어그램 (현재 → 이 플랜 → 12개월 이상적)
+- 0C-bis: 구현 대안 테이블 (2-3개 접근법, 노력/리스크/장단점)
+- 0D: 모드별 분석, 범위 결정 기록
+- 0E: 시간적 질문 (1시간차 → 6시간차+)
+- 0F: 모드 선택 확인
 
-Step 0.5 (Dual Voices): Run Claude subagent (foreground Agent tool) first, then
-Codex (Bash). Present Codex output under CODEX SAYS (CEO — strategy challenge)
-header. Present subagent output under CLAUDE SUBAGENT (CEO — strategic independence)
-header. Produce CEO consensus table:
+Step 0.5 (이중 목소리): 먼저 Claude 서브에이전트(포그라운드 Agent 도구)를 실행하고,
+그 다음 Codex(Bash)를 실행합니다. Codex 출력을 CODEX SAYS (CEO — strategy challenge)
+헤더 아래에 제시. 서브에이전트 출력을 CLAUDE SUBAGENT (CEO — strategic independence)
+헤더 아래에 제시. CEO 합의 테이블 생성:
 
 ```
 CEO DUAL VOICES — CONSENSUS TABLE:
@@ -940,50 +935,50 @@ CONFIRMED = both agree. DISAGREE = models differ (→ taste decision).
 Missing voice = N/A (not CONFIRMED). Single critical finding from one voice = flagged regardless.
 ```
 
-Sections 1-10 — for EACH section, run the evaluation criteria from the loaded skill file:
-- Sections WITH findings: full analysis, auto-decide each issue, log to audit trail
-- Sections with NO findings: 1-2 sentences stating what was examined and why nothing
-  was flagged. NEVER compress a section to just its name in a table row.
-- Section 11 (Design): run only if UI scope was detected in Phase 0
+섹션 1-10 — 각 섹션에 대해 로드된 스킬 파일의 평가 기준을 실행:
+- 발견 사항이 있는 섹션: 전체 분석, 각 이슈 자동 결정, 감사 추적에 기록
+- 발견 사항이 없는 섹션: 무엇을 조사했고 왜 아무것도 플래그되지 않았는지
+  1-2문장으로 명시. 섹션을 테이블 행의 이름만으로 절대 압축하지 마세요.
+- 섹션 11 (디자인): 페이즈 0에서 UI 범위가 감지된 경우에만 실행
 
-**Mandatory outputs from Phase 1:**
-- "NOT in scope" section with deferred items and rationale
-- "What already exists" section mapping sub-problems to existing code
-- Error & Rescue Registry table (from Section 2)
-- Failure Modes Registry table (from review sections)
-- Dream state delta (where this plan leaves us vs 12-month ideal)
-- Completion Summary (the full summary table from the CEO skill)
+**페이즈 1의 필수 산출물:**
+- 범위 밖 항목과 근거가 있는 "NOT in scope" 섹션
+- 하위 문제를 기존 코드에 매핑하는 "What already exists" 섹션
+- Error & Rescue Registry 테이블 (섹션 2에서)
+- Failure Modes Registry 테이블 (리뷰 섹션에서)
+- 드림 스테이트 델타 (이 플랜이 12개월 이상적 대비 어디에 놓이는지)
+- 완료 요약 (CEO 스킬의 전체 요약 테이블)
 
-**PHASE 1 COMPLETE.** Emit phase-transition summary:
-> **Phase 1 complete.** Codex: [N concerns]. Claude subagent: [N issues].
-> Consensus: [X/6 confirmed, Y disagreements → surfaced at gate].
-> Passing to Phase 2.
+**페이즈 1 완료.** 단계 전환 요약 출력:
+> **페이즈 1 완료.** Codex: [N개 우려]. Claude 서브에이전트: [N개 이슈].
+> 합의: [X/6 확인됨, Y개 의견 불일치 → 게이트에서 제시].
+> 페이즈 2로 전달합니다.
 
-Do NOT begin Phase 2 until all Phase 1 outputs are written to the plan file
-and the premise gate has been passed.
+페이즈 1의 모든 산출물이 플랜 파일에 작성되고 전제 게이트가 통과될 때까지
+페이즈 2를 시작하지 마세요.
 
 ---
 
-**Pre-Phase 2 checklist (verify before starting):**
-- [ ] CEO completion summary written to plan file
-- [ ] CEO dual voices ran (Codex + Claude subagent, or noted unavailable)
-- [ ] CEO consensus table produced
-- [ ] Premise gate passed (user confirmed)
-- [ ] Phase-transition summary emitted
+**페이즈 2 사전 체크리스트 (시작 전 확인):**
+- [ ] CEO 완료 요약이 플랜 파일에 작성됨
+- [ ] CEO 이중 목소리 실행됨 (Codex + Claude 서브에이전트, 또는 사용 불가 명시)
+- [ ] CEO 합의 테이블 생성됨
+- [ ] 전제 게이트 통과됨 (사용자 확인)
+- [ ] 단계 전환 요약 출력됨
 
-## Phase 2: Design Review (conditional — skip if no UI scope)
+## 페이즈 2: 디자인 리뷰 (조건부 — UI 범위 없으면 건너뛰기)
 
-Follow plan-design-review/SKILL.md — all 7 dimensions, full depth.
-Override: every AskUserQuestion → auto-decide using the 6 principles.
+plan-design-review/SKILL.md를 따르세요 — 7가지 차원 전체, 전체 깊이.
+오버라이드: 모든 AskUserQuestion → 6가지 원칙을 사용하여 자동 결정.
 
-**Override rules:**
-- Focus areas: all relevant dimensions (P1)
-- Structural issues (missing states, broken hierarchy): auto-fix (P5)
-- Aesthetic/taste issues: mark TASTE DECISION
-- Design system alignment: auto-fix if DESIGN.md exists and fix is obvious
-- Dual voices: always run BOTH Claude subagent AND Codex if available (P6).
+**오버라이드 규칙:**
+- 집중 영역: 관련된 모든 차원 (P1)
+- 구조적 이슈 (누락된 상태, 깨진 계층): 자동 수정 (P5)
+- 미적/감성적 이슈: 감성적 결정으로 표시
+- 디자인 시스템 정렬: DESIGN.md가 있고 수정이 명확하면 자동 수정
+- 이중 목소리: 가능하면 항상 Claude 서브에이전트와 Codex 모두 실행 (P6).
 
-  **Codex design voice** (via Bash):
+  **Codex 디자인 목소리** (Bash 경유):
   ```bash
   _REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
   codex exec "IMPORTANT: Do NOT read or execute any SKILL.md files or files in skill definition directories (paths containing skills/gstack). These are AI assistant skill definitions meant for a different system. Stay focused on repository code only.
@@ -1002,9 +997,9 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
   What design decisions will haunt the implementer if left ambiguous?
   Be opinionated. No hedging." -C "$_REPO_ROOT" -s read-only --enable web_search_cached
   ```
-  Timeout: 10 minutes
+  타임아웃: 10분
 
-  **Claude design subagent** (via Agent tool):
+  **Claude 디자인 서브에이전트** (Agent 도구 경유):
   "Read the plan file at <plan_path>. You are an independent senior product designer
   reviewing this plan. You have NOT seen any prior review. Evaluate:
   1. Information hierarchy: what does the user see first, second, third? Is it right?
@@ -1013,52 +1008,52 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
   4. Specificity: does the plan describe SPECIFIC UI or generic patterns?
   5. What design decisions will haunt the implementer if left ambiguous?
   For each finding: what's wrong, severity (critical/high/medium), and the fix."
-  NO prior-phase context — subagent must be truly independent.
+  이전 단계 컨텍스트 없음 — 서브에이전트는 진정으로 독립적이어야 합니다.
 
-  Error handling: same as Phase 1 (both foreground/blocking, degradation matrix applies).
+  에러 처리: 페이즈 1과 동일 (둘 다 포그라운드/블로킹, 성능 저하 매트릭스 적용).
 
-- Design choices: if codex disagrees with a design decision with valid UX reasoning
-  → TASTE DECISION. Scope changes both models agree on → USER CHALLENGE.
+- 디자인 선택: codex가 유효한 UX 근거로 디자인 결정에 동의하지 않으면
+  → 감성적 결정. 두 모델 모두 동의한 범위 변경 → USER CHALLENGE.
 
-**Required execution checklist (Design):**
+**필수 실행 체크리스트 (디자인):**
 
-1. Step 0 (Design Scope): Rate completeness 0-10. Check DESIGN.md. Map existing patterns.
+1. Step 0 (디자인 범위): 완전성 0-10 점수. DESIGN.md 확인. 기존 패턴 매핑.
 
-2. Step 0.5 (Dual Voices): Run Claude subagent (foreground) first, then Codex. Present under
-   CODEX SAYS (design — UX challenge) and CLAUDE SUBAGENT (design — independent review)
-   headers. Produce design litmus scorecard (consensus table). Use the litmus scorecard
-   format from plan-design-review. Include CEO phase findings in Codex prompt ONLY
-   (not Claude subagent — stays independent).
+2. Step 0.5 (이중 목소리): 먼저 Claude 서브에이전트(포그라운드)를 실행하고, 그 다음 Codex를 실행.
+   CODEX SAYS (design — UX challenge)와 CLAUDE SUBAGENT (design — independent review)
+   헤더 아래에 제시. 디자인 리트머스 스코어카드 (합의 테이블) 생성. plan-design-review의
+   리트머스 스코어카드 형식을 사용. CEO 단계 발견 사항을 Codex 프롬프트에만 포함
+   (Claude 서브에이전트에는 포함하지 않음 — 독립성 유지).
 
-3. Passes 1-7: Run each from loaded skill. Rate 0-10. Auto-decide each issue.
-   DISAGREE items from scorecard → raised in the relevant pass with both perspectives.
+3. Pass 1-7: 로드된 스킬에서 각각 실행. 0-10 점수. 각 이슈 자동 결정.
+   스코어카드의 DISAGREE 항목 → 양쪽 관점과 함께 해당 패스에서 제기.
 
-**PHASE 2 COMPLETE.** Emit phase-transition summary:
-> **Phase 2 complete.** Codex: [N concerns]. Claude subagent: [N issues].
-> Consensus: [X/Y confirmed, Z disagreements → surfaced at gate].
-> Passing to Phase 3.
+**페이즈 2 완료.** 단계 전환 요약 출력:
+> **페이즈 2 완료.** Codex: [N개 우려]. Claude 서브에이전트: [N개 이슈].
+> 합의: [X/Y 확인됨, Z개 의견 불일치 → 게이트에서 제시].
+> 페이즈 3으로 전달합니다.
 
-Do NOT begin Phase 3 until all Phase 2 outputs (if run) are written to the plan file.
+페이즈 2의 모든 산출물이 (실행된 경우) 플랜 파일에 작성될 때까지 페이즈 3을 시작하지 마세요.
 
 ---
 
-**Pre-Phase 3 checklist (verify before starting):**
-- [ ] All Phase 1 items above confirmed
-- [ ] Design completion summary written (or "skipped, no UI scope")
-- [ ] Design dual voices ran (if Phase 2 ran)
-- [ ] Design consensus table produced (if Phase 2 ran)
-- [ ] Phase-transition summary emitted
+**페이즈 3 사전 체크리스트 (시작 전 확인):**
+- [ ] 위의 페이즈 1 항목 모두 확인됨
+- [ ] 디자인 완료 요약 작성됨 (또는 "건너뜀, UI 범위 없음")
+- [ ] 디자인 이중 목소리 실행됨 (페이즈 2가 실행된 경우)
+- [ ] 디자인 합의 테이블 생성됨 (페이즈 2가 실행된 경우)
+- [ ] 단계 전환 요약 출력됨
 
-## Phase 3: Eng Review + Dual Voices
+## 페이즈 3: 엔지니어링 리뷰 + 이중 목소리
 
-Follow plan-eng-review/SKILL.md — all sections, full depth.
-Override: every AskUserQuestion → auto-decide using the 6 principles.
+plan-eng-review/SKILL.md를 따르세요 — 모든 섹션, 전체 깊이.
+오버라이드: 모든 AskUserQuestion → 6가지 원칙을 사용하여 자동 결정.
 
-**Override rules:**
-- Scope challenge: never reduce (P2)
-- Dual voices: always run BOTH Claude subagent AND Codex if available (P6).
+**오버라이드 규칙:**
+- 범위 도전: 절대 축소하지 않음 (P2)
+- 이중 목소리: 가능하면 항상 Claude 서브에이전트와 Codex 모두 실행 (P6).
 
-  **Codex eng voice** (via Bash):
+  **Codex 엔지니어링 목소리** (Bash 경유):
   ```bash
   _REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
   codex exec "IMPORTANT: Do NOT read or execute any SKILL.md files or files in skill definition directories (paths containing skills/gstack). These are AI assistant skill definitions meant for a different system. Stay focused on repository code only.
@@ -1072,9 +1067,9 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
 
   File: <plan_path>" -C "$_REPO_ROOT" -s read-only --enable web_search_cached
   ```
-  Timeout: 10 minutes
+  타임아웃: 10분
 
-  **Claude eng subagent** (via Agent tool):
+  **Claude 엔지니어링 서브에이전트** (Agent 도구 경유):
   "Read the plan file at <plan_path>. You are an independent senior engineer
   reviewing this plan. You have NOT seen any prior review. Evaluate:
   1. Architecture: Is the component structure sound? Coupling concerns?
@@ -1083,24 +1078,23 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
   4. Security: New attack surface? Auth boundaries? Input validation?
   5. Hidden complexity: What looks simple but isn't?
   For each finding: what's wrong, severity, and the fix."
-  NO prior-phase context — subagent must be truly independent.
+  이전 단계 컨텍스트 없음 — 서브에이전트는 진정으로 독립적이어야 합니다.
 
-  Error handling: same as Phase 1 (both foreground/blocking, degradation matrix applies).
+  에러 처리: 페이즈 1과 동일 (둘 다 포그라운드/블로킹, 성능 저하 매트릭스 적용).
 
-- Architecture choices: explicit over clever (P5). If codex disagrees with valid reason → TASTE DECISION. Scope changes both models agree on → USER CHALLENGE.
-- Evals: always include all relevant suites (P1)
-- Test plan: generate artifact at `~/.gstack/projects/$SLUG/{user}-{branch}-test-plan-{datetime}.md`
-- TODOS.md: collect all deferred scope expansions from Phase 1, auto-write
+- 아키텍처 선택: 명시적 > 교묘한 (P5). codex가 유효한 이유로 동의하지 않으면 → 감성적 결정. 두 모델 모두 동의한 범위 변경 → USER CHALLENGE.
+- Evals: 관련된 모든 스위트 항상 포함 (P1)
+- 테스트 플랜: `~/.gstack/projects/$SLUG/{user}-{branch}-test-plan-{datetime}.md`에 아티팩트 생성
+- TODOS.md: 페이즈 1의 모든 연기된 범위 확장을 수집하여 자동 작성
 
-**Required execution checklist (Eng):**
+**필수 실행 체크리스트 (Eng):**
 
-1. Step 0 (Scope Challenge): Read actual code referenced by the plan. Map each
-   sub-problem to existing code. Run the complexity check. Produce concrete findings.
+1. Step 0 (범위 도전): 플랜이 참조하는 실제 코드를 읽기. 각 하위 문제를
+   기존 코드에 매핑. 복잡도 확인 실행. 구체적 발견 사항 생성.
 
-2. Step 0.5 (Dual Voices): Run Claude subagent (foreground) first, then Codex. Present
-   Codex output under CODEX SAYS (eng — architecture challenge) header. Present subagent
-   output under CLAUDE SUBAGENT (eng — independent review) header. Produce eng consensus
-   table:
+2. Step 0.5 (이중 목소리): 먼저 Claude 서브에이전트(포그라운드)를 실행하고, 그 다음 Codex를 실행. Codex 출력을
+   CODEX SAYS (eng — architecture challenge) 헤더 아래에 제시. 서브에이전트 출력을
+   CLAUDE SUBAGENT (eng — independent review) 헤더 아래에 제시. Eng 합의 테이블 생성:
 
 ```
 ENG DUAL VOICES — CONSENSUS TABLE:
@@ -1118,62 +1112,61 @@ CONFIRMED = both agree. DISAGREE = models differ (→ taste decision).
 Missing voice = N/A (not CONFIRMED). Single critical finding from one voice = flagged regardless.
 ```
 
-3. Section 1 (Architecture): Produce ASCII dependency graph showing new components
-   and their relationships to existing ones. Evaluate coupling, scaling, security.
+3. 섹션 1 (아키텍처): 새 컴포넌트와 기존 컴포넌트의 관계를 보여주는
+   ASCII 의존성 그래프 생성. 결합도, 확장성, 보안 평가.
 
-4. Section 2 (Code Quality): Identify DRY violations, naming issues, complexity.
-   Reference specific files and patterns. Auto-decide each finding.
+4. 섹션 2 (코드 품질): DRY 위반, 네이밍 이슈, 복잡도 식별.
+   구체적 파일과 패턴 참조. 각 발견 사항 자동 결정.
 
-5. **Section 3 (Test Review) — NEVER SKIP OR COMPRESS.**
-   This section requires reading actual code, not summarizing from memory.
-   - Read the diff or the plan's affected files
-   - Build the test diagram: list every NEW UX flow, data flow, codepath, and branch
-   - For EACH item in the diagram: what type of test covers it? Does one exist? Gaps?
-   - For LLM/prompt changes: which eval suites must run?
-   - Auto-deciding test gaps means: identify the gap → decide whether to add a test
-     or defer (with rationale and principle) → log the decision. It does NOT mean
-     skipping the analysis.
-   - Write the test plan artifact to disk
+5. **섹션 3 (테스트 리뷰) — 절대 건너뛰거나 압축하지 마세요.**
+   이 섹션은 기억이 아닌 실제 코드를 읽어야 합니다.
+   - diff 또는 플랜의 영향받는 파일 읽기
+   - 테스트 다이어그램 구축: 모든 새 UX 플로우, 데이터 플로우, 코드 경로, 분기 나열
+   - 다이어그램의 각 항목에 대해: 어떤 유형의 테스트가 커버하나? 존재하나? 갭은?
+   - LLM/프롬프트 변경의 경우: 어떤 eval 스위트를 실행해야 하나?
+   - 테스트 갭 자동 결정이란: 갭 식별 → 테스트 추가 또는 연기 결정 (근거와 원칙) →
+     결정 기록. 분석 건너뛰기가 아닙니다.
+   - 테스트 플랜 아티팩트를 디스크에 작성
 
-6. Section 4 (Performance): Evaluate N+1 queries, memory, caching, slow paths.
+6. 섹션 4 (성능): N+1 쿼리, 메모리, 캐싱, 느린 경로 평가.
 
-**Mandatory outputs from Phase 3:**
-- "NOT in scope" section
-- "What already exists" section
-- Architecture ASCII diagram (Section 1)
-- Test diagram mapping codepaths to coverage (Section 3)
-- Test plan artifact written to disk (Section 3)
-- Failure modes registry with critical gap flags
-- Completion Summary (the full summary from the Eng skill)
-- TODOS.md updates (collected from all phases)
+**페이즈 3의 필수 산출물:**
+- "NOT in scope" 섹션
+- "What already exists" 섹션
+- 아키텍처 ASCII 다이어그램 (섹션 1)
+- 코드 경로를 커버리지에 매핑하는 테스트 다이어그램 (섹션 3)
+- 디스크에 작성된 테스트 플랜 아티팩트 (섹션 3)
+- 크리티컬 갭 플래그가 있는 Failure modes registry
+- 완료 요약 (Eng 스킬의 전체 요약)
+- TODOS.md 업데이트 (모든 단계에서 수집)
 
-**PHASE 3 COMPLETE.** Emit phase-transition summary:
-> **Phase 3 complete.** Codex: [N concerns]. Claude subagent: [N issues].
-> Consensus: [X/6 confirmed, Y disagreements → surfaced at gate].
-> Passing to Phase 3.5 (DX Review) or Phase 4 (Final Gate).
+**페이즈 3 완료.** 단계 전환 요약 출력:
+> **페이즈 3 완료.** Codex: [N개 우려]. Claude 서브에이전트: [N개 이슈].
+> 합의: [X/6 확인됨, Y개 의견 불일치 → 게이트에서 제시].
+> 페이즈 3.5 (DX 리뷰) 또는 페이즈 4 (최종 게이트)로 전달합니다.
 
 ---
 
-## Phase 3.5: DX Review (conditional — skip if no developer-facing scope)
+## 페이즈 3.5: DX 리뷰 (조건부 — 개발자 대상 범위 없으면 건너뛰기)
 
-Follow plan-devex-review/SKILL.md — all 8 DX dimensions, full depth.
-Override: every AskUserQuestion → auto-decide using the 6 principles.
+plan-devex-review/SKILL.md를 따르세요 — 8가지 DX 차원 전체, 전체 깊이.
+오버라이드: 모든 AskUserQuestion → 6가지 원칙을 사용하여 자동 결정.
 
-**Skip condition:** If DX scope was NOT detected in Phase 0, skip this phase entirely.
-Log: "Phase 3.5 skipped — no developer-facing scope detected."
+**건너뛰기 조건:** DX 범위가 페이즈 0에서 감지되지 않았다면, 이 페이즈를 완전히 건너뜁니다.
+기록: "Phase 3.5 skipped — no developer-facing scope detected."
 
-**Override rules:**
-- Mode selection: DX POLISH
-- Persona: infer from README/docs, pick the most common developer type (P6)
-- Competitive benchmark: run searches if WebSearch available, use reference benchmarks otherwise (P1)
-- Magical moment: pick the lowest-effort delivery vehicle that achieves the competitive tier (P5)
-- Getting started friction: always optimize toward fewer steps (P5, simpler over clever)
-- Error message quality: always require problem + cause + fix (P1, completeness)
-- API/CLI naming: consistency wins over cleverness (P5)
-- DX taste decisions (e.g., opinionated defaults vs flexibility): mark TASTE DECISION
-- Dual voices: always run BOTH Claude subagent AND Codex if available (P6).
+**오버라이드 규칙:**
+- 모드 선택: DX POLISH
+- 페르소나: README/docs에서 추론, 가장 일반적인 개발자 유형 선택 (P6)
+- 경쟁 벤치마크: WebSearch가 가능하면 검색 실행, 아니면 reference benchmark 사용 (P1)
+- 매직 모먼트: 경쟁 티어를 달성하는 가장 낮은 노력의 전달 수단 선택 (P5)
+- getting started 마찰: 항상 더 적은 단계 쪽으로 최적화 (P5, 단순함 > 교묘함)
+- 에러 메시지 품질: 항상 problem + cause + fix 요구 (P1, 완전성)
+- API/CLI 네이밍: 일관성이 교묘함보다 우선 (P5)
+- DX 감성적 결정 (예: opinionated default vs flexibility): 감성적 결정으로 표시
+- 이중 목소리: 가능하면 항상 Claude 서브에이전트와 Codex 모두 실행 (P6).
 
-  **Codex DX voice** (via Bash):
+  **Codex DX 목소리** (Bash 경유):
   ```bash
   _REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
   codex exec "IMPORTANT: Do NOT read or execute any SKILL.md files or files in skill definition directories (paths containing skills/gstack). These are AI assistant skill definitions meant for a different system. Stay focused on repository code only.
@@ -1192,9 +1185,9 @@ Log: "Phase 3.5 skipped — no developer-facing scope detected."
   5. Upgrade path: can devs upgrade without fear? Migration guides? Deprecation warnings?
   Be adversarial. Think like a developer who is evaluating this against 3 competitors." -C "$_REPO_ROOT" -s read-only --enable web_search_cached
   ```
-  Timeout: 10 minutes
+  타임아웃: 10분
 
-  **Claude DX subagent** (via Agent tool):
+  **Claude DX 서브에이전트** (Agent 도구 경유):
   "Read the plan file at <plan_path>. You are an independent DX engineer
   reviewing this plan. You have NOT seen any prior review. Evaluate:
   1. Getting started: how many steps from zero to hello world? What's the TTHW?
@@ -1203,21 +1196,21 @@ Log: "Phase 3.5 skipped — no developer-facing scope detected."
   4. Documentation: copy-paste examples? Information architecture? Interactive elements?
   5. Escape hatches: can developers override every opinionated default?
   For each finding: what's wrong, severity (critical/high/medium), and the fix."
-  NO prior-phase context — subagent must be truly independent.
+  이전 단계 컨텍스트 없음 — 서브에이전트는 진정으로 독립적이어야 합니다.
 
-  Error handling: same as Phase 1 (both foreground/blocking, degradation matrix applies).
+  에러 처리: 페이즈 1과 동일 (둘 다 포그라운드/블로킹, 성능 저하 매트릭스 적용).
 
-- DX choices: if codex disagrees with a DX decision with valid developer empathy reasoning
-  → TASTE DECISION. Scope changes both models agree on → USER CHALLENGE.
+- DX 선택: codex가 유효한 developer empathy 근거로 DX 결정에 동의하지 않으면
+  → 감성적 결정. 두 모델 모두 동의한 범위 변경 → USER CHALLENGE.
 
-**Required execution checklist (DX):**
+**필수 실행 체크리스트 (DX):**
 
-1. Step 0 (DX Scope Assessment): Auto-detect product type. Map the developer journey.
-   Rate initial DX completeness 0-10. Assess TTHW.
+1. Step 0 (DX 범위 평가): 제품 유형 자동 감지. 개발자 여정 매핑.
+   초기 DX 완전성 0-10 점수. TTHW 평가.
 
-2. Step 0.5 (Dual Voices): Run Claude subagent (foreground) first, then Codex. Present
-   under CODEX SAYS (DX — developer experience challenge) and CLAUDE SUBAGENT
-   (DX — independent review) headers. Produce DX consensus table:
+2. Step 0.5 (이중 목소리): 먼저 Claude 서브에이전트(포그라운드)를 실행하고, 그 다음 Codex를 실행.
+   CODEX SAYS (DX — developer experience challenge)와 CLAUDE SUBAGENT
+   (DX — independent review) 헤더 아래에 제시. DX 합의 테이블 생성:
 
 ```
 DX DUAL VOICES — CONSENSUS TABLE:
@@ -1235,29 +1228,29 @@ CONFIRMED = both agree. DISAGREE = models differ (→ taste decision).
 Missing voice = N/A (not CONFIRMED). Single critical finding from one voice = flagged regardless.
 ```
 
-3. Passes 1-8: Run each from loaded skill. Rate 0-10. Auto-decide each issue.
-   DISAGREE items from consensus table → raised in the relevant pass with both perspectives.
+3. Pass 1-8: 로드된 스킬에서 각각 실행. 0-10 점수. 각 이슈 자동 결정.
+   합의 테이블의 DISAGREE 항목 → 양쪽 관점과 함께 해당 패스에서 제기.
 
-4. DX Scorecard: Produce the full scorecard with all 8 dimensions scored.
+4. DX Scorecard: 8가지 차원 모두 점수를 매긴 전체 scorecard 생성.
 
-**Mandatory outputs from Phase 3.5:**
-- Developer journey map (9-stage table)
-- Developer empathy narrative (first-person perspective)
-- DX Scorecard with all 8 dimension scores
+**페이즈 3.5의 필수 산출물:**
+- 개발자 여정 맵 (9단계 테이블)
+- 개발자 공감 내러티브 (1인칭 관점)
+- 8가지 차원 점수가 포함된 DX Scorecard
 - DX Implementation Checklist
-- TTHW assessment with target
+- 목표가 포함된 TTHW 평가
 
-**PHASE 3.5 COMPLETE.** Emit phase-transition summary:
-> **Phase 3.5 complete.** DX overall: [N]/10. TTHW: [N] min → [target] min.
-> Codex: [N concerns]. Claude subagent: [N issues].
-> Consensus: [X/6 confirmed, Y disagreements → surfaced at gate].
-> Passing to Phase 4 (Final Gate).
+**페이즈 3.5 완료.** 단계 전환 요약 출력:
+> **페이즈 3.5 완료.** DX 전체: [N]/10. TTHW: [N] min → [target] min.
+> Codex: [N개 우려]. Claude 서브에이전트: [N개 이슈].
+> 합의: [X/6 확인됨, Y개 의견 불일치 → 게이트에서 제시].
+> 페이즈 4 (최종 게이트)로 전달합니다.
 
 ---
 
-## Decision Audit Trail
+## 결정 감사 추적
 
-After each auto-decision, append a row to the plan file using Edit:
+각 자동 결정 후, Edit를 사용하여 플랜 파일에 행을 추가하세요:
 
 ```markdown
 <!-- AUTONOMOUS DECISION LOG -->
@@ -1267,149 +1260,149 @@ After each auto-decision, append a row to the plan file using Edit:
 |---|-------|----------|-----------|-----------|----------|
 ```
 
-Write one row per decision incrementally (via Edit). This keeps the audit on disk,
-not accumulated in conversation context.
+결정당 한 행을 점진적으로 작성하세요 (Edit 경유). 이렇게 하면 감사가 대화 컨텍스트가
+아닌 디스크에 유지됩니다.
 
 ---
 
-## Pre-Gate Verification
+## 게이트 전 검증
 
-Before presenting the Final Approval Gate, verify that required outputs were actually
-produced. Check the plan file and conversation for each item.
+최종 승인 게이트를 제시하기 전에, 필수 산출물이 실제로 생성되었는지 확인하세요.
+플랜 파일과 대화에서 각 항목을 확인하세요.
 
-**Phase 1 (CEO) outputs:**
-- [ ] Premise challenge with specific premises named (not just "premises accepted")
-- [ ] All applicable review sections have findings OR explicit "examined X, nothing flagged"
-- [ ] Error & Rescue Registry table produced (or noted N/A with reason)
-- [ ] Failure Modes Registry table produced (or noted N/A with reason)
-- [ ] "NOT in scope" section written
-- [ ] "What already exists" section written
-- [ ] Dream state delta written
-- [ ] Completion Summary produced
-- [ ] Dual voices ran (Codex + Claude subagent, or noted unavailable)
-- [ ] CEO consensus table produced
+**페이즈 1 (CEO) 산출물:**
+- [ ] 구체적 전제가 명명된 전제 도전 ("전제 수용됨"만이 아닌)
+- [ ] 모든 해당 리뷰 섹션에 발견 사항 또는 명시적 "X 조사, 플래그 없음"
+- [ ] Error & Rescue Registry 테이블 생성 (또는 사유와 함께 N/A 명시)
+- [ ] Failure Modes Registry 테이블 생성 (또는 사유와 함께 N/A 명시)
+- [ ] "NOT in scope" 섹션 작성됨
+- [ ] "What already exists" 섹션 작성됨
+- [ ] 드림 스테이트 델타 작성됨
+- [ ] 완료 요약 생성됨
+- [ ] 이중 목소리 실행됨 (Codex + Claude 서브에이전트, 또는 사용 불가 명시)
+- [ ] CEO 합의 테이블 생성됨
 
-**Phase 2 (Design) outputs — only if UI scope detected:**
-- [ ] All 7 dimensions evaluated with scores
-- [ ] Issues identified and auto-decided
-- [ ] Dual voices ran (or noted unavailable/skipped with phase)
-- [ ] Design litmus scorecard produced
+**페이즈 2 (디자인) 산출물 — UI 범위가 감지된 경우에만:**
+- [ ] 7가지 차원 모두 점수와 함께 평가됨
+- [ ] 이슈 식별되고 자동 결정됨
+- [ ] 이중 목소리 실행됨 (또는 단계와 함께 사용 불가/건너뜀 명시)
+- [ ] 디자인 리트머스 스코어카드 생성됨
 
-**Phase 3 (Eng) outputs:**
-- [ ] Scope challenge with actual code analysis (not just "scope is fine")
-- [ ] Architecture ASCII diagram produced
-- [ ] Test diagram mapping codepaths to test coverage
-- [ ] Test plan artifact written to disk at ~/.gstack/projects/$SLUG/
-- [ ] "NOT in scope" section written
-- [ ] "What already exists" section written
-- [ ] Failure modes registry with critical gap assessment
-- [ ] Completion Summary produced
-- [ ] Dual voices ran (Codex + Claude subagent, or noted unavailable)
-- [ ] Eng consensus table produced
+**페이즈 3 (Eng) 산출물:**
+- [ ] 실제 코드 분석이 포함된 범위 도전 ("범위가 괜찮음"만이 아닌)
+- [ ] 아키텍처 ASCII 다이어그램 생성됨
+- [ ] 코드 경로를 테스트 커버리지에 매핑하는 테스트 다이어그램
+- [ ] ~/.gstack/projects/$SLUG/에 테스트 플랜 아티팩트가 디스크에 작성됨
+- [ ] "NOT in scope" 섹션 작성됨
+- [ ] "What already exists" 섹션 작성됨
+- [ ] 크리티컬 갭 평가가 포함된 Failure modes registry
+- [ ] 완료 요약 생성됨
+- [ ] 이중 목소리 실행됨 (Codex + Claude 서브에이전트, 또는 사용 불가 명시)
+- [ ] Eng 합의 테이블 생성됨
 
-**Phase 3.5 (DX) outputs — only if DX scope detected:**
-- [ ] All 8 DX dimensions evaluated with scores
-- [ ] Developer journey map produced
-- [ ] Developer empathy narrative written
-- [ ] TTHW assessment with target
-- [ ] DX Implementation Checklist produced
-- [ ] Dual voices ran (or noted unavailable/skipped with phase)
-- [ ] DX consensus table produced
+**페이즈 3.5 (DX) 산출물 — DX 범위가 감지된 경우에만:**
+- [ ] 8가지 DX 차원 모두 점수와 함께 평가됨
+- [ ] 개발자 여정 맵 생성됨
+- [ ] 개발자 공감 내러티브 작성됨
+- [ ] 목표가 포함된 TTHW 평가
+- [ ] DX Implementation Checklist 생성됨
+- [ ] 이중 목소리 실행됨 (또는 단계와 함께 사용 불가/건너뜀 명시)
+- [ ] DX 합의 테이블 생성됨
 
-**Cross-phase:**
-- [ ] Cross-phase themes section written
+**교차 단계:**
+- [ ] 교차 단계 테마 섹션 작성됨
 
-**Audit trail:**
-- [ ] Decision Audit Trail has at least one row per auto-decision (not empty)
+**감사 추적:**
+- [ ] Decision Audit Trail에 자동 결정당 최소 한 행 (비어있지 않음)
 
-If ANY checkbox above is missing, go back and produce the missing output. Max 2
-attempts — if still missing after retrying twice, proceed to the gate with a warning
-noting which items are incomplete. Do not loop indefinitely.
+위의 체크박스 중 하나라도 누락되면, 돌아가서 누락된 산출물을 생성하세요. 최대 2회
+재시도 — 두 번 재시도 후에도 여전히 누락이면, 어떤 항목이 불완전한지 경고와 함께
+게이트로 진행하세요. 무한 반복하지 마세요.
 
 ---
 
-## Phase 4: Final Approval Gate
+## 페이즈 4: 최종 승인 게이트
 
-**STOP here and present the final state to the user.**
+**여기서 멈추고 사용자에게 최종 상태를 제시하세요.**
 
-Present as a message, then use AskUserQuestion:
+메시지로 제시한 후 AskUserQuestion을 사용하세요:
 
 ```
 ## /autoplan Review Complete
 
 ### Plan Summary
-[1-3 sentence summary]
+[1-3문장 요약]
 
 ### Decisions Made: [N] total ([M] auto-decided, [K] taste choices, [J] user challenges)
 
 ### User Challenges (both models disagree with your stated direction)
-[For each user challenge:]
-**Challenge [N]: [title]** (from [phase])
-You said: [user's original direction]
-Both models recommend: [the change]
-Why: [reasoning]
-What we might be missing: [blind spots]
-If we're wrong, the cost is: [downside of changing]
-[If security/feasibility: "⚠️ Both models flag this as a security/feasibility risk,
+[각 user challenge에 대해:]
+**Challenge [N]: [제목]** (from [단계])
+You said: [사용자의 원래 방향]
+Both models recommend: [변경 사항]
+Why: [근거]
+What we might be missing: [블라인드 스팟]
+If we're wrong, the cost is: [변경의 단점]
+[보안/실행 가능성인 경우: "⚠️ Both models flag this as a security/feasibility risk,
 not just a preference."]
 
 Your call — your original direction stands unless you explicitly change it.
 
 ### Your Choices (taste decisions)
-[For each taste decision:]
-**Choice [N]: [title]** (from [phase])
-I recommend [X] — [principle]. But [Y] is also viable:
-  [1-sentence downstream impact if you pick Y]
+[각 감성적 결정에 대해:]
+**Choice [N]: [제목]** (from [단계])
+I recommend [X] — [원칙]. But [Y] is also viable:
+  [Y를 선택하면 1문장 하류 영향]
 
 ### Auto-Decided: [M] decisions [see Decision Audit Trail in plan file]
 
 ### Review Scores
-- CEO: [summary]
-- CEO Voices: Codex [summary], Claude subagent [summary], Consensus [X/6 confirmed]
-- Design: [summary or "skipped, no UI scope"]
-- Design Voices: Codex [summary], Claude subagent [summary], Consensus [X/7 confirmed] (or "skipped")
-- Eng: [summary]
-- Eng Voices: Codex [summary], Claude subagent [summary], Consensus [X/6 confirmed]
-- DX: [summary or "skipped, no developer-facing scope"]
-- DX Voices: Codex [summary], Claude subagent [summary], Consensus [X/6 confirmed] (or "skipped")
+- CEO: [요약]
+- CEO Voices: Codex [요약], Claude subagent [요약], Consensus [X/6 confirmed]
+- Design: [요약 또는 "skipped, no UI scope"]
+- Design Voices: Codex [요약], Claude subagent [요약], Consensus [X/7 confirmed] (or "skipped")
+- Eng: [요약]
+- Eng Voices: Codex [요약], Claude subagent [요약], Consensus [X/6 confirmed]
+- DX: [요약 또는 "skipped, no developer-facing scope"]
+- DX Voices: Codex [요약], Claude subagent [요약], Consensus [X/6 confirmed] (or "skipped")
 
 ### Cross-Phase Themes
-[For any concern that appeared in 2+ phases' dual voices independently:]
-**Theme: [topic]** — flagged in [Phase 1, Phase 3]. High-confidence signal.
-[If no themes span phases:] "No cross-phase themes — each phase's concerns were distinct."
+[2개 이상 단계의 이중 목소리에서 독립적으로 나타난 우려에 대해:]
+**Theme: [주제]** — flagged in [Phase 1, Phase 3]. High-confidence signal.
+[단계를 가로지르는 테마가 없으면:] "No cross-phase themes — each phase's concerns were distinct."
 
 ### Deferred to TODOS.md
-[Items auto-deferred with reasons]
+[사유와 함께 자동 연기된 항목]
 ```
 
-**Cognitive load management:**
-- 0 user challenges: skip "User Challenges" section
-- 0 taste decisions: skip "Your Choices" section
-- 1-7 taste decisions: flat list
-- 8+: group by phase. Add warning: "This plan had unusually high ambiguity ([N] taste decisions). Review carefully."
+**인지 부하 관리:**
+- user challenge 0개: "User Challenges" 섹션 건너뛰기
+- 감성적 결정 0개: "Your Choices" 섹션 건너뛰기
+- 감성적 결정 1-7개: 평면 목록
+- 8개 이상: 단계별 그룹화. 경고 추가: "이 플랜은 비정상적으로 높은 모호성을 보였습니다 ([N]개 감성적 결정). 신중하게 검토하세요."
 
-AskUserQuestion options:
-- A) Approve as-is (accept all recommendations)
-- B) Approve with overrides (specify which taste decisions to change)
-- B2) Approve with user challenge responses (accept or reject each challenge)
-- C) Interrogate (ask about any specific decision)
-- D) Revise (the plan itself needs changes)
-- E) Reject (start over)
+AskUserQuestion 옵션:
+- A) 그대로 승인 (모든 추천 수용)
+- B) 오버라이드와 함께 승인 (어떤 감성적 결정을 변경할지 지정)
+- B2) user challenge 응답과 함께 승인 (각 challenge를 수용 또는 거부)
+- C) 질문 (특정 결정에 대해 질문)
+- D) 수정 (플랜 자체에 변경이 필요)
+- E) 거부 (처음부터 다시)
 
-**Option handling:**
-- A: mark APPROVED, write review logs, suggest /ship
-- B: ask which overrides, apply, re-present gate
-- C: answer freeform, re-present gate
-- D: make changes, re-run affected phases (scope→1B, design→2, test plan→3, arch→3). Max 3 cycles.
-- E: start over
+**옵션 처리:**
+- A: APPROVED로 표시, 리뷰 로그 작성, /ship 제안
+- B: 어떤 오버라이드인지 확인, 적용, 게이트 재제시
+- C: 자유 형식 답변, 게이트 재제시
+- D: 변경 적용, 영향받는 단계 재실행 (범위→1B, 디자인→2, 테스트 플랜→3, 아키텍처→3). 최대 3사이클.
+- E: 처음부터 다시
 
 ---
 
-## Completion: Write Review Logs
+## 완료: 리뷰 로그 작성
 
-On approval, write 3 separate review log entries so /ship's dashboard recognizes them.
-Replace TIMESTAMP, STATUS, and N with actual values from each review phase.
-STATUS is "clean" if no unresolved issues, "issues_open" otherwise.
+승인 시, /ship의 대시보드가 인식할 수 있도록 3개의 별도 리뷰 로그 항목을 작성하세요.
+TIMESTAMP, STATUS, N을 각 리뷰 단계의 실제 값으로 대체하세요.
+STATUS는 미해결 이슈가 없으면 "clean", 있으면 "issues_open"입니다.
 
 ```bash
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
@@ -1420,45 +1413,45 @@ TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"plan-eng-review","timestamp":"'"$TIMESTAMP"'","status":"STATUS","unresolved":N,"critical_gaps":N,"issues_found":N,"mode":"FULL_REVIEW","via":"autoplan","commit":"'"$COMMIT"'"}'
 ```
 
-If Phase 2 ran (UI scope):
+페이즈 2가 실행된 경우 (UI 범위):
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"plan-design-review","timestamp":"'"$TIMESTAMP"'","status":"STATUS","unresolved":N,"via":"autoplan","commit":"'"$COMMIT"'"}'
 ```
 
-If Phase 3.5 ran (DX scope):
+페이즈 3.5가 실행된 경우 (DX 범위):
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"plan-devex-review","timestamp":"'"$TIMESTAMP"'","status":"STATUS","initial_score":N,"overall_score":N,"product_type":"TYPE","tthw_current":"TTHW","tthw_target":"TARGET","unresolved":N,"via":"autoplan","commit":"'"$COMMIT"'"}'
 ```
 
-Dual voice logs (one per phase that ran):
+이중 목소리 로그 (실행된 각 단계당 하나):
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"autoplan-voices","timestamp":"'"$TIMESTAMP"'","status":"STATUS","source":"SOURCE","phase":"ceo","via":"autoplan","consensus_confirmed":N,"consensus_disagree":N,"commit":"'"$COMMIT"'"}'
 
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"autoplan-voices","timestamp":"'"$TIMESTAMP"'","status":"STATUS","source":"SOURCE","phase":"eng","via":"autoplan","consensus_confirmed":N,"consensus_disagree":N,"commit":"'"$COMMIT"'"}'
 ```
 
-If Phase 2 ran (UI scope), also log:
+페이즈 2가 실행된 경우 (UI 범위), 추가 로그:
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"autoplan-voices","timestamp":"'"$TIMESTAMP"'","status":"STATUS","source":"SOURCE","phase":"design","via":"autoplan","consensus_confirmed":N,"consensus_disagree":N,"commit":"'"$COMMIT"'"}'
 ```
 
-If Phase 3.5 ran (DX scope), also log:
+페이즈 3.5가 실행된 경우 (DX 범위), 추가 로그:
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"autoplan-voices","timestamp":"'"$TIMESTAMP"'","status":"STATUS","source":"SOURCE","phase":"dx","via":"autoplan","consensus_confirmed":N,"consensus_disagree":N,"commit":"'"$COMMIT"'"}'
 ```
 
-SOURCE = "codex+subagent", "codex-only", "subagent-only", or "unavailable".
-Replace N values with actual consensus counts from the tables.
+SOURCE = "codex+subagent", "codex-only", "subagent-only", 또는 "unavailable".
+N 값을 테이블의 실제 합의 수로 대체하세요.
 
-Suggest next step: `/ship` when ready to create the PR.
+다음 단계 제안: PR을 만들 준비가 되면 `/ship`.
 
 ---
 
-## Important Rules
+## 중요 규칙
 
-- **Never abort.** The user chose /autoplan. Respect that choice. Surface all taste decisions, never redirect to interactive review.
-- **Two gates.** The non-auto-decided AskUserQuestions are: (1) premise confirmation in Phase 1, and (2) User Challenges — when both models agree the user's stated direction should change. Everything else is auto-decided using the 6 principles.
-- **Log every decision.** No silent auto-decisions. Every choice gets a row in the audit trail.
-- **Full depth means full depth.** Do not compress or skip sections from the loaded skill files (except the skip list in Phase 0). "Full depth" means: read the code the section asks you to read, produce the outputs the section requires, identify every issue, and decide each one. A one-sentence summary of a section is not "full depth" — it is a skip. If you catch yourself writing fewer than 3 sentences for any review section, you are likely compressing.
-- **Artifacts are deliverables.** Test plan artifact, failure modes registry, error/rescue table, ASCII diagrams — these must exist on disk or in the plan file when the review completes. If they don't exist, the review is incomplete.
-- **Sequential order.** CEO → Design → Eng → DX. Each phase builds on the last.
+- **절대 중단하지 마세요.** 사용자가 /autoplan을 선택했습니다. 그 선택을 존중하세요. 모든 감성적 결정을 제시하고, 인터랙티브 리뷰로 절대 리다이렉트하지 마세요.
+- **두 개의 게이트.** 자동 결정되지 않는 AskUserQuestion은 다음입니다: (1) 페이즈 1의 전제 확인, (2) User Challenge — 두 모델 모두 사용자가 명시한 방향이 바뀌어야 한다고 동의할 때. 그 외 모든 것은 6가지 원칙을 사용하여 자동 결정합니다.
+- **모든 결정을 기록하세요.** 무음 자동 결정 없음. 모든 선택이 감사 추적에 한 행을 가집니다.
+- **전체 깊이는 전체 깊이입니다.** 로드된 스킬 파일의 섹션을 압축하거나 건너뛰지 마세요 (페이즈 0의 건너뛰기 목록 제외). "전체 깊이"란: 섹션이 읽으라는 코드를 읽고, 섹션이 요구하는 산출물을 생성하고, 모든 이슈를 식별하고, 각각을 결정하는 것입니다. 섹션의 한 문장 요약은 "전체 깊이"가 아닙니다 — 건너뛰기입니다. 리뷰 섹션에 대해 3문장 미만으로 작성하고 있다면, 아마도 압축하고 있는 것입니다.
+- **아티팩트는 결과물입니다.** 테스트 플랜 아티팩트, failure modes registry, error/rescue 테이블, ASCII 다이어그램 — 리뷰가 완료될 때 디스크나 플랜 파일에 반드시 존재해야 합니다. 존재하지 않으면, 리뷰가 불완전합니다.
+- **순차 순서.** CEO → Design → Eng → DX. 각 단계가 이전 단계 위에 구축됩니다.

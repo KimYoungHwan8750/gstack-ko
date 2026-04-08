@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-benchmark"
-  short_description: ""
+  short_description: "browse 데몬을 활용한 성능 회귀 감지. 페이지 로드 시간, Core Web Vitals, 리소스 크기에 대한 기준선을 수립합니다. 모든 PR에서 변경 전/후를 비교합니다. 시간 경과에 따른 성능 추세를..."
   default_prompt: "Use gstack-benchmark for this task."
 policy:
   allow_implicit_invocation: true

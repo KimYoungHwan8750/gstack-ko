@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-browse"
-  short_description: ""
+  short_description: "QA 테스트 및 사이트 독포딩을 위한 빠른 헤드리스 브라우저. URL 탐색, 요소 상호작용, 페이지 상태 확인, 액션 전/후 diff, 주석이 달린 스크린샷 촬영, 반응형 레이아웃 확인, 폼 및 업로드..."
   default_prompt: "Use gstack-browse for this task."
 policy:
   allow_implicit_invocation: true

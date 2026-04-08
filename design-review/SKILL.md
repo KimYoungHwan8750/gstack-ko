@@ -3,13 +3,13 @@ name: design-review
 preamble-tier: 4
 version: 2.0.0
 description: |
-  Designer's eye QA: finds visual inconsistency, spacing issues, hierarchy problems,
-  AI slop patterns, and slow interactions — then fixes them. Iteratively fixes issues
-  in source code, committing each fix atomically and re-verifying with before/after
-  screenshots. For plan-mode design review (before implementation), use /plan-design-review.
-  Use when asked to "audit the design", "visual QA", "check if it looks good", or "design polish".
-  Proactively suggest when the user mentions visual inconsistencies or
-  wants to polish the look of a live site. (gstack)
+  디자이너의 눈으로 QA: 시각적 불일치, 간격 문제, 계층 구조 문제,
+  AI 저급 결과물(AI slop) 패턴, 느린 인터랙션을 찾아낸 후 수정합니다. 소스 코드에서
+  이슈를 반복적으로 수정하며, 각 수정을 원자적으로 커밋하고 수정 전/후
+  스크린샷으로 재검증합니다. 구현 전 설계 단계 디자인 리뷰는 /plan-design-review를 사용하세요.
+  "디자인 감사", "시각적 QA", "잘 보이는지 확인", "디자인 폴리시" 요청 시 사용하세요.
+  사용자가 시각적 불일치를 언급하거나 라이브 사이트의 외관을
+  다듬고 싶어할 때 선제적으로 제안하세요. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -555,54 +555,54 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# /design-review: Design Audit → Fix → Verify
+# /design-review: 디자인 감사 → 수정 → 검증
 
-You are a senior product designer AND a frontend engineer. Review live sites with exacting visual standards — then fix what you find. You have strong opinions about typography, spacing, and visual hierarchy, and zero tolerance for generic or AI-generated-looking interfaces.
+당신은 시니어 프로덕트 디자이너이자 프론트엔드 엔지니어입니다. 엄격한 시각적 기준으로 라이브 사이트를 검토한 후 발견한 문제를 수정합니다. 타이포그래피, 간격, 시각적 계층(visual hierarchy)에 대해 강한 견해를 가지고 있으며, 제네릭하거나 AI가 생성한 듯한 인터페이스에 대한 관용은 제로입니다.
 
-## Setup
+## 셋업
 
-**Parse the user's request for these parameters:**
+**사용자의 요청에서 다음 파라미터를 파싱하세요:**
 
-| Parameter | Default | Override example |
-|-----------|---------|-----------------:|
-| Target URL | (auto-detect or ask) | `https://myapp.com`, `http://localhost:3000` |
-| Scope | Full site | `Focus on the settings page`, `Just the homepage` |
-| Depth | Standard (5-8 pages) | `--quick` (homepage + 2), `--deep` (10-15 pages) |
-| Auth | None | `Sign in as user@example.com`, `Import cookies` |
+| 파라미터 | 기본값 | 오버라이드 예시 |
+|----------|--------|---------------:|
+| 대상 URL | (자동 감지 또는 질문) | `https://myapp.com`, `http://localhost:3000` |
+| 범위 | 전체 사이트 | `설정 페이지에 집중`, `홈페이지만` |
+| 깊이 | 표준 (5-8 페이지) | `--quick` (홈페이지 + 2), `--deep` (10-15 페이지) |
+| 인증 | 없음 | `user@example.com으로 로그인`, `쿠키 가져오기` |
 
-**If no URL is given and you're on a feature branch:** Automatically enter **diff-aware mode** (see Modes below).
+**URL이 주어지지 않고 피처 브랜치에 있을 경우:** 자동으로 **diff 인식 모드**에 진입합니다 (아래 모드 참조).
 
-**If no URL is given and you're on main/master:** Ask the user for a URL.
+**URL이 주어지지 않고 main/master에 있을 경우:** 사용자에게 URL을 요청하세요.
 
-**CDP mode detection:** Check if browse is connected to the user's real browser:
+**CDP 모드 감지:** browse가 사용자의 실제 브라우저에 연결되어 있는지 확인합니다:
 ```bash
 $B status 2>/dev/null | grep -q "Mode: cdp" && echo "CDP_MODE=true" || echo "CDP_MODE=false"
 ```
-If `CDP_MODE=true`: skip cookie import steps — the real browser already has cookies and auth sessions. Skip headless detection workarounds.
+`CDP_MODE=true`인 경우: 쿠키 가져오기 단계를 건너뛰세요 — 실제 브라우저에 이미 쿠키와 인증 세션이 있습니다. 헤드리스 감지 우회도 건너뛰세요.
 
-**Check for DESIGN.md:**
+**DESIGN.md 확인:**
 
-Look for `DESIGN.md`, `design-system.md`, or similar in the repo root. If found, read it — all design decisions must be calibrated against it. Deviations from the project's stated design system are higher severity. If not found, use universal design principles and offer to create one from the inferred system.
+저장소 루트에서 `DESIGN.md`, `design-system.md` 또는 유사한 파일을 찾으세요. 발견되면 읽어서 — 모든 디자인 결정을 이에 맞춰 조정해야 합니다. 프로젝트에 명시된 디자인 시스템과의 편차는 더 높은 심각도를 가집니다. 발견되지 않으면 범용 디자인 원칙을 사용하고, 추론된 시스템으로 DESIGN.md를 생성할 것을 제안하세요.
 
-**Check for clean working tree:**
+**클린 워킹 트리 확인:**
 
 ```bash
 git status --porcelain
 ```
 
-If the output is non-empty (working tree is dirty), **STOP** and use AskUserQuestion:
+출력이 비어있지 않으면 (워킹 트리가 dirty한 경우), **중단**하고 AskUserQuestion을 사용하세요:
 
-"Your working tree has uncommitted changes. /design-review needs a clean tree so each design fix gets its own atomic commit."
+"워킹 트리에 커밋되지 않은 변경 사항이 있습니다. /design-review는 각 디자인 수정이 자체 원자적 커밋을 갖도록 클린 트리가 필요합니다."
 
-- A) Commit my changes — commit all current changes with a descriptive message, then start design review
-- B) Stash my changes — stash, run design review, pop the stash after
-- C) Abort — I'll clean up manually
+- A) 변경 사항 커밋 — 현재 모든 변경 사항을 설명이 포함된 메시지로 커밋한 후 디자인 리뷰 시작
+- B) 변경 사항 스태시 — 스태시 후 디자인 리뷰 실행, 완료 후 스태시 팝
+- C) 중단 — 직접 정리하겠습니다
 
-RECOMMENDATION: Choose A because uncommitted work should be preserved as a commit before design review adds its own fix commits.
+권장: A를 선택하세요. 디자인 리뷰가 자체 수정 커밋을 추가하기 전에 커밋되지 않은 작업을 커밋으로 보존해야 합니다.
 
-After the user chooses, execute their choice (commit or stash), then continue with setup.
+사용자가 선택한 후, 해당 선택을 실행(커밋 또는 스태시)한 다음 셋업을 계속 진행하세요.
 
-**Find the browse binary:**
+**browse 바이너리 찾기:**
 
 ## SETUP (run this check BEFORE any browse command)
 
@@ -640,7 +640,7 @@ If `NEEDS_SETUP`:
    fi
    ```
 
-**Check test framework (bootstrap if needed):**
+**테스트 프레임워크 확인 (필요시 부트스트랩):**
 
 ## Test Framework Bootstrap
 
@@ -796,7 +796,7 @@ Only commit if there are changes. Stage all bootstrap files (config, test direct
 
 ---
 
-**Find the gstack designer (optional — enables target mockup generation):**
+**gstack designer 찾기 (선택 사항 — 대상 mockup 생성을 활성화):**
 
 ## DESIGN SETUP (run this check BEFORE any design mockup command)
 
@@ -841,11 +841,11 @@ MUST be saved to `~/.gstack/projects/$SLUG/designs/`, NEVER to `.context/`,
 `docs/designs/`, `/tmp/`, or any project-local directory. Design artifacts are USER
 data, not project files. They persist across branches, conversations, and workspaces.
 
-If `DESIGN_READY`: during the fix loop, you can generate "target mockups" showing what a finding should look like after fixing. This makes the gap between current and intended design visceral, not abstract.
+`DESIGN_READY`인 경우: 수정 루프 중에 항목이 수정된 후 어떤 모습이어야 하는지 보여주는 "대상 mockup"을 생성할 수 있습니다. 이렇게 하면 현재 디자인과 의도한 디자인 사이의 간극이 추상적이지 않고 직관적으로 드러납니다.
 
-If `DESIGN_NOT_AVAILABLE`: skip mockup generation — the fix loop works without it.
+`DESIGN_NOT_AVAILABLE`인 경우: mockup 생성을 건너뛰세요 — 수정 루프는 이것 없이도 작동합니다.
 
-**Create output directories:**
+**출력 디렉토리 생성:**
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
@@ -894,7 +894,7 @@ matches a past learning, display:
 This makes the compounding visible. The user should see that gstack is getting
 smarter on their codebase over time.
 
-## Phases 1-6: Design Audit Baseline
+## 페이즈 1-6: 디자인 감사 베이스라인
 
 ## Modes
 
@@ -1296,26 +1296,26 @@ Tie everything to user goals and product objectives. Always suggest specific imp
 
 Source: [OpenAI "Designing Delightful Frontends with GPT-5.4"](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4) (Mar 2026) + gstack design methodology.
 
-Record baseline design score and AI slop score at end of Phase 6.
+페이즈 6 종료 시 베이스라인 디자인 점수와 AI 저급 결과물(AI slop) 점수를 기록하세요.
 
 ---
 
-## Output Structure
+## 출력 구조
 
 ```
 ~/.gstack/projects/$SLUG/designs/design-audit-{YYYYMMDD}/
-├── design-audit-{domain}.md                  # Structured report
+├── design-audit-{domain}.md                  # 구조화된 보고서
 ├── screenshots/
-│   ├── first-impression.png                  # Phase 1
-│   ├── {page}-annotated.png                  # Per-page annotated
-│   ├── {page}-mobile.png                     # Responsive
+│   ├── first-impression.png                  # 페이즈 1
+│   ├── {page}-annotated.png                  # 페이지별 주석 포함
+│   ├── {page}-mobile.png                     # 반응형
 │   ├── {page}-tablet.png
 │   ├── {page}-desktop.png
-│   ├── finding-001-before.png                # Before fix
-│   ├── finding-001-target.png                # Target mockup (if generated)
-│   ├── finding-001-after.png                 # After fix
+│   ├── finding-001-before.png                # 수정 전
+│   ├── finding-001-target.png                # 대상 mockup (생성된 경우)
+│   ├── finding-001-after.png                 # 수정 후
 │   └── ...
-└── design-baseline.json                      # For regression mode
+└── design-baseline.json                      # 회귀 모드용
 ```
 
 ---
@@ -1402,66 +1402,66 @@ Merge findings into the triage with `[codex]` / `[subagent]` / `[cross-model]` t
 ```
 Replace STATUS with "clean" or "issues_found", SOURCE with "codex+subagent", "codex-only", "subagent-only", or "unavailable".
 
-## Phase 7: Triage
+## 페이즈 7: 우선순위 분류
 
-Sort all discovered findings by impact, then decide which to fix:
+발견된 모든 항목을 영향도순으로 정렬한 후 수정할 항목을 결정하세요:
 
-- **High Impact:** Fix first. These affect the first impression and hurt user trust.
-- **Medium Impact:** Fix next. These reduce polish and are felt subconsciously.
-- **Polish:** Fix if time allows. These separate good from great.
+- **높은 영향도:** 먼저 수정합니다. 첫인상에 영향을 미치고 사용자 신뢰를 손상시킵니다.
+- **중간 영향도:** 다음에 수정합니다. 완성도를 떨어뜨리며 무의식적으로 느껴집니다.
+- **폴리시:** 시간이 허락하면 수정합니다. 좋은 것과 훌륭한 것의 차이를 만듭니다.
 
-Mark findings that cannot be fixed from source code (e.g., third-party widget issues, content problems requiring copy from the team) as "deferred" regardless of impact.
+소스 코드에서 수정할 수 없는 항목(예: 서드파티 위젯 이슈, 팀의 카피가 필요한 콘텐츠 문제)은 영향도에 관계없이 "보류"로 표시하세요.
 
 ---
 
-## Phase 8: Fix Loop
+## 페이즈 8: 수정 루프
 
-For each fixable finding, in impact order:
+수정 가능한 각 항목에 대해 영향도 순으로:
 
-### 8a. Locate source
+### 8a. 소스 찾기
 
 ```bash
-# Search for CSS classes, component names, style files
-# Glob for file patterns matching the affected page
+# CSS 클래스, 컴포넌트 이름, 스타일 파일 검색
+# 영향받는 페이지와 일치하는 파일 패턴 Glob
 ```
 
-- Find the source file(s) responsible for the design issue
-- ONLY modify files directly related to the finding
-- Prefer CSS/styling changes over structural component changes
+- 디자인 이슈를 담당하는 소스 파일을 찾으세요
+- 해당 항목과 직접 관련된 파일만 수정하세요
+- 구조적 컴포넌트 변경보다 CSS/스타일링 변경을 선호하세요
 
-### 8a.5. Target Mockup (if DESIGN_READY)
+### 8a.5. 대상 Mockup (`DESIGN_READY`인 경우)
 
-If the gstack designer is available and the finding involves visual layout, hierarchy, or spacing (not just a CSS value fix like wrong color or font-size), generate a target mockup showing what the corrected version should look like:
+gstack designer를 사용할 수 있고 해당 항목이 시각적 레이아웃, 계층, 간격과 관련되어 있다면 (잘못된 색상이나 font-size 같은 CSS 값 수정만이 아니라), 수정된 버전이 어떤 모습이어야 하는지 보여주는 대상 mockup을 생성하세요:
 
 ```bash
 $D generate --brief "<description of the page/component with the finding fixed, referencing DESIGN.md constraints>" --output "$REPORT_DIR/screenshots/finding-NNN-target.png"
 ```
 
-Show the user: "Here's the current state (screenshot) and here's what it should look like (mockup). Now I'll fix the source to match."
+사용자에게 보여주세요: "현재 상태(스크린샷)와 이렇게 보여야 하는 상태(mockup)입니다. 이제 소스를 수정해 이에 맞추겠습니다."
 
-This step is optional — skip for trivial CSS fixes (wrong hex color, missing padding value). Use it for findings where the intended design isn't obvious from the description alone.
+이 단계는 선택 사항입니다 — 사소한 CSS 수정(잘못된 hex 색상, 누락된 padding 값)은 건너뛰세요. 설명만으로 의도한 디자인이 명확하지 않은 항목에 사용하세요.
 
-### 8b. Fix
+### 8b. 수정
 
-- Read the source code, understand the context
-- Make the **minimal fix** — smallest change that resolves the design issue
-- If a target mockup was generated in 8a.5, use it as the visual reference for the fix
-- CSS-only changes are preferred (safer, more reversible)
-- Do NOT refactor surrounding code, add features, or "improve" unrelated things
+- 소스 코드를 읽고 컨텍스트를 파악하세요
+- **최소한의 수정**을 적용하세요 — 디자인 이슈를 해결하는 가장 작은 변경
+- 8a.5에서 대상 mockup이 생성된 경우, 이를 수정을 위한 시각적 참조로 사용하세요
+- CSS만의 변경이 선호됩니다 (더 안전하고, 되돌리기 쉬움)
+- 주변 코드를 리팩토링하거나, 기능을 추가하거나, 관련 없는 것을 "개선"하지 마세요
 
-### 8c. Commit
+### 8c. 커밋
 
 ```bash
 git add <only-changed-files>
 git commit -m "style(design): FINDING-NNN — short description"
 ```
 
-- One commit per fix. Never bundle multiple fixes.
-- Message format: `style(design): FINDING-NNN — short description`
+- 수정 하나당 커밋 하나. 여러 수정을 하나로 묶지 마세요.
+- 메시지 형식: `style(design): FINDING-NNN — short description`
 
-### 8d. Re-test
+### 8d. 재테스트
 
-Navigate back to the affected page and verify the fix:
+영향받는 페이지로 다시 이동하여 수정을 검증하세요:
 
 ```bash
 $B goto <affected-url>
@@ -1470,29 +1470,25 @@ $B console --errors
 $B snapshot -D
 ```
 
-Take **before/after screenshot pair** for every fix.
+모든 수정에 대해 **수정 전/후 스크린샷 쌍**을 촬영하세요.
 
-### 8e. Classify
+### 8e. 분류
 
-- **verified**: re-test confirms the fix works, no new errors introduced
-- **best-effort**: fix applied but couldn't fully verify (e.g., needs specific browser state)
-- **reverted**: regression detected → `git revert HEAD` → mark finding as "deferred"
+- **검증됨(verified)**: 재테스트에서 수정이 작동함을 확인, 새로운 오류 없음
+- **최선 노력(best-effort)**: 수정 적용했으나 완전 검증 불가 (예: 특정 브라우저 상태 필요)
+- **되돌림(reverted)**: 회귀 감지 → `git revert HEAD` → 해당 항목을 "보류"로 표시
 
-### 8e.5. Regression Test (design-review variant)
+### 8e.5. 회귀 테스트 (design-review 변형)
 
-Design fixes are typically CSS-only. Only generate regression tests for fixes involving
-JavaScript behavior changes — broken dropdowns, animation failures, conditional rendering,
-interactive state issues.
+디자인 수정은 일반적으로 CSS만 해당됩니다. JavaScript 동작 변경이 포함된 수정에 대해서만 회귀 테스트를 생성하세요 — 깨진 드롭다운, 애니메이션 실패, 조건부 렌더링, 인터랙티브 상태 이슈.
 
-For CSS-only fixes: skip entirely. CSS regressions are caught by re-running /design-review.
+CSS만의 수정: 완전히 건너뛰세요. CSS 회귀는 /design-review를 다시 실행하여 발견됩니다.
 
-If the fix involved JS behavior: follow the same procedure as /qa Phase 8e.5 (study existing
-test patterns, write a regression test encoding the exact bug condition, run it, commit if
-passes or defer if fails). Commit format: `test(design): regression test for FINDING-NNN`.
+JS 동작이 포함된 수정의 경우: /qa 페이즈 8e.5와 동일한 절차를 따르세요 (기존 테스트 패턴 연구, 정확한 버그 조건을 인코딩하는 회귀 테스트 작성, 실행, 통과하면 커밋 또는 실패하면 보류). 커밋 형식: `test(design): regression test for FINDING-NNN`.
 
-### 8f. Self-Regulation (STOP AND EVALUATE)
+### 8f. 자기 조절 (멈추고 평가)
 
-Every 5 fixes (or after any revert), compute the design-fix risk level:
+5번의 수정마다 (또는 되돌림 후), 디자인 수정 위험 수준을 계산하세요:
 
 ```
 DESIGN-FIX RISK:
@@ -1504,59 +1500,59 @@ DESIGN-FIX RISK:
   Touching unrelated files:           +20%
 ```
 
-**If risk > 20%:** STOP immediately. Show the user what you've done so far. Ask whether to continue.
+**위험도 > 20%인 경우:** 즉시 중단하세요. 지금까지의 작업을 사용자에게 보여주세요. 계속할지 여부를 물으세요.
 
-**Hard cap: 30 fixes.** After 30 fixes, stop regardless of remaining findings.
-
----
-
-## Phase 9: Final Design Audit
-
-After all fixes are applied:
-
-1. Re-run the design audit on all affected pages
-2. If target mockups were generated during the fix loop AND `DESIGN_READY`: run `$D verify --mockup "$REPORT_DIR/screenshots/finding-NNN-target.png" --screenshot "$REPORT_DIR/screenshots/finding-NNN-after.png"` to compare the fix result against the target. Include pass/fail in the report.
-3. Compute final design score and AI slop score
-4. **If final scores are WORSE than baseline:** WARN prominently — something regressed
+**하드캡: 30개 수정.** 30개 수정 후에는 남은 항목에 관계없이 중단하세요.
 
 ---
 
-## Phase 10: Report
+## 페이즈 9: 최종 디자인 감사
 
-Write the report to `$REPORT_DIR` (already set up in the setup phase):
+모든 수정이 적용된 후:
+
+1. 영향받은 모든 페이지에 대해 디자인 감사를 재실행하세요
+2. 수정 루프 중 대상 mockup이 생성되었고 `DESIGN_READY`인 경우: `$D verify --mockup "$REPORT_DIR/screenshots/finding-NNN-target.png" --screenshot "$REPORT_DIR/screenshots/finding-NNN-after.png"`를 실행하여 수정 결과를 대상과 비교하세요. 통과/실패를 보고서에 포함하세요.
+3. 최종 디자인 점수와 AI 저급 결과물(AI slop) 점수를 계산하세요
+4. **최종 점수가 베이스라인보다 나빠진 경우:** 눈에 띄게 경고하세요 — 무언가 회귀되었습니다
+
+---
+
+## 페이즈 10: 보고서
+
+보고서를 `$REPORT_DIR`에 작성하세요 (셋업 페이즈에서 이미 설정됨):
 
 **Primary:** `$REPORT_DIR/design-audit-{domain}.md`
 
-**Also write a summary to the project index:**
+**프로젝트 인덱스에도 요약 작성:**
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 ```
-Write a one-line summary to `~/.gstack/projects/{slug}/{user}-{branch}-design-audit-{datetime}.md` with a pointer to the full report in `$REPORT_DIR`.
+`~/.gstack/projects/{slug}/{user}-{branch}-design-audit-{datetime}.md`에 `$REPORT_DIR`의 전체 보고서를 가리키는 포인터와 함께 한 줄 요약을 작성하세요.
 
-**Per-finding additions** (beyond standard design audit report):
-- Fix Status: verified / best-effort / reverted / deferred
-- Commit SHA (if fixed)
-- Files Changed (if fixed)
-- Before/After screenshots (if fixed)
+**항목별 추가 사항** (표준 디자인 감사 보고서 외):
+- 수정 상태: verified / best-effort / reverted / deferred
+- 커밋 SHA (수정된 경우)
+- 변경된 파일 (수정된 경우)
+- 수정 전/후 스크린샷 (수정된 경우)
 
-**Summary section:**
-- Total findings
-- Fixes applied (verified: X, best-effort: Y, reverted: Z)
-- Deferred findings
-- Design score delta: baseline → final
-- AI slop score delta: baseline → final
+**요약 섹션:**
+- 총 발견 항목 수
+- 적용된 수정 (verified: X, best-effort: Y, reverted: Z)
+- 보류된 항목
+- 디자인 점수 변화: 베이스라인 → 최종
+- AI 저급 결과물(AI slop) 점수 변화: 베이스라인 → 최종
 
-**PR Summary:** Include a one-line summary suitable for PR descriptions:
-> "Design review found N issues, fixed M. Design score X → Y, AI slop score X → Y."
+**PR 요약:** PR 설명에 적합한 한 줄 요약을 포함하세요:
+> "디자인 리뷰에서 N개 이슈 발견, M개 수정. 디자인 점수 X → Y, AI slop 점수 X → Y."
 
 ---
 
-## Phase 11: TODOS.md Update
+## 페이즈 11: TODOS.md 업데이트
 
-If the repo has a `TODOS.md`:
+저장소에 `TODOS.md`가 있는 경우:
 
-1. **New deferred design findings** → add as TODOs with impact level, category, and description
-2. **Fixed findings that were in TODOS.md** → annotate with "Fixed by /design-review on {branch}, {date}"
+1. **새로운 보류 디자인 항목** → 영향 수준, 카테고리, 설명과 함께 TODO로 추가
+2. **TODOS.md에 있던 수정된 항목** → "{branch}에서 {date}에 /design-review로 수정됨"으로 주석 처리
 
 ---
 
@@ -1585,12 +1581,12 @@ staleness detection: if those files are later deleted, the learning can be flagg
 **Only log genuine discoveries.** Don't log obvious things. Don't log things the user
 already knows. A good test: would this insight save time in a future session? If yes, log it.
 
-## Additional Rules (design-review specific)
+## 추가 규칙 (design-review 전용)
 
-11. **Clean working tree required.** If dirty, use AskUserQuestion to offer commit/stash/abort before proceeding.
-12. **One commit per fix.** Never bundle multiple design fixes into one commit.
-13. **Only modify tests when generating regression tests in Phase 8e.5.** Never modify CI configuration. Never modify existing tests — only create new test files.
-14. **Revert on regression.** If a fix makes things worse, `git revert HEAD` immediately.
-15. **Self-regulate.** Follow the design-fix risk heuristic. When in doubt, stop and ask.
-16. **CSS-first.** Prefer CSS/styling changes over structural component changes. CSS-only changes are safer and more reversible.
-17. **DESIGN.md export.** You MAY write a DESIGN.md file if the user accepts the offer from Phase 2.
+11. **클린 워킹 트리 필수.** dirty한 경우, 진행 전 AskUserQuestion으로 커밋/스태시/중단을 제안하세요.
+12. **수정 하나당 커밋 하나.** 여러 디자인 수정을 하나의 커밋으로 묶지 마세요.
+13. **페이즈 8e.5에서 회귀 테스트를 생성할 때만 테스트를 수정하세요.** CI 설정은 절대 수정하지 마세요. 기존 테스트는 수정하지 마세요 — 새 테스트 파일만 생성하세요.
+14. **회귀 시 되돌리기.** 수정이 상황을 악화시키면, 즉시 `git revert HEAD`를 실행하세요.
+15. **자기 조절.** 디자인 수정 위험 휴리스틱을 따르세요. 확신이 없으면 멈추고 물으세요.
+16. **CSS 우선.** 구조적 컴포넌트 변경보다 CSS/스타일링 변경을 선호하세요. CSS만의 변경이 더 안전하고 되돌리기 쉽습니다.
+17. **DESIGN.md 내보내기.** 페이즈 2에서 사용자가 제안을 수락하면 DESIGN.md 파일을 작성해도 됩니다.

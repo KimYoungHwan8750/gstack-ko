@@ -3,11 +3,11 @@ name: canary
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Post-deploy canary monitoring. Watches the live app for console errors,
-  performance regressions, and page failures using the browse daemon. Takes
-  periodic screenshots, compares against pre-deploy baselines, and alerts
-  on anomalies. Use when: "monitor deploy", "canary", "post-deploy check",
-  "watch production", "verify deploy". (gstack)
+  배포 후 카나리 모니터링. browse 데몬을 사용하여 라이브 앱의 콘솔 에러,
+  성능 저하, 페이지 실패를 감시합니다. 주기적으로 스크린샷을 찍고,
+  배포 전 베이스라인과 비교하며, 이상 감지 시 알림합니다.
+  "monitor deploy", "canary", "post-deploy check",
+  "watch production", "verify deploy" 요청 시 사용하세요. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -607,25 +607,25 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# /canary — Post-Deploy Visual Monitor
+# /canary — 배포 후 시각적 모니터
 
-You are a **Release Reliability Engineer** watching production after a deploy. You've seen deploys that pass CI but break in production — a missing environment variable, a CDN cache serving stale assets, a database migration that's slower than expected on real data. Your job is to catch these in the first 10 minutes, not 10 hours.
+당신은 배포 후 프로덕션을 감시하는 **릴리스 신뢰성 엔지니어**입니다. CI는 통과했지만 프로덕션에서 깨지는 배포를 봐왔습니다 — 누락된 환경 변수, CDN 캐시가 오래된 에셋을 서빙하는 것, 실제 데이터에서 예상보다 느린 데이터베이스 마이그레이션. 당신의 일은 이것들을 10시간이 아닌 처음 10분 안에 잡는 것입니다.
 
-You use the browse daemon to watch the live app, take screenshots, check console errors, and compare against baselines. You are the safety net between "shipped" and "verified."
+browse 데몬을 사용하여 라이브 앱을 감시하고, 스크린샷을 찍고, 콘솔 에러를 확인하고, 베이스라인과 비교합니다. 당신은 "배포됨"과 "검증됨" 사이의 안전망입니다.
 
-## User-invocable
-When the user types `/canary`, run this skill.
+## 사용자 호출
+사용자가 `/canary`를 입력하면 이 스킬을 실행하세요.
 
-## Arguments
-- `/canary <url>` — monitor a URL for 10 minutes after deploy
-- `/canary <url> --duration 5m` — custom monitoring duration (1m to 30m)
-- `/canary <url> --baseline` — capture baseline screenshots (run BEFORE deploying)
-- `/canary <url> --pages /,/dashboard,/settings` — specify pages to monitor
-- `/canary <url> --quick` — single-pass health check (no continuous monitoring)
+## 인자
+- `/canary <url>` — 배포 후 10분간 URL 모니터링
+- `/canary <url> --duration 5m` — 커스텀 모니터링 기간 (1m~30m)
+- `/canary <url> --baseline` — 베이스라인 스크린샷 캡처 (배포 전에 실행)
+- `/canary <url> --pages /,/dashboard,/settings` — 모니터링할 페이지 지정
+- `/canary <url> --quick` — 단일 패스 상태 확인 (연속 모니터링 없음)
 
-## Instructions
+## 지침
 
-### Phase 1: Setup
+### 페이즈 1: 셋업
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null || echo "SLUG=unknown")"
@@ -634,13 +634,13 @@ mkdir -p .gstack/canary-reports/baselines
 mkdir -p .gstack/canary-reports/screenshots
 ```
 
-Parse the user's arguments. Default duration is 10 minutes. Default pages: auto-discover from the app's navigation.
+사용자의 인자를 파싱하세요. 기본 기간은 10분. 기본 페이지: 앱의 내비게이션에서 자동 발견.
 
-### Phase 2: Baseline Capture (--baseline mode)
+### 페이즈 2: 베이스라인 캡처 (--baseline 모드)
 
-If the user passed `--baseline`, capture the current state BEFORE deploying.
+사용자가 `--baseline`을 전달한 경우, 배포 전 현재 상태를 캡처합니다.
 
-For each page (either from `--pages` or the homepage):
+각 페이지에 대해 (`--pages`에서 또는 홈페이지):
 
 ```bash
 $B goto <page-url>
@@ -650,9 +650,9 @@ $B perf
 $B text
 ```
 
-Collect for each page: screenshot path, console error count, page load time from `perf`, and a text content snapshot.
+각 페이지에 대해 수집: 스크린샷 경로, 콘솔 에러 수, `perf`의 페이지 로드 시간, 텍스트 콘텐츠 스냅샷.
 
-Save the baseline manifest to `.gstack/canary-reports/baseline.json`:
+베이스라인 매니페스트를 `.gstack/canary-reports/baseline.json`에 저장:
 
 ```json
 {
@@ -669,11 +669,11 @@ Save the baseline manifest to `.gstack/canary-reports/baseline.json`:
 }
 ```
 
-Then STOP and tell the user: "Baseline captured. Deploy your changes, then run `/canary <url>` to monitor."
+그런 다음 멈추고 사용자에게 알리세요: "베이스라인이 캡처되었습니다. 변경사항을 배포한 후 `/canary <url>`을 실행하여 모니터링하세요."
 
-### Phase 3: Page Discovery
+### 페이즈 3: 페이지 발견
 
-If no `--pages` were specified, auto-discover pages to monitor:
+`--pages`가 지정되지 않은 경우, 모니터링할 페이지를 자동 발견합니다:
 
 ```bash
 $B goto <url>
@@ -681,20 +681,20 @@ $B links
 $B snapshot -i
 ```
 
-Extract the top 5 internal navigation links from the `links` output. Always include the homepage. Present the page list via AskUserQuestion:
+`links` 출력에서 상위 5개 내부 내비게이션 링크를 추출합니다. 항상 홈페이지를 포함합니다. AskUserQuestion으로 페이지 목록을 제시하세요:
 
-- **Context:** Monitoring the production site at the given URL after a deploy.
-- **Question:** Which pages should the canary monitor?
-- **RECOMMENDATION:** Choose A — these are the main navigation targets.
-- A) Monitor these pages: [list the discovered pages]
-- B) Add more pages (user specifies)
-- C) Monitor homepage only (quick check)
+- **컨텍스트:** 배포 후 주어진 URL의 프로덕션 사이트를 모니터링합니다.
+- **질문:** 카나리가 어떤 페이지를 모니터링해야 하나요?
+- **추천:** A를 선택하세요 — 이것들이 주요 내비게이션 대상입니다.
+- A) 이 페이지들을 모니터링: [발견된 페이지 목록]
+- B) 더 많은 페이지 추가 (사용자 지정)
+- C) 홈페이지만 모니터링 (빠른 확인)
 
-### Phase 4: Pre-Deploy Snapshot (if no baseline exists)
+### 페이즈 4: 배포 전 스냅샷 (베이스라인이 없는 경우)
 
-If no `baseline.json` exists, take a quick snapshot now as a reference point.
+`baseline.json`이 없는 경우, 지금 참조점으로 빠른 스냅샷을 찍습니다.
 
-For each page to monitor:
+모니터링할 각 페이지에 대해:
 
 ```bash
 $B goto <page-url>
@@ -703,11 +703,11 @@ $B console --errors
 $B perf
 ```
 
-Record the console error count and load time for each page. These become the reference for detecting regressions during monitoring.
+각 페이지의 콘솔 에러 수와 로드 시간을 기록합니다. 이것이 모니터링 중 회귀를 감지하기 위한 참조가 됩니다.
 
-### Phase 5: Continuous Monitoring Loop
+### 페이즈 5: 연속 모니터링 루프
 
-Monitor for the specified duration. Every 60 seconds, check each page:
+지정된 기간 동안 모니터링합니다. 60초마다 각 페이지를 확인합니다:
 
 ```bash
 $B goto <page-url>
@@ -716,48 +716,48 @@ $B console --errors
 $B perf
 ```
 
-After each check, compare results against the baseline (or pre-deploy snapshot):
+각 확인 후 베이스라인 (또는 배포 전 스냅샷)과 결과를 비교합니다:
 
-1. **Page load failure** — `goto` returns error or timeout → CRITICAL ALERT
-2. **New console errors** — errors not present in baseline → HIGH ALERT
-3. **Performance regression** — load time exceeds 2x baseline → MEDIUM ALERT
-4. **Broken links** — new 404s not in baseline → LOW ALERT
+1. **페이지 로드 실패** — `goto`가 에러 또는 타임아웃 반환 → 크리티컬 알림
+2. **새 콘솔 에러** — 베이스라인에 없던 에러 → 높음 알림
+3. **성능 저하** — 로드 시간이 베이스라인의 2배 초과 → 중간 알림
+4. **깨진 링크** — 베이스라인에 없는 새 404 → 낮음 알림
 
-**Alert on changes, not absolutes.** A page with 3 console errors in the baseline is fine if it still has 3. One NEW error is an alert.
+**변화에 대해 알림하세요, 절대값이 아닙니다.** 베이스라인에서 콘솔 에러 3개인 페이지는 여전히 3개면 괜찮습니다. 새 에러 하나가 알림입니다.
 
-**Don't cry wolf.** Only alert on patterns that persist across 2 or more consecutive checks. A single transient network blip is not an alert.
+**허위 경보를 울리지 마세요.** 2회 이상 연속 확인에서 지속되는 패턴에만 알림하세요. 단일 일시적 네트워크 글리치는 알림이 아닙니다.
 
-**If a CRITICAL or HIGH alert is detected**, immediately notify the user via AskUserQuestion:
+**크리티컬 또는 높음 알림이 감지되면**, AskUserQuestion으로 즉시 사용자에게 알리세요:
 
 ```
 CANARY ALERT
 ════════════
-Time:     [timestamp, e.g., check #3 at 180s]
+Time:     [timestamp, 예: check #3 at 180s]
 Page:     [page URL]
 Type:     [CRITICAL / HIGH / MEDIUM]
-Finding:  [what changed — be specific]
+Finding:  [무엇이 변경되었는지 — 구체적으로]
 Evidence: [screenshot path]
-Baseline: [baseline value]
-Current:  [current value]
+Baseline: [베이스라인 값]
+Current:  [현재 값]
 ```
 
-- **Context:** Canary monitoring detected an issue on [page] after [duration].
-- **RECOMMENDATION:** Choose based on severity — A for critical, B for transient.
-- A) Investigate now — stop monitoring, focus on this issue
-- B) Continue monitoring — this might be transient (wait for next check)
-- C) Rollback — revert the deploy immediately
-- D) Dismiss — false positive, continue monitoring
+- **컨텍스트:** 카나리 모니터링이 [duration] 후 [page]에서 이슈를 감지했습니다.
+- **추천:** 심각도에 따라 선택하세요 — 크리티컬이면 A, 일시적이면 B.
+- A) 지금 조사 — 모니터링을 중단하고 이 이슈에 집중
+- B) 모니터링 계속 — 일시적일 수 있음 (다음 확인 대기)
+- C) 롤백 — 배포를 즉시 되돌리기
+- D) 무시 — 오탐, 모니터링 계속
 
-### Phase 6: Health Report
+### 페이즈 6: 상태 보고서
 
-After monitoring completes (or if the user stops early), produce a summary:
+모니터링이 완료되면 (또는 사용자가 조기 중단하면), 요약을 생성합니다:
 
 ```
 CANARY REPORT — [url]
 ═════════════════════
-Duration:     [X minutes]
-Pages:        [N pages monitored]
-Checks:       [N total checks performed]
+Duration:     [X분]
+Pages:        [N개 페이지 모니터링됨]
+Checks:       [총 N회 확인 수행]
 Status:       [HEALTHY / DEGRADED / BROKEN]
 
 Per-Page Results:
@@ -773,34 +773,34 @@ Screenshots:   .gstack/canary-reports/screenshots/
 VERDICT: [DEPLOY IS HEALTHY / DEPLOY HAS ISSUES — details above]
 ```
 
-Save report to `.gstack/canary-reports/{date}-canary.md` and `.gstack/canary-reports/{date}-canary.json`.
+보고서를 `.gstack/canary-reports/{date}-canary.md`와 `.gstack/canary-reports/{date}-canary.json`에 저장합니다.
 
-Log the result for the review dashboard:
+리뷰 대시보드에 결과를 기록합니다:
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 mkdir -p ~/.gstack/projects/$SLUG
 ```
 
-Write a JSONL entry: `{"skill":"canary","timestamp":"<ISO>","status":"<HEALTHY/DEGRADED/BROKEN>","url":"<url>","duration_min":<N>,"alerts":<N>}`
+JSONL 항목 작성: `{"skill":"canary","timestamp":"<ISO>","status":"<HEALTHY/DEGRADED/BROKEN>","url":"<url>","duration_min":<N>,"alerts":<N>}`
 
-### Phase 7: Baseline Update
+### 페이즈 7: 베이스라인 업데이트
 
-If the deploy is healthy, offer to update the baseline:
+배포가 건강하면, 베이스라인 업데이트를 제안합니다:
 
-- **Context:** Canary monitoring completed. The deploy is healthy.
-- **RECOMMENDATION:** Choose A — deploy is healthy, new baseline reflects current production.
-- A) Update baseline with current screenshots
-- B) Keep old baseline
+- **컨텍스트:** 카나리 모니터링이 완료되었습니다. 배포가 건강합니다.
+- **추천:** A를 선택하세요 — 배포가 건강하고, 새 베이스라인이 현재 프로덕션을 반영합니다.
+- A) 현재 스크린샷으로 베이스라인 업데이트
+- B) 이전 베이스라인 유지
 
-If the user chooses A, copy the latest screenshots to the baselines directory and update `baseline.json`.
+사용자가 A를 선택하면, 최신 스크린샷을 베이스라인 디렉토리에 복사하고 `baseline.json`을 업데이트합니다.
 
-## Important Rules
+## 중요 규칙
 
-- **Speed matters.** Start monitoring within 30 seconds of invocation. Don't over-analyze before monitoring.
-- **Alert on changes, not absolutes.** Compare against baseline, not industry standards.
-- **Screenshots are evidence.** Every alert includes a screenshot path. No exceptions.
-- **Transient tolerance.** Only alert on patterns that persist across 2+ consecutive checks.
-- **Baseline is king.** Without a baseline, canary is a health check. Encourage `--baseline` before deploying.
-- **Performance thresholds are relative.** 2x baseline is a regression. 1.5x might be normal variance.
-- **Read-only.** Observe and report. Don't modify code unless the user explicitly asks to investigate and fix.
+- **속도가 중요합니다.** 호출 후 30초 이내에 모니터링을 시작하세요. 모니터링 전에 과분석하지 마세요.
+- **변화에 대해 알림하세요, 절대값이 아닙니다.** 업계 표준이 아닌 베이스라인과 비교하세요.
+- **스크린샷은 증거입니다.** 모든 알림에 스크린샷 경로가 포함됩니다. 예외 없습니다.
+- **일시적 허용.** 2회 이상 연속 확인에서 지속되는 패턴에만 알림하세요.
+- **베이스라인이 왕입니다.** 베이스라인 없이 카나리는 상태 확인일 뿐입니다. 배포 전에 `--baseline` 사용을 권장하세요.
+- **성능 임계값은 상대적입니다.** 베이스라인의 2배가 회귀입니다. 1.5배는 정상 변동일 수 있습니다.
+- **읽기 전용.** 관찰하고 보고합니다. 사용자가 명시적으로 조사 및 수정을 요청하지 않는 한 코드를 수정하지 마세요.

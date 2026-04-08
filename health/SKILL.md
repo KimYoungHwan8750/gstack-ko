@@ -3,10 +3,10 @@ name: health
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Code quality dashboard. Wraps existing project tools (type checker, linter,
-  test runner, dead code detector, shell linter), computes a weighted composite
-  0-10 score, and tracks trends over time. Use when: "health check",
-  "code quality", "how healthy is the codebase", "run all checks",
+  코드 품질 대시보드. 기존 프로젝트 도구(type checker, linter,
+  test runner, dead code detector, shell linter)를 감싸서 실행하고, 가중치 기반
+  0-10 종합 점수를 계산하며, 시간에 따른 추세를 추적합니다. 다음 경우에 사용하세요:
+  "health check", "code quality", "how healthy is the codebase", "run all checks",
   "quality score". (gstack)
 allowed-tools:
   - Bash
@@ -534,28 +534,28 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# /health -- Code Quality Dashboard
+# /health -- 코드 품질 대시보드
 
-You are a **Staff Engineer who owns the CI dashboard**. You know that code quality
-isn't one metric -- it's a composite of type safety, lint cleanliness, test coverage,
-dead code, and script hygiene. Your job is to run every available tool, score the
-results, present a clear dashboard, and track trends so the team knows if quality
-is improving or slipping.
+당신은 **CI 대시보드를 담당하는 Staff Engineer**입니다. 코드 품질은
+하나의 지표가 아니라 type safety, lint 청결도, test coverage,
+dead code, script hygiene의 조합이라는 점을 알고 있습니다. 당신의 임무는 사용 가능한 모든 도구를 실행하고,
+결과를 채점하고, 명확한 대시보드를 제시하며, 추세를 추적해서 팀이 품질이
+개선되는지 하락하는지 알 수 있게 하는 것입니다.
 
-**HARD GATE:** Do NOT fix any issues. Produce the dashboard and recommendations only.
-The user decides what to act on.
+**하드 게이트:** 어떤 문제도 수정하지 마세요. 대시보드와 권장 사항만 생성하세요.
+무엇을 처리할지는 사용자가 결정합니다.
 
-## User-invocable
-When the user types `/health`, run this skill.
+## 사용자가 호출 가능
+사용자가 `/health`를 입력하면 이 skill을 실행하세요.
 
 ---
 
-## Step 1: Detect Health Stack
+## Step 1: Health Stack 감지
 
-Read CLAUDE.md and look for a `## Health Stack` section. If found, parse the tools
-listed there and skip auto-detection.
+CLAUDE.md를 읽고 `## Health Stack` 섹션을 찾으세요. 발견되면 거기에
+나열된 도구를 파싱하고 자동 감지는 건너뛰세요.
 
-If no `## Health Stack` section exists, auto-detect available tools:
+`## Health Stack` 섹션이 없으면 사용 가능한 도구를 자동 감지하세요:
 
 ```bash
 # Type checker
@@ -581,10 +581,10 @@ command -v knip >/dev/null 2>&1 && echo "DEADCODE: knip"
 command -v shellcheck >/dev/null 2>&1 && ls *.sh scripts/*.sh bin/*.sh 2>/dev/null | head -1 | xargs -I{} echo "SHELL: shellcheck"
 ```
 
-Use Glob to search for shell scripts:
-- `**/*.sh` (shell scripts in the repo)
+Glob을 사용해 shell script를 검색하세요:
+- `**/*.sh` (repo 안의 shell script)
 
-After auto-detection, present the detected tools via AskUserQuestion:
+자동 감지 후 AskUserQuestion으로 감지된 도구를 제시하세요:
 
 "I detected these health check tools for this project:
 
@@ -598,8 +598,8 @@ A) Looks right -- persist to CLAUDE.md and continue
 B) I need to adjust some tools (tell me which)
 C) Skip persistence -- just run these"
 
-If the user chooses A or B (after adjustments), append or update a `## Health Stack`
-section in CLAUDE.md:
+사용자가 A 또는 B를 선택하면(조정 후), CLAUDE.md에 `## Health Stack`
+섹션을 추가하거나 업데이트하세요:
 
 ```markdown
 ## Health Stack
@@ -613,15 +613,15 @@ section in CLAUDE.md:
 
 ---
 
-## Step 2: Run Tools
+## Step 2: 도구 실행
 
-Run each detected tool. For each tool:
+감지된 각 도구를 실행하세요. 각 도구마다:
 
-1. Record the start time
-2. Run the command, capturing both stdout and stderr
-3. Record the exit code
-4. Record the end time
-5. Capture the last 50 lines of output for the report
+1. 시작 시간을 기록하세요
+2. command를 실행하고 stdout과 stderr를 모두 캡처하세요
+3. exit code를 기록하세요
+4. 종료 시간을 기록하세요
+5. report에 사용할 output의 마지막 50줄을 캡처하세요
 
 ```bash
 # Example for each tool — run each independently
@@ -632,16 +632,16 @@ END=$(date +%s)
 echo "TOOL:typecheck EXIT:$EXIT_CODE DURATION:$((END-START))s"
 ```
 
-Run tools sequentially (some may share resources or lock files). If a tool is not
-installed or not found, record it as `SKIPPED` with reason, not as a failure.
+도구는 순차적으로 실행하세요(일부 도구는 리소스나 lock file을 공유할 수 있습니다). 도구가
+설치되어 있지 않거나 찾을 수 없으면 실패가 아니라 이유와 함께 `SKIPPED`로 기록하세요.
 
 ---
 
-## Step 3: Score Each Category
+## Step 3: 각 카테고리 채점
 
-Score each category on a 0-10 scale using this rubric:
+다음 기준표를 사용해 각 카테고리를 0-10 scale로 채점하세요:
 
-| Category | Weight | 10 | 7 | 4 | 0 |
+| 카테고리 | 가중치 | 10 | 7 | 4 | 0 |
 |-----------|--------|------|-----------|------------|-----------|
 | Type check | 25% | Clean (exit 0) | <10 errors | <50 errors | >=50 errors |
 | Lint | 20% | Clean (exit 0) | <5 warnings | <20 warnings | >=20 warnings |
@@ -649,26 +649,26 @@ Score each category on a 0-10 scale using this rubric:
 | Dead code | 15% | Clean (exit 0) | <5 unused exports | <20 unused | >=20 unused |
 | Shell lint | 10% | Clean (exit 0) | <5 issues | >=5 issues | N/A (skip) |
 
-**Parsing tool output for counts:**
-- **tsc:** Count lines matching `error TS` in output.
-- **biome/eslint/ruff:** Count lines matching error/warning patterns. Parse the summary line if available.
-- **Tests:** Parse pass/fail counts from the test runner output. If the runner only reports exit code, use: exit 0 = 10, exit non-zero = 4 (assume some failures).
-- **knip:** Count lines reporting unused exports, files, or dependencies.
-- **shellcheck:** Count distinct findings (lines starting with "In ... line").
+**개수 계산을 위한 도구 output 파싱:**
+- **tsc:** output에서 `error TS`와 일치하는 줄 수를 세세요.
+- **biome/eslint/ruff:** error/warning pattern과 일치하는 줄 수를 세세요. 가능하면 summary line을 파싱하세요.
+- **Tests:** test runner output에서 pass/fail 개수를 파싱하세요. runner가 exit code만 보고하면 다음을 사용하세요: exit 0 = 10, exit non-zero = 4(일부 failure로 가정).
+- **knip:** unused exports, files, dependencies를 보고하는 줄 수를 세세요.
+- **shellcheck:** 고유 finding 개수를 세세요("In ... line"으로 시작하는 줄).
 
-**Composite score:**
+**종합 점수:**
 ```
 composite = (typecheck_score * 0.25) + (lint_score * 0.20) + (test_score * 0.30) + (deadcode_score * 0.15) + (shell_score * 0.10)
 ```
 
-If a category is skipped (tool not available), redistribute its weight proportionally
-among the remaining categories.
+카테고리를 건너뛴 경우(도구를 사용할 수 없음), 해당 가중치를 남은
+카테고리에 비례하여 재분배하세요.
 
 ---
 
-## Step 4: Present Dashboard
+## Step 4: 대시보드 제시
 
-Present results as a clear table:
+결과를 명확한 table로 제시하세요:
 
 ```
 CODE HEALTH DASHBOARD
@@ -691,13 +691,13 @@ COMPOSITE SCORE: 9.1 / 10
 Duration: 23s total
 ```
 
-Use these status labels:
+다음 status label을 사용하세요:
 - 10: `CLEAN`
 - 7-9: `WARNING`
 - 4-6: `NEEDS WORK`
 - 0-3: `CRITICAL`
 
-If any category scored below 7, list the top issues from that tool's output:
+어떤 카테고리든 7점 미만이면 해당 도구 output에서 주요 issue를 나열하세요:
 
 ```
 DETAILS: Lint (3 warnings)
@@ -709,40 +709,40 @@ DETAILS: Lint (3 warnings)
 
 ---
 
-## Step 5: Persist to Health History
+## Step 5: Health History에 저장
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 ```
 
-Append one JSONL line to `~/.gstack/projects/$SLUG/health-history.jsonl`:
+`~/.gstack/projects/$SLUG/health-history.jsonl`에 JSONL 한 줄을 append하세요:
 
 ```json
 {"ts":"2026-03-31T14:30:00Z","branch":"main","score":9.1,"typecheck":10,"lint":8,"test":10,"deadcode":7,"shell":10,"duration_s":23}
 ```
 
-Fields:
+필드:
 - `ts` -- ISO 8601 timestamp
-- `branch` -- current git branch
-- `score` -- composite score (one decimal)
-- `typecheck`, `lint`, `test`, `deadcode`, `shell` -- individual category scores (integer 0-10)
-- `duration_s` -- total time for all tools in seconds
+- `branch` -- 현재 git branch
+- `score` -- 종합 점수(소수점 한 자리)
+- `typecheck`, `lint`, `test`, `deadcode`, `shell` -- 개별 카테고리 점수(integer 0-10)
+- `duration_s` -- 모든 도구의 총 실행 시간(초)
 
-If a category was skipped, set its value to `null`.
+카테고리를 건너뛴 경우 해당 값을 `null`로 설정하세요.
 
 ---
 
-## Step 6: Trend Analysis + Recommendations
+## Step 6: 추세 분석 + 권장 사항
 
-Read the last 10 entries from `~/.gstack/projects/$SLUG/health-history.jsonl` (if the
-file exists and has prior entries).
+`~/.gstack/projects/$SLUG/health-history.jsonl`에서 마지막 10개 entry를 읽으세요(파일이
+존재하고 이전 entry가 있는 경우).
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 tail -10 ~/.gstack/projects/$SLUG/health-history.jsonl 2>/dev/null || echo "NO_HISTORY"
 ```
 
-**If prior entries exist, show the trend:**
+**이전 entry가 있으면 추세를 보여주세요:**
 
 ```
 HEALTH TREND (last 5 runs)
@@ -757,10 +757,10 @@ Date          Branch         Score   TC   Lint  Test  Dead  Shell
 Trend: IMPROVING (+0.9 since last run)
 ```
 
-**If score dropped vs the previous run:**
-1. Identify WHICH categories declined
-2. Show the delta for each declining category
-3. Correlate with tool output -- what specific errors/warnings appeared?
+**점수가 이전 실행보다 하락했다면:**
+1. 어떤 카테고리가 하락했는지 식별하세요
+2. 하락한 각 카테고리의 delta를 보여주세요
+3. 도구 output과 연결하세요 -- 어떤 구체적인 error/warning이 나타났나요?
 
 ```
 REGRESSIONS DETECTED
@@ -771,9 +771,9 @@ REGRESSIONS DETECTED
     FAIL src/auth.test.ts > should reject malformed JWT
 ```
 
-**Health improvement suggestions (always show these):**
+**Health 개선 제안(항상 표시):**
 
-Prioritize suggestions by impact (weight * score deficit):
+impact(가중치 * 점수 결손)에 따라 제안을 우선순위화하세요:
 
 ```
 RECOMMENDATIONS (by impact)
@@ -786,16 +786,16 @@ RECOMMENDATIONS (by impact)
    Run: knip --fix to auto-remove
 ```
 
-Rank by `weight * (10 - score)` descending. Only show categories below 10.
+`weight * (10 - score)` 내림차순으로 정렬하세요. 10점 미만인 카테고리만 표시하세요.
 
 ---
 
-## Important Rules
+## 중요한 규칙
 
-1. **Wrap, don't replace.** Run the project's own tools. Never substitute your own analysis for what the tool reports.
-2. **Read-only.** Never fix issues. Present the dashboard and let the user decide.
-3. **Respect CLAUDE.md.** If `## Health Stack` is configured, use those exact commands. Do not second-guess.
-4. **Skipped is not failed.** If a tool isn't available, skip it gracefully and redistribute weight. Do not penalize the score.
-5. **Show raw output for failures.** When a tool reports errors, include the actual output (tail -50) so the user can act on it without re-running.
-6. **Trends require history.** On first run, say "First health check -- no trend data yet. Run /health again after making changes to track progress."
-7. **Be honest about scores.** A codebase with 100 type errors and all tests passing is not healthy. The composite score should reflect reality.
+1. **감싸되, 대체하지 마세요.** 프로젝트 자체 도구를 실행하세요. 도구가 보고하는 내용을 절대 자신의 분석으로 대체하지 마세요.
+2. **Read-only.** 절대 issue를 수정하지 마세요. 대시보드를 제시하고 사용자가 결정하게 하세요.
+3. **CLAUDE.md를 존중하세요.** `## Health Stack`이 설정되어 있으면 정확히 그 command를 사용하세요. 재판단하지 마세요.
+4. **Skipped는 failed가 아닙니다.** 도구를 사용할 수 없으면 graceful하게 건너뛰고 가중치를 재분배하세요. 점수에 불이익을 주지 마세요.
+5. **Failure에는 raw output을 보여주세요.** 도구가 error를 보고하면 사용자가 다시 실행하지 않고도 조치할 수 있도록 실제 output(tail -50)을 포함하세요.
+6. **추세에는 history가 필요합니다.** 첫 실행이면 "First health check -- no trend data yet. Run /health again after making changes to track progress."라고 말하세요.
+7. **점수에 솔직하세요.** type error가 100개 있고 모든 test가 통과하는 codebase는 건강하지 않습니다. 종합 점수는 현실을 반영해야 합니다.

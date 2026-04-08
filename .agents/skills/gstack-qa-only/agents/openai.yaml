@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-qa-only"
-  short_description: ""
+  short_description: "리포트 전용 QA 테스트. 웹 애플리케이션을 체계적으로 테스트하고 건강 점수, 스크린샷, 재현 단계가 포함된 구조화된 리포트를 생성합니다 — 아무것도 수정하지 않습니다. \"버그만 보고해줘\", \"qa..."
   default_prompt: "Use gstack-qa-only for this task."
 policy:
   allow_implicit_invocation: true

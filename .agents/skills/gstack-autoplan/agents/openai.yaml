@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-autoplan"
-  short_description: ""
+  short_description: "자동 리뷰 파이프라인 — CEO, 디자인, 엔지니어링, DX 리뷰 스킬 전체를 디스크에서 읽고 6가지 의사결정 원칙을 사용하여 자동 결정으로 순차 실행합니다. 감성적 결정(근접한 접근법, 경계선 범위,..."
   default_prompt: "Use gstack-autoplan for this task."
 policy:
   allow_implicit_invocation: true

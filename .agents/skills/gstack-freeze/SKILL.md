@@ -1,27 +1,10 @@
 ---
 name: freeze
-version: 0.1.0
 description: |
   세션 동안 파일 편집을 특정 디렉토리로 제한합니다. 허용된 경로 외부에서의 Edit 및
   Write를 차단합니다. 디버깅 시 관련 없는 코드를 실수로 "수정"하는 것을 방지하거나,
   변경 범위를 하나의 모듈로 한정하고 싶을 때 사용하세요. "freeze", "restrict edits",
-  "only edit this folder", "lock down edits" 요청 시 사용합니다.
-allowed-tools:
-  - Bash
-  - Read
-  - AskUserQuestion
-hooks:
-  PreToolUse:
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/check-freeze.sh"
-          statusMessage: "Checking freeze boundary..."
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/check-freeze.sh"
-          statusMessage: "Checking freeze boundary..."
+  "only edit this folder", "lock down edits" 요청 시 사용합니다. (gstack)
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->

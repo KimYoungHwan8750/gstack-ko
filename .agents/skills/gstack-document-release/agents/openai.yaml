@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-document-release"
-  short_description: ""
+  short_description: "배포 후 문서 업데이트. 모든 프로젝트 문서를 읽고, diff와 상호 참조하여, README/ARCHITECTURE/CONTRIBUTING/CLAUDE.md를 배포된 내용에 맞게 업데이트하고,..."
   default_prompt: "Use gstack-document-release for this task."
 policy:
   allow_implicit_invocation: true

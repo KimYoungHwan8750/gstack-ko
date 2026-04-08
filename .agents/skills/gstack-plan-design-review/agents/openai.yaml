@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-plan-design-review"
-  short_description: ""
+  short_description: "디자이너 관점의 플랜 리뷰 — CEO 및 Eng 리뷰처럼 인터랙티브. 각 디자인 차원을 0-10으로 평가하고, 10점이 되려면 무엇이 필요한지 설명한 후, 플랜을 수정하여 달성합니다. 플랜 모드에서..."
   default_prompt: "Use gstack-plan-design-review for this task."
 policy:
   allow_implicit_invocation: true

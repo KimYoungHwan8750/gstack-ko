@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-investigate"
-  short_description: ""
+  short_description: "근본 원인 조사를 통한 체계적 디버깅. 네 단계: 조사, 분석, 가설 수립, 구현. 철칙: 근본 원인 없이 수정하지 않는다. 다음 요청 시 사용: \"debug this\", \"fix this bug\", \"why..."
   default_prompt: "Use gstack-investigate for this task."
 policy:
   allow_implicit_invocation: true

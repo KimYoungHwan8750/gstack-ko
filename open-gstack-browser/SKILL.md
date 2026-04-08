@@ -2,11 +2,11 @@
 name: open-gstack-browser
 version: 0.2.0
 description: |
-  Launch GStack Browser — AI-controlled Chromium with the sidebar extension baked in.
-  Opens a visible browser window where you can watch every action in real time.
-  The sidebar shows a live activity feed and chat. Anti-bot stealth built in.
-  Use when asked to "open gstack browser", "launch browser", "connect chrome",
-  "open chrome", "real browser", "launch chrome", "side panel", or "control my browser".
+  GStack Browser를 실행합니다 — 사이드바 확장이 내장된 AI 제어 Chromium입니다.
+  모든 동작을 실시간으로 확인할 수 있는 보이는 브라우저 창을 엽니다.
+  사이드바는 라이브 활동 피드와 채팅을 표시합니다. Anti-bot stealth가 내장되어 있습니다.
+  "open gstack browser", "launch browser", "connect chrome",
+  "open chrome", "real browser", "launch chrome", "side panel", "control my browser" 요청 시 사용합니다.
   Voice triggers (speech-to-text aliases): "show me the browser".
 allowed-tools:
   - Bash
@@ -549,10 +549,10 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# /open-gstack-browser — Launch GStack Browser
+# /open-gstack-browser — GStack Browser 실행
 
-Launch GStack Browser — AI-controlled Chromium with the sidebar extension,
-anti-bot stealth, and custom branding. You see every action in real time.
+GStack Browser를 실행합니다 — 사이드바 확장, anti-bot stealth,
+커스텀 브랜딩이 포함된 AI 제어 Chromium입니다. 모든 동작을 실시간으로 확인할 수 있습니다.
 
 ## SETUP (run this check BEFORE any browse command)
 
@@ -590,11 +590,10 @@ If `NEEDS_SETUP`:
    fi
    ```
 
-## Step 0: Pre-flight cleanup
+## Step 0: 사전 정리
 
-Before connecting, kill any stale browse servers and clean up lock files that
-may have persisted from a crash. This prevents "already connected" false
-positives and Chromium profile lock conflicts.
+연결하기 전에, 이전 크래시에서 남은 오래된 browse 서버와 잠금 파일을 정리합니다.
+이를 통해 "이미 연결됨" 오탐지와 Chromium 프로필 잠금 충돌을 방지합니다.
 
 ```bash
 # Kill any existing browse server
@@ -613,44 +612,44 @@ done
 echo "Pre-flight cleanup done"
 ```
 
-## Step 1: Connect
+## Step 1: 연결
 
 ```bash
 $B connect
 ```
 
-This launches GStack Browser (rebranded Chromium) in headed mode with:
-- A visible window you can watch (not your regular Chrome — it stays untouched)
-- The gstack sidebar extension auto-loaded via `launchPersistentContext`
-- Anti-bot stealth patches (sites like Google and NYTimes work without captchas)
-- Custom user agent and GStack Browser branding in Dock/menu bar
-- A sidebar agent process for chat commands
+이 명령은 GStack Browser(리브랜딩된 Chromium)를 headed 모드로 실행합니다:
+- 확인할 수 있는 보이는 창 (일반 Chrome과 별개 — 일반 Chrome은 영향 없음)
+- `launchPersistentContext`를 통해 gstack 사이드바 확장이 자동 로드됨
+- Anti-bot stealth 패치 (Google, NYTimes 같은 사이트가 captcha 없이 작동)
+- 커스텀 user agent와 Dock/menu bar의 GStack Browser 브랜딩
+- 채팅 명령을 위한 사이드바 에이전트 프로세스
 
-The `connect` command auto-discovers the extension from the gstack install
-directory. It always uses port **34567** so the extension can auto-connect.
+`connect` 명령은 gstack 설치 디렉토리에서 확장을 자동 검색합니다.
+항상 포트 **34567**을 사용하여 확장이 자동 연결됩니다.
 
-After connecting, print the full output to the user. Confirm you see
-`Mode: headed` in the output.
+연결 후, 전체 출력을 사용자에게 표시합니다. 출력에서
+`Mode: headed`를 확인합니다.
 
-If the output shows an error or the mode is not `headed`, run `$B status` and
-share the output with the user before proceeding.
+출력에 오류가 있거나 모드가 `headed`가 아닌 경우, `$B status`를 실행하고
+진행하기 전에 출력을 사용자와 공유합니다.
 
-## Step 2: Verify
+## Step 2: 확인
 
 ```bash
 $B status
 ```
 
-Confirm the output shows `Mode: headed`. Read the port from the state file:
+출력에서 `Mode: headed`를 확인합니다. 상태 파일에서 포트를 읽습니다:
 
 ```bash
 cat "$(git rev-parse --show-toplevel 2>/dev/null)/.gstack/browse.json" 2>/dev/null | grep -o '"port":[0-9]*' | grep -o '[0-9]*'
 ```
 
-The port should be **34567**. If it's different, note it — the user may need it
-for the Side Panel.
+포트는 **34567**이어야 합니다. 다른 경우, 사용자가 사이드 패널에서
+필요할 수 있으므로 기록합니다.
 
-Also find the extension path so you can help the user if they need to load it manually:
+또한 사용자가 수동 로드가 필요한 경우를 위해 확장 경로를 찾습니다:
 
 ```bash
 _EXT_PATH=""
@@ -660,111 +659,109 @@ _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 echo "EXTENSION_PATH: ${_EXT_PATH:-NOT FOUND}"
 ```
 
-## Step 3: Guide the user to the Side Panel
+## Step 3: 사이드 패널 안내
 
-Use AskUserQuestion:
+AskUserQuestion 사용:
 
-> Chrome is launched with gstack control. You should see Playwright's Chromium
-> (not your regular Chrome) with a golden shimmer line at the top of the page.
+> Chrome이 gstack 제어와 함께 실행되었습니다. Playwright의 Chromium
+> (일반 Chrome이 아님)에 페이지 상단에 골든 쉬머 라인이 보여야 합니다.
 >
-> The Side Panel extension should be auto-loaded. To open it:
-> 1. Look for the **puzzle piece icon** (Extensions) in the toolbar — it may
->    already show the gstack icon if the extension loaded successfully
-> 2. Click the **puzzle piece** → find **gstack browse** → click the **pin icon**
-> 3. Click the pinned **gstack icon** in the toolbar
-> 4. The Side Panel should open on the right showing a live activity feed
+> 사이드 패널 확장이 자동 로드되었습니다. 열려면:
+> 1. 도구 모음에서 **퍼즐 조각 아이콘** (확장 프로그램)을 찾으세요 — 확장이
+>    성공적으로 로드되면 gstack 아이콘이 이미 표시될 수 있습니다
+> 2. **퍼즐 조각**을 클릭 → **gstack browse** 찾기 → **핀 아이콘** 클릭
+> 3. 도구 모음에서 고정된 **gstack 아이콘** 클릭
+> 4. 오른쪽에 라이브 활동 피드가 표시되는 사이드 패널이 열립니다
 >
-> **Port:** 34567 (auto-detected — the extension connects automatically in the
-> Playwright-controlled Chrome).
+> **포트:** 34567 (자동 감지 — Playwright 제어 Chrome에서 확장이 자동 연결됩니다).
 
-Options:
-- A) I can see the Side Panel — let's go!
-- B) I can see Chrome but can't find the extension
-- C) Something went wrong
+옵션:
+- A) 사이드 패널이 보입니다 — 시작하죠!
+- B) Chrome은 보이지만 확장을 찾을 수 없습니다
+- C) 문제가 발생했습니다
 
-If B: Tell the user:
+B인 경우: 사용자에게 안내:
 
-> The extension is loaded into Playwright's Chromium at launch time, but
-> sometimes it doesn't appear immediately. Try these steps:
+> 확장은 실행 시 Playwright의 Chromium에 로드되지만, 때때로 즉시
+> 나타나지 않을 수 있습니다. 다음 단계를 시도하세요:
 >
-> 1. Type `chrome://extensions` in the address bar
-> 2. Look for **"gstack browse"** — it should be listed and enabled
-> 3. If it's there but not pinned, go back to any page, click the puzzle piece
->    icon, and pin it
-> 4. If it's NOT listed at all, click **"Load unpacked"** and navigate to:
->    - Press **Cmd+Shift+G** in the file picker dialog
->    - Paste this path: `{EXTENSION_PATH}` (use the path from Step 2)
->    - Click **Select**
+> 1. 주소창에 `chrome://extensions` 입력
+> 2. **"gstack browse"**를 찾으세요 — 목록에 활성화되어 있어야 합니다
+> 3. 있지만 고정되지 않은 경우, 아무 페이지로 돌아가서 퍼즐 조각
+>    아이콘을 클릭하고 고정하세요
+> 4. 목록에 **없는** 경우, **"Load unpacked"**를 클릭하고 다음 경로로 이동하세요:
+>    - 파일 선택 대화상자에서 **Cmd+Shift+G** 누르기
+>    - 이 경로를 붙여넣기: `{EXTENSION_PATH}` (Step 2의 경로 사용)
+>    - **Select** 클릭
 >
-> After loading, pin it and click the icon to open the Side Panel.
+> 로드 후, 고정하고 아이콘을 클릭하여 사이드 패널을 엽니다.
 >
-> If the Side Panel badge stays gray (disconnected), click the gstack icon
-> and enter port **34567** manually.
+> 사이드 패널 배지가 회색(연결 해제)으로 남아있으면, gstack 아이콘을
+> 클릭하고 포트 **34567**을 수동 입력하세요.
 
-If C:
+C인 경우:
 
-1. Run `$B status` and show the output
-2. If the server is not healthy, re-run Step 0 cleanup + Step 1 connect
-3. If the server IS healthy but the browser isn't visible, try `$B focus`
-4. If that fails, ask the user what they see (error message, blank screen, etc.)
+1. `$B status` 실행 후 출력 표시
+2. 서버가 정상이 아닌 경우, Step 0 정리 + Step 1 연결을 다시 실행
+3. 서버가 정상이지만 브라우저가 보이지 않으면, `$B focus` 시도
+4. 그래도 실패하면, 사용자에게 무엇이 보이는지 물어보기 (오류 메시지, 빈 화면 등)
 
-## Step 4: Demo
+## Step 4: 데모
 
-After the user confirms the Side Panel is working, run a quick demo:
+사용자가 사이드 패널이 작동한다고 확인하면, 빠른 데모를 실행합니다:
 
 ```bash
 $B goto https://news.ycombinator.com
 ```
 
-Wait 2 seconds, then:
+2초 후:
 
 ```bash
 $B snapshot -i
 ```
 
-Tell the user: "Check the Side Panel — you should see the `goto` and `snapshot`
-commands appear in the activity feed. Every command Claude runs shows up here
-in real time."
+사용자에게 안내: "사이드 패널을 확인하세요 — `goto`와 `snapshot`
+명령이 활동 피드에 나타나야 합니다. Claude가 실행하는 모든 명령이
+여기에 실시간으로 표시됩니다."
 
-## Step 5: Sidebar chat
+## Step 5: 사이드바 채팅
 
-After the activity feed demo, tell the user about the sidebar chat:
+활동 피드 데모 후, 사용자에게 사이드바 채팅에 대해 안내합니다:
 
-> The Side Panel also has a **chat tab**. Try typing a message like "take a
-> snapshot and describe this page." A sidebar agent (a child Claude instance)
-> executes your request in the browser — you'll see the commands appear in
-> the activity feed as they happen.
+> 사이드 패널에는 **채팅 탭**도 있습니다. "스냅샷을 찍고 이 페이지를 설명해줘"
+> 같은 메시지를 입력해보세요. 사이드바 에이전트(하위 Claude 인스턴스)가
+> 브라우저에서 요청을 실행합니다 — 실행되는 명령이 활동 피드에 나타납니다.
 >
-> The sidebar agent can navigate pages, click buttons, fill forms, and read
-> content. Each task gets up to 5 minutes. It runs in an isolated session, so
-> it won't interfere with this Claude Code window.
+> 사이드바 에이전트는 페이지 탐색, 버튼 클릭, 폼 입력, 콘텐츠 읽기가 가능합니다.
+> 각 작업은 최대 5분입니다. 격리된 세션에서 실행되므로
+> 이 Claude Code 창과 간섭하지 않습니다.
 
-## Step 6: What's next
+## Step 6: 다음 단계
 
-Tell the user:
+사용자에게 안내:
 
-> You're all set! Here's what you can do with the connected Chrome:
+> 준비 완료! 연결된 Chrome으로 할 수 있는 작업:
 >
-> **Watch Claude work in real time:**
-> - Run any gstack skill (`/qa`, `/design-review`, `/benchmark`) and watch
->   every action happen in the visible Chrome window + Side Panel feed
-> - No cookie import needed — the Playwright browser shares its own session
+> **Claude 작업을 실시간으로 확인:**
+> - gstack 스킬 (`/qa`, `/design-review`, `/benchmark`)을 실행하면
+>   보이는 Chrome 창 + 사이드 패널 피드에서 모든 동작을 확인
+> - 쿠키 가져오기 불필요 — Playwright 브라우저가 자체 세션을 공유
 >
-> **Control the browser directly:**
-> - **Sidebar chat** — type natural language in the Side Panel and the sidebar
->   agent executes it (e.g., "fill in the login form and submit")
-> - **Browse commands** — `$B goto <url>`, `$B click <sel>`, `$B fill <sel> <val>`,
->   `$B snapshot -i` — all visible in Chrome + Side Panel
+> **브라우저 직접 제어:**
+> - **사이드바 채팅** — 사이드 패널에서 자연어 입력, 사이드바 에이전트가
+>   실행 (예: "로그인 폼을 작성하고 제출해줘")
+> - **Browse 명령** — `$B goto <url>`, `$B click <sel>`, `$B fill <sel> <val>`,
+>   `$B snapshot -i` — Chrome + 사이드 패널에서 모두 확인 가능
 >
-> **Window management:**
-> - `$B focus` — bring Chrome to the foreground anytime
-> - `$B disconnect` — close headed Chrome and return to headless mode
+> **창 관리:**
+> - `$B focus` — 언제든 Chrome을 전면으로 가져오기
+> - `$B disconnect` — headed Chrome을 닫고 헤드리스 모드로 복귀
 >
-> **What skills look like in headed mode:**
-> - `/qa` runs its full test suite in the visible browser — you see every page
->   load, every click, every assertion
-> - `/design-review` takes screenshots in the real browser — same pixels you see
-> - `/benchmark` measures performance in the headed browser
+> **headed 모드에서의 스킬 실행:**
+> - `/qa` — 보이는 브라우저에서 전체 테스트 슈트 실행 — 모든 페이지 로드,
+>   클릭, 어설션을 확인
+> - `/design-review` — 실제 브라우저에서 스크린샷 — 보이는 것과 동일한 픽셀
+> - `/benchmark` — headed 브라우저에서 성능 측정
 
-Then proceed with whatever the user asked to do. If they didn't specify a task,
-ask what they'd like to test or browse.
+그런 다음 사용자가 요청한 작업을 진행합니다. 특정 작업을 지정하지 않은 경우,
+무엇을 테스트하거나 브라우징할지 물어봅니다.

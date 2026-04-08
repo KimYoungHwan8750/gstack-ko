@@ -1,22 +1,11 @@
 ---
 name: careful
-version: 0.1.0
 description: |
   위험한 명령어에 대한 안전 가드레일. rm -rf, DROP TABLE, force-push, git reset --hard,
   kubectl delete 등 파괴적인 명령어 실행 전 경고를 표시합니다. 사용자가 각 경고를
   재정의할 수 있습니다. 프로덕션 환경 작업, 라이브 시스템 디버깅, 공유 환경에서
   작업할 때 사용하세요. "be careful", "safety mode", "prod mode", "careful mode" 요청 시
-  사용합니다.
-allowed-tools:
-  - Bash
-  - Read
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/check-careful.sh"
-          statusMessage: "Checking for destructive commands..."
+  사용합니다. (gstack)
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->

@@ -1,33 +1,11 @@
 ---
 name: guard
-version: 0.1.0
 description: |
   전체 안전 모드: 파괴적 명령어 경고 + 디렉토리 범위 편집 제한.
   /careful(rm -rf, DROP TABLE, force-push 등에 대한 경고)과
   /freeze(지정된 디렉토리 외부 편집 차단)를 결합합니다. 프로덕션 환경 작업이나
   라이브 시스템 디버깅 시 최대 안전을 위해 사용하세요. "guard mode",
-  "full safety", "lock it down", "maximum safety" 요청 시 사용합니다.
-allowed-tools:
-  - Bash
-  - Read
-  - AskUserQuestion
-hooks:
-  PreToolUse:
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/../careful/bin/check-careful.sh"
-          statusMessage: "Checking for destructive commands..."
-    - matcher: "Edit"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/../freeze/bin/check-freeze.sh"
-          statusMessage: "Checking freeze boundary..."
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/../freeze/bin/check-freeze.sh"
-          statusMessage: "Checking freeze boundary..."
+  "full safety", "lock it down", "maximum safety" 요청 시 사용합니다. (gstack)
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->

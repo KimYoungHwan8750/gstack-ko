@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-careful"
-  short_description: ""
+  short_description: "위험한 명령어에 대한 안전 가드레일. rm -rf, DROP TABLE, force-push, git reset --hard, kubectl delete 등 파괴적인 명령어 실행 전 경고를 표시합니다...."
   default_prompt: "Use gstack-careful for this task."
 policy:
   allow_implicit_invocation: true

@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-cso"
-  short_description: ""
+  short_description: "최고 보안 책임자(CSO) 모드. 인프라 우선 보안 감사: 시크릿 고고학, 의존성 공급망, CI/CD 파이프라인 보안, LLM/AI 보안, 스킬 공급망 스캐닝, OWASP Top 10, STRIDE 위협..."
   default_prompt: "Use gstack-cso for this task."
 policy:
   allow_implicit_invocation: true

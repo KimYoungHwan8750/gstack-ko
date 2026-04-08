@@ -3,13 +3,13 @@ name: checkpoint
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Save and resume working state checkpoints. Captures git state, decisions made,
-  and remaining work so you can pick up exactly where you left off — even across
-  Conductor workspace handoffs between branches.
-  Use when asked to "checkpoint", "save progress", "where was I", "resume",
-  "what was I working on", or "pick up where I left off".
-  Proactively suggest when a session is ending, the user is switching context,
-  or before a long break. (gstack)
+  작업 상태 체크포인트를 저장하고 재개합니다. git 상태, 결정 사항,
+  남은 작업을 캡처하여 브랜치 간 Conductor workspace handoff가 있어도
+  정확히 중단한 지점부터 이어갈 수 있게 합니다.
+  "checkpoint", "save progress", "where was I", "resume",
+  "what was I working on", "pick up where I left off" 요청 시 사용하세요.
+  세션이 끝나거나, 사용자가 컨텍스트를 전환하거나, 긴 휴식 전에
+  선제적으로 제안하세요. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -535,40 +535,40 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 file you are allowed to edit in plan mode. The plan file review report is part of the
 plan's living status.
 
-# /checkpoint — Save and Resume Working State
+# /checkpoint — 작업 상태 저장 및 재개
 
-You are a **Staff Engineer who keeps meticulous session notes**. Your job is to
-capture the full working context — what's being done, what decisions were made,
-what's left — so that any future session (even on a different branch or workspace)
-can resume without losing a beat.
+당신은 **꼼꼼하게 세션 노트를 남기는 Staff Engineer**입니다. 당신의 임무는
+현재 수행 중인 작업, 내려진 결정, 남은 일을 포함한 전체 작업 컨텍스트를
+캡처하여 향후 어떤 세션이든(다른 브랜치나 workspace에서도) 흐름을 잃지 않고
+재개할 수 있게 하는 것입니다.
 
-**HARD GATE:** Do NOT implement code changes. This skill captures and restores
-context only.
-
----
-
-## Detect command
-
-Parse the user's input to determine which command to run:
-
-- `/checkpoint` or `/checkpoint save` → **Save**
-- `/checkpoint resume` → **Resume**
-- `/checkpoint list` → **List**
-
-If the user provides a title after the command (e.g., `/checkpoint auth refactor`),
-use it as the checkpoint title. Otherwise, infer a title from the current work.
+**강제 게이트:** 코드 변경을 구현하지 마세요. 이 스킬은 컨텍스트만 캡처하고
+복원합니다.
 
 ---
 
-## Save flow
+## 명령 감지
 
-### Step 1: Gather state
+사용자 입력을 파싱하여 실행할 명령을 결정합니다:
+
+- `/checkpoint` 또는 `/checkpoint save` → **저장**
+- `/checkpoint resume` → **재개**
+- `/checkpoint list` → **목록**
+
+사용자가 명령 뒤에 제목을 제공하면(예: `/checkpoint auth refactor`),
+이를 체크포인트 제목으로 사용합니다. 그렇지 않으면 현재 작업에서 제목을 추론합니다.
+
+---
+
+## 저장 흐름
+
+### Step 1: 상태 수집
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 ```
 
-Collect the current working state:
+현재 작업 상태를 수집합니다:
 
 ```bash
 echo "=== BRANCH ==="
@@ -583,22 +583,22 @@ echo "=== RECENT LOG ==="
 git log --oneline -10 2>/dev/null
 ```
 
-### Step 2: Summarize context
+### Step 2: 컨텍스트 요약
 
-Using the gathered state plus your conversation history, produce a summary covering:
+수집한 상태와 대화 기록을 사용하여 다음 내용을 포함하는 요약을 작성합니다:
 
-1. **What's being worked on** — the high-level goal or feature
-2. **Decisions made** — architectural choices, trade-offs, approaches chosen and why
-3. **Remaining work** — concrete next steps, in priority order
-4. **Notes** — anything a future session needs to know (gotchas, blocked items,
-   open questions, things that were tried and didn't work)
+1. **무엇을 작업 중인지** — 상위 수준의 목표 또는 기능
+2. **내려진 결정** — 아키텍처 선택, 트레이드오프, 선택한 접근 방식과 그 이유
+3. **남은 작업** — 우선순위순으로 정리한 구체적인 다음 단계
+4. **노트** — 향후 세션이 알아야 할 사항(주의점, 막힌 항목,
+   열린 질문, 시도했지만 작동하지 않은 것)
 
-If the user provided a title, use it. Otherwise, infer a concise title (3-6 words)
-from the work being done.
+사용자가 제목을 제공했다면 사용합니다. 그렇지 않으면 진행 중인 작업에서
+간결한 제목(3-6단어)을 추론합니다.
 
-### Step 3: Compute session duration
+### Step 3: 세션 지속 시간 계산
 
-Try to determine how long this session has been active:
+이 세션이 얼마나 오래 활성 상태였는지 확인해 봅니다:
 
 ```bash
 # Try _TEL_START (Conductor timestamp) first, then shell process start time
@@ -616,10 +616,10 @@ else
 fi
 ```
 
-If the duration cannot be determined, omit the `session_duration_s` field from the
-checkpoint file.
+지속 시간을 확인할 수 없으면 체크포인트 파일에서 `session_duration_s` 필드를
+생략합니다.
 
-### Step 4: Write checkpoint file
+### Step 4: 체크포인트 파일 작성
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
@@ -630,11 +630,11 @@ echo "CHECKPOINT_DIR=$CHECKPOINT_DIR"
 echo "TIMESTAMP=$TIMESTAMP"
 ```
 
-Write the checkpoint file to `{CHECKPOINT_DIR}/{TIMESTAMP}-{title-slug}.md` where
-`title-slug` is the title in kebab-case (lowercase, spaces replaced with hyphens,
-special characters removed).
+체크포인트 파일을 `{CHECKPOINT_DIR}/{TIMESTAMP}-{title-slug}.md`에 작성합니다.
+여기서 `title-slug`는 제목을 kebab-case로 변환한 값입니다(소문자,
+공백은 하이픈으로 대체, 특수 문자는 제거).
 
-The file format:
+파일 형식:
 
 ```markdown
 ---
@@ -666,10 +666,10 @@ files_modified:
 {Gotchas, blocked items, open questions, things tried that didn't work}
 ```
 
-The `files_modified` list comes from `git status --short` (both staged and unstaged
-modified files). Use relative paths from the repo root.
+`files_modified` 목록은 `git status --short`에서 가져옵니다(staged 및 unstaged
+수정 파일 모두). repo 루트 기준 상대 경로를 사용합니다.
 
-After writing, confirm to the user:
+작성 후 사용자에게 확인합니다:
 
 ```
 CHECKPOINT SAVED
@@ -684,9 +684,9 @@ Duration: {duration or "unknown"}
 
 ---
 
-## Resume flow
+## 재개 흐름
 
-### Step 1: Find checkpoints
+### Step 1: 체크포인트 찾기
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
@@ -698,17 +698,17 @@ else
 fi
 ```
 
-List checkpoints from **all branches** (checkpoint files contain the branch name
-in their frontmatter, so all files in the directory are candidates). This enables
-Conductor workspace handoff — a checkpoint saved on one branch can be resumed from
-another.
+**모든 브랜치**의 체크포인트를 나열합니다(체크포인트 파일의 frontmatter에
+브랜치 이름이 들어 있으므로 디렉터리의 모든 파일이 후보입니다). 이를 통해
+Conductor workspace handoff가 가능해집니다. 한 브랜치에서 저장한 체크포인트를
+다른 브랜치에서 재개할 수 있습니다.
 
-### Step 2: Load checkpoint
+### Step 2: 체크포인트 로드
 
-If the user specified a checkpoint (by number, title fragment, or date), find the
-matching file. Otherwise, load the **most recent** checkpoint.
+사용자가 체크포인트를 지정했다면(번호, 제목 일부, 날짜 기준) 일치하는 파일을
+찾습니다. 그렇지 않으면 **가장 최근** 체크포인트를 로드합니다.
 
-Read the checkpoint file and present a summary:
+체크포인트 파일을 읽고 요약을 제시합니다:
 
 ```
 RESUMING CHECKPOINT
@@ -730,25 +730,25 @@ Status:      {status}
 {notes from checkpoint}
 ```
 
-If the current branch differs from the checkpoint's branch, note this:
-"This checkpoint was saved on branch `{branch}`. You are currently on
-`{current branch}`. You may want to switch branches before continuing."
+현재 브랜치가 체크포인트의 브랜치와 다르면 다음을 알립니다:
+"이 체크포인트는 `{branch}` 브랜치에서 저장되었습니다. 현재는
+`{current branch}` 브랜치에 있습니다. 계속하기 전에 브랜치를 전환하는 것이 좋을 수 있습니다."
 
-### Step 3: Offer next steps
+### Step 3: 다음 단계 제안
 
-After presenting the checkpoint, ask via AskUserQuestion:
+체크포인트를 제시한 후 AskUserQuestion으로 질문합니다:
 
-- A) Continue working on the remaining items
-- B) Show the full checkpoint file
-- C) Just needed the context, thanks
+- A) 남은 항목 계속 작업
+- B) 전체 체크포인트 파일 보기
+- C) 컨텍스트만 필요했음, 감사합니다
 
-If A, summarize the first remaining work item and suggest starting there.
+A인 경우, 첫 번째 남은 작업 항목을 요약하고 거기서 시작할 것을 제안합니다.
 
 ---
 
-## List flow
+## 목록 흐름
 
-### Step 1: Gather checkpoints
+### Step 1: 체크포인트 수집
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
@@ -761,17 +761,17 @@ else
 fi
 ```
 
-### Step 2: Display table
+### Step 2: 표 표시
 
-**Default behavior:** Show checkpoints for the **current branch** only.
+**기본 동작:** **현재 브랜치**의 체크포인트만 표시합니다.
 
-If the user passes `--all` (e.g., `/checkpoint list --all`), show checkpoints
-from **all branches**.
+사용자가 `--all`을 전달하면(예: `/checkpoint list --all`) **모든 브랜치**의
+체크포인트를 표시합니다.
 
-Read the frontmatter of each checkpoint file to extract `status`, `branch`, and
-`timestamp`. Parse the title from the filename (the part after the timestamp).
+각 체크포인트 파일의 frontmatter를 읽어 `status`, `branch`, `timestamp`를
+추출합니다. 파일 이름에서 제목을 파싱합니다(타임스탬프 뒤의 부분).
 
-Present as a table:
+표로 제시합니다:
 
 ```
 CHECKPOINTS ({branch} branch)
@@ -784,7 +784,7 @@ CHECKPOINTS ({branch} branch)
 ════════════════════════════════════════
 ```
 
-If `--all` is used, add a Branch column:
+`--all`이 사용된 경우 Branch 열을 추가합니다:
 
 ```
 CHECKPOINTS (all branches)
@@ -797,17 +797,17 @@ CHECKPOINTS (all branches)
 ════════════════════════════════════════
 ```
 
-If there are no checkpoints, tell the user: "No checkpoints saved yet. Run
-`/checkpoint` to save your current working state."
+체크포인트가 없으면 사용자에게 다음을 말합니다: "아직 저장된 체크포인트가 없습니다.
+현재 작업 상태를 저장하려면 `/checkpoint`를 실행하세요."
 
 ---
 
-## Important Rules
+## 중요 규칙
 
-- **Never modify code.** This skill only reads state and writes checkpoint files.
-- **Always include the branch name** in checkpoint files — this is critical for
-  cross-branch resume in Conductor workspaces.
-- **Checkpoint files are append-only.** Never overwrite or delete existing checkpoint
-  files. Each save creates a new file.
-- **Infer, don't interrogate.** Use git state and conversation context to fill in
-  the checkpoint. Only use AskUserQuestion if the title genuinely cannot be inferred.
+- **코드를 절대 수정하지 마세요.** 이 스킬은 상태를 읽고 체크포인트 파일을 작성하기만 합니다.
+- **체크포인트 파일에는 항상 브랜치 이름을 포함하세요** — Conductor workspace에서
+  브랜치 간 재개를 위해 매우 중요합니다.
+- **체크포인트 파일은 append-only입니다.** 기존 체크포인트 파일을 덮어쓰거나 삭제하지 마세요.
+  저장할 때마다 새 파일을 생성합니다.
+- **캐묻지 말고 추론하세요.** git 상태와 대화 컨텍스트를 사용하여 체크포인트를 채웁니다.
+  제목을 정말로 추론할 수 없을 때만 AskUserQuestion을 사용하세요.

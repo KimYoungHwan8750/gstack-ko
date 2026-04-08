@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-canary"
-  short_description: ""
+  short_description: "배포 후 카나리 모니터링. browse 데몬을 사용하여 라이브 앱의 콘솔 에러, 성능 저하, 페이지 실패를 감시합니다. 주기적으로 스크린샷을 찍고, 배포 전 베이스라인과 비교하며, 이상 감지 시 알림합니다...."
   default_prompt: "Use gstack-canary for this task."
 policy:
   allow_implicit_invocation: true

@@ -1,6 +1,6 @@
 interface:
   display_name: "gstack-plan-ceo-review"
-  short_description: ""
+  short_description: "CEO/창업자 모드 플랜 리뷰. 문제를 재구성하고, 10스타 제품을 찾고, 전제를 도전하며, 더 나은 제품을 만들 수 있을 때 범위를 확장한다. 네 가지 모드: 범위 확장(SCOPE EXPANSION) (크게..."
   default_prompt: "Use gstack-plan-ceo-review for this task."
 policy:
   allow_implicit_invocation: true
