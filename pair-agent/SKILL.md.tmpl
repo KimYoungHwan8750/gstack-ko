@@ -2,12 +2,12 @@
 name: pair-agent
 version: 0.1.0
 description: |
-  Pair a remote AI agent with your browser. One command generates a setup key and
-  prints instructions the other agent can follow to connect. Works with OpenClaw,
-  Hermes, Codex, Cursor, or any agent that can make HTTP requests. The remote agent
-  gets its own tab with scoped access (read+write by default, admin on request).
-  Use when asked to "pair agent", "connect agent", "share browser", "remote browser",
-  "let another agent use my browser", or "give browser access". (gstack)
+  원격 AI 에이전트를 브라우저와 페어링합니다. 한 번의 명령으로 설정 키를 생성하고,
+  다른 에이전트가 연결할 때 따를 수 있는 지침을 출력합니다. OpenClaw,
+  Hermes, Codex, Cursor 또는 HTTP 요청을 보낼 수 있는 모든 에이전트에서 작동합니다. 원격 에이전트는
+  범위가 제한된 접근 권한이 있는 자체 탭을 받습니다(기본값은 read+write, 요청 시 admin).
+  "pair agent", "connect agent", "share browser", "remote browser",
+  "let another agent use my browser", 또는 "give browser access" 요청을 받았을 때 사용하세요. (gstack)
 voice-triggers:
   - "pair agent"
   - "connect agent"
@@ -22,240 +22,240 @@ allowed-tools:
 
 {{PREAMBLE}}
 
-# /pair-agent — Share Your Browser With Another AI Agent
+# /pair-agent — 다른 AI 에이전트와 브라우저 공유하기
 
-You're sitting in Claude Code with a browser running. You also have another AI agent
-open (OpenClaw, Hermes, Codex, Cursor, whatever). You want that other agent to be
-able to browse the web using YOUR browser. This skill makes that happen.
+Claude Code에서 브라우저가 실행 중인 상태입니다. 또한 다른 AI 에이전트
+(OpenClaw, Hermes, Codex, Cursor 등 무엇이든)를 열어 두었습니다. 그 다른 에이전트가
+내 브라우저를 사용해 웹을 탐색할 수 있게 만들고 싶습니다. 이 스킬은 그 작업을 처리합니다.
 
-## How it works
+## 작동 방식
 
-Your gstack browser runs a local HTTP server. This skill creates a one-time setup key,
-prints a block of instructions, and you paste those instructions into the other agent.
-The other agent exchanges the key for a session token, creates its own tab, and starts
-browsing. Each agent gets its own tab. They can't mess with each other's tabs.
+gstack 브라우저는 로컬 HTTP 서버를 실행합니다. 이 스킬은 일회용 설정 키를 생성하고,
+지침 블록을 출력하며, 사용자는 그 지침을 다른 에이전트에 붙여넣습니다.
+다른 에이전트는 키를 세션 토큰으로 교환하고, 자체 탭을 만든 뒤
+탐색을 시작합니다. 각 에이전트는 자체 탭을 받습니다. 서로의 탭을 건드릴 수 없습니다.
 
-The setup key expires in 5 minutes and can only be used once. If it leaks, it's dead
-before anyone can abuse it. The session token lasts 24 hours.
+설정 키는 5분 후 만료되며 한 번만 사용할 수 있습니다. 유출되더라도
+누군가 악용하기 전에 무효화됩니다. 세션 토큰은 24시간 동안 유지됩니다.
 
-**Same machine:** If the other agent is on the same machine (like OpenClaw running
-locally), you can skip the copy-paste ceremony and write the credentials directly to
-the agent's config directory.
+**같은 머신:** 다른 에이전트가 같은 머신에 있는 경우(예: OpenClaw가
+로컬에서 실행 중인 경우), 복사-붙여넣기 절차를 건너뛰고 자격 증명을
+에이전트의 config 디렉터리에 직접 쓸 수 있습니다.
 
-**Remote:** If the other agent is on a different machine, you need an ngrok tunnel.
-The skill will tell you if one is needed and how to set it up.
+**원격:** 다른 에이전트가 다른 머신에 있는 경우 ngrok 터널이 필요합니다.
+이 스킬은 터널이 필요한지 알려 주고 설정 방법을 안내합니다.
 
 {{BROWSE_SETUP}}
 
-## Step 1: Check prerequisites
+## 1단계: 필수 조건 확인
 
 ```bash
 $B status 2>/dev/null
 ```
 
-If the browse server is not running, start it:
+browse 서버가 실행 중이 아니라면 시작하세요.
 
 ```bash
 $B goto about:blank
 ```
 
-This ensures the server is up and healthy before pairing.
+이렇게 하면 페어링 전에 서버가 실행 중이고 정상 상태인지 확인할 수 있습니다.
 
-## Step 2: Ask what they want
+## 2단계: 원하는 대상 확인
 
-Use AskUserQuestion:
+AskUserQuestion을 사용하세요.
 
-> Which agent do you want to pair with your browser? This determines the
-> instructions format and where credentials get written.
+> 어떤 에이전트를 브라우저와 페어링할까요? 이 선택에 따라
+> 지침 형식과 자격 증명이 기록될 위치가 결정됩니다.
 
-Options:
+옵션:
 - A) OpenClaw (local or remote)
 - B) Codex / OpenAI Agents (local)
 - C) Cursor (local)
 - D) Another Claude Code session (local or remote)
 - E) Something else (generic HTTP instructions — use this for Hermes)
 
-Based on the answer, set `TARGET_HOST`:
+응답에 따라 `TARGET_HOST`를 설정하세요.
 - A → `openclaw`
 - B → `codex`
 - C → `cursor`
 - D → `claude`
-- E → generic (no host-specific config)
+- E → generic (호스트별 config 없음)
 
-## Step 3: Local or remote?
+## 3단계: 로컬인가요, 원격인가요?
 
-Use AskUserQuestion:
+AskUserQuestion을 사용하세요.
 
-> Is the other agent running on this same machine, or on a different machine/server?
+> 다른 에이전트가 이 같은 머신에서 실행 중인가요, 아니면 다른 머신/서버에서 실행 중인가요?
 >
-> **Same machine** skips the copy-paste ceremony. Credentials are written directly to
-> the agent's config directory. No tunnel needed.
+> **같은 머신**은 복사-붙여넣기 절차를 건너뜁니다. 자격 증명이
+> 에이전트의 config 디렉터리에 직접 기록됩니다. 터널은 필요하지 않습니다.
 >
-> **Different machine** generates a setup key and instruction block. If ngrok is
-> installed, the tunnel starts automatically. If not, I'll walk you through setup.
+> **다른 머신**은 설정 키와 지침 블록을 생성합니다. ngrok이
+> 설치되어 있으면 터널이 자동으로 시작됩니다. 설치되어 있지 않으면 설정 과정을 안내합니다.
 >
-> RECOMMENDATION: Choose A if the agent is local. It's instant, no copy-paste needed.
+> 권장: 에이전트가 로컬이라면 A를 선택하세요. 즉시 완료되며, 복사-붙여넣기가 필요 없습니다.
 
-Options:
+옵션:
 - A) Same machine (write credentials directly)
 - B) Different machine (generate instruction block for copy-paste)
 
-## Step 4: Execute pairing
+## 4단계: 페어링 실행
 
-### If same machine (option A):
+### 같은 머신인 경우(옵션 A):
 
-Run pair-agent with --local flag:
+--local 플래그로 pair-agent를 실행하세요.
 
 ```bash
 $B pair-agent --local TARGET_HOST
 ```
 
-Replace `TARGET_HOST` with the value from Step 2 (openclaw, codex, cursor, etc.).
+`TARGET_HOST`를 2단계에서 얻은 값(openclaw, codex, cursor 등)으로 바꾸세요.
 
-If it succeeds, tell the user:
-"Done. TARGET_HOST can now use your browser. It will read credentials from the
-config file that was written. Try asking it to navigate to a URL."
+성공하면 사용자에게 이렇게 말하세요.
+"완료되었습니다. 이제 TARGET_HOST가 브라우저를 사용할 수 있습니다. 기록된
+config 파일에서 자격 증명을 읽습니다. URL로 이동하도록 요청해 보세요."
 
-If it fails (host not found, write permission error), show the error and suggest
-using the generic remote flow instead.
+실패하면(호스트를 찾을 수 없음, 쓰기 권한 오류) 오류를 보여 주고
+대신 generic 원격 흐름을 사용하도록 제안하세요.
 
-### If different machine (option B):
+### 다른 머신인 경우(옵션 B):
 
-First, detect ngrok status:
+먼저 ngrok 상태를 감지하세요.
 
 ```bash
 which ngrok 2>/dev/null && echo "NGROK_INSTALLED" || echo "NGROK_NOT_INSTALLED"
 ngrok config check 2>/dev/null && echo "NGROK_AUTHED" || echo "NGROK_NOT_AUTHED"
 ```
 
-**If ngrok is installed and authed:** Just run the command. The CLI will auto-detect
-ngrok, start the tunnel, and print the instruction block with the tunnel URL:
+**ngrok이 설치되어 있고 인증되어 있는 경우:** 명령을 실행하기만 하면 됩니다. CLI가
+ngrok을 자동 감지하고, 터널을 시작하며, 터널 URL이 포함된 지침 블록을 출력합니다.
 
 ```bash
 $B pair-agent --client TARGET_HOST
 ```
 
-If the user also needs admin access (JS execution, cookies, storage):
+사용자에게 admin 접근 권한(JS 실행, 쿠키, 스토리지)도 필요한 경우:
 
 ```bash
 $B pair-agent --admin --client TARGET_HOST
 ```
 
-**CRITICAL: You MUST output the full instruction block to the user.** The command
-prints everything between ═══ lines. Copy the ENTIRE block verbatim into your
-response so the user can copy-paste it into their other agent. Do NOT summarize it,
-do NOT skip it, do NOT just say "here's the output." The user needs to SEE the block
-to copy it. Output it inside a markdown code block so it's easy to select and copy.
+**중요: 전체 지침 블록을 사용자에게 반드시 출력해야 합니다.** 이 명령은
+═══ 줄 사이의 모든 내용을 출력합니다. 사용자가 다른 에이전트에 복사-붙여넣을 수 있도록
+응답에 전체 블록을 그대로 복사하세요. 요약하지 말고,
+건너뛰지 말고, "출력은 다음과 같습니다"라고만 말하지 마세요. 사용자가 복사하려면
+블록을 직접 볼 수 있어야 합니다. 선택하고 복사하기 쉽도록 markdown code block 안에 출력하세요.
 
-Then tell the user:
-"Copy the block above and paste it into your other agent's chat. The setup key
-expires in 5 minutes."
+그런 다음 사용자에게 이렇게 말하세요.
+"위 블록을 복사해 다른 에이전트의 채팅에 붙여넣으세요. 설정 키는
+5분 후 만료됩니다."
 
-**If ngrok is installed but NOT authed:** Walk the user through authentication:
+**ngrok이 설치되어 있지만 인증되지 않은 경우:** 사용자에게 인증 과정을 안내하세요.
 
-Tell the user:
-"ngrok is installed but not logged in. Let's fix that:
+사용자에게 이렇게 말하세요.
+"ngrok이 설치되어 있지만 로그인되어 있지 않습니다. 이 문제를 해결하겠습니다.
 
-1. Go to https://dashboard.ngrok.com/get-started/your-authtoken
-2. Copy your auth token
-3. Come back here and I'll run the auth command for you."
+1. https://dashboard.ngrok.com/get-started/your-authtoken 로 이동하세요
+2. auth token을 복사하세요
+3. 여기로 돌아오면 auth 명령을 실행해 드리겠습니다."
 
-STOP here and wait for the user to provide their auth token.
+여기서 중단하고 사용자가 auth token을 제공할 때까지 기다리세요.
 
-When they provide it, run:
+사용자가 토큰을 제공하면 다음을 실행하세요.
 ```bash
 ngrok config add-authtoken THEIR_TOKEN
 ```
 
-Then retry `$B pair-agent --client TARGET_HOST`.
+그런 다음 `$B pair-agent --client TARGET_HOST`를 다시 시도하세요.
 
-**If ngrok is NOT installed:** Walk the user through installation:
+**ngrok이 설치되어 있지 않은 경우:** 사용자에게 설치 과정을 안내하세요.
 
-Tell the user:
-"To connect a remote agent, we need ngrok (a tunnel that exposes your local
-browser to the internet securely).
+사용자에게 이렇게 말하세요.
+"원격 에이전트를 연결하려면 ngrok이 필요합니다(로컬 브라우저를
+인터넷에 안전하게 노출하는 터널입니다).
 
-1. Go to https://ngrok.com and sign up (free tier works)
-2. Install ngrok:
+1. https://ngrok.com 으로 이동해 가입하세요(무료 티어로 충분합니다)
+2. ngrok을 설치하세요:
    - macOS: `brew install ngrok`
-   - Linux: `snap install ngrok` or download from ngrok.com/download
-3. Auth it: `ngrok config add-authtoken YOUR_TOKEN`
-   (get your token from https://dashboard.ngrok.com/get-started/your-authtoken)
-4. Come back here and run `/pair-agent` again."
+   - Linux: `snap install ngrok` 또는 ngrok.com/download에서 다운로드
+3. 인증하세요: `ngrok config add-authtoken YOUR_TOKEN`
+   (토큰은 https://dashboard.ngrok.com/get-started/your-authtoken 에서 받을 수 있습니다)
+4. 여기로 돌아와 `/pair-agent`를 다시 실행하세요."
 
-STOP here. Wait for the user to install ngrok and re-invoke.
+여기서 중단하세요. 사용자가 ngrok을 설치하고 다시 호출할 때까지 기다리세요.
 
-## Step 5: Verify connection
+## 5단계: 연결 확인
 
-After the user pastes the instructions into the other agent, wait a moment then check:
+사용자가 지침을 다른 에이전트에 붙여넣은 후 잠시 기다렸다가 확인하세요.
 
 ```bash
 $B status
 ```
 
-Look for the connected agent in the status output. If it appears, tell the user:
-"The remote agent is connected and has its own tab. You'll see its activity in the
-side panel if you have GStack Browser open."
+상태 출력에서 연결된 에이전트를 찾으세요. 보이면 사용자에게 이렇게 말하세요.
+"원격 에이전트가 연결되었고 자체 탭을 가지고 있습니다. GStack Browser를 열어 두었다면
+side panel에서 해당 활동을 볼 수 있습니다."
 
-## What the remote agent can do
+## 원격 에이전트가 할 수 있는 일
 
-With default (read+write) access:
-- Navigate to URLs, click elements, fill forms, take screenshots
-- Read page content (text, HTML, snapshot)
-- Create new tabs (each agent gets its own)
-- Cannot execute arbitrary JavaScript, read cookies, or access storage
+기본(read+write) 접근 권한:
+- URL로 이동, 요소 클릭, 폼 채우기, 스크린샷 촬영
+- 페이지 콘텐츠 읽기(text, HTML, snapshot)
+- 새 탭 만들기(각 에이전트는 자체 탭을 받음)
+- 임의의 JavaScript 실행, 쿠키 읽기, 스토리지 접근은 불가
 
-With admin access (--admin flag):
-- Everything above, plus JS execution, cookie access, storage access
-- Use sparingly. Only for agents you fully trust.
+admin 접근 권한(--admin 플래그):
+- 위의 모든 작업에 더해 JS 실행, 쿠키 접근, 스토리지 접근
+- 신중하게 사용하세요. 완전히 신뢰하는 에이전트에만 사용하세요.
 
-## Troubleshooting
+## 문제 해결
 
-**"Tab not owned by your agent"** — The remote agent tried to interact with a tab
-it didn't create. Tell it to run `newtab` first to get its own tab.
+**"Tab not owned by your agent"** — 원격 에이전트가 자신이 만들지 않은 탭과
+상호작용하려고 했습니다. 자체 탭을 얻도록 먼저 `newtab`을 실행하라고 안내하세요.
 
-**"Domain not allowed"** — The token has domain restrictions. Re-pair with broader
-domain access or no domain restrictions.
+**"Domain not allowed"** — 토큰에 도메인 제한이 있습니다. 더 넓은
+도메인 접근 권한 또는 도메인 제한 없음으로 다시 페어링하세요.
 
-**"Rate limit exceeded"** — The agent is sending > 10 requests/second. It should
-wait for the Retry-After header and slow down.
+**"Rate limit exceeded"** — 에이전트가 초당 10개를 초과하는 요청을 보내고 있습니다.
+Retry-After 헤더를 기다리고 속도를 낮춰야 합니다.
 
-**"Token expired"** — The 24-hour session expired. Run `/pair-agent` again to
-generate a new setup key.
+**"Token expired"** — 24시간 세션이 만료되었습니다. `/pair-agent`를 다시 실행해
+새 설정 키를 생성하세요.
 
-**Agent can't reach the server** — If remote, check the ngrok tunnel is running
-(`$B status`). If local, check the browse server is running.
+**에이전트가 서버에 접근할 수 없음** — 원격인 경우 ngrok 터널이 실행 중인지
+확인하세요(`$B status`). 로컬인 경우 browse 서버가 실행 중인지 확인하세요.
 
-## Platform-specific notes
+## 플랫폼별 참고 사항
 
 ### OpenClaw / AlphaClaw
 
-OpenClaw agents use the `exec` tool instead of `Bash`. The instruction block uses
-`exec curl` syntax which OpenClaw understands natively. When using `--local openclaw`,
-credentials are written to `~/.openclaw/skills/gstack/browse-remote.json`.
+OpenClaw 에이전트는 `Bash` 대신 `exec` 도구를 사용합니다. 지침 블록은
+OpenClaw가 기본적으로 이해하는 `exec curl` 구문을 사용합니다. `--local openclaw`를 사용할 때
+자격 증명은 `~/.openclaw/skills/gstack/browse-remote.json`에 기록됩니다.
 
 
 ### Codex
 
-Codex agents can execute shell commands via `codex exec`. The instruction block's
-curl commands work directly. When using `--local codex`, credentials are written
-to `~/.codex/skills/gstack/browse-remote.json`.
+Codex 에이전트는 `codex exec`를 통해 shell 명령을 실행할 수 있습니다. 지침 블록의
+curl 명령은 그대로 작동합니다. `--local codex`를 사용할 때 자격 증명은
+`~/.codex/skills/gstack/browse-remote.json`에 기록됩니다.
 
 ### Cursor
 
-Cursor's AI can run terminal commands. The instruction block works as-is.
-When using `--local cursor`, credentials are written to
-`~/.cursor/skills/gstack/browse-remote.json`.
+Cursor의 AI는 터미널 명령을 실행할 수 있습니다. 지침 블록은 그대로 작동합니다.
+`--local cursor`를 사용할 때 자격 증명은
+`~/.cursor/skills/gstack/browse-remote.json`에 기록됩니다.
 
-## Revoking access
+## 접근 권한 취소
 
-To disconnect a specific agent:
+특정 에이전트의 연결을 끊으려면:
 
 ```bash
 $B tunnel revoke AGENT_NAME
 ```
 
-To disconnect all agents and rotate the root token:
+모든 에이전트의 연결을 끊고 root token을 교체하려면:
 
 ```bash
 # This invalidates ALL scoped tokens immediately

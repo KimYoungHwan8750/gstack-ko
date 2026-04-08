@@ -3,14 +3,15 @@ name: design-html
 preamble-tier: 2
 version: 1.0.0
 description: |
-  Design finalization: generates production-quality Pretext-native HTML/CSS.
-  Works with approved mockups from /design-shotgun, CEO plans from /plan-ceo-review,
-  design review context from /plan-design-review, or from scratch with a user
-  description. Text actually reflows, heights are computed, layouts are dynamic.
-  30KB overhead, zero deps. Smart API routing: picks the right Pretext patterns
-  for each design type. Use when: "finalize this design", "turn this into HTML",
-  "build me a page", "implement this design", or after any planning skill.
-  Proactively suggest when user has approved a design or has a plan ready. (gstack)
+  디자인 최종화: 프로덕션 품질의 Pretext 네이티브 HTML/CSS를 생성합니다.
+  /design-shotgun에서 승인된 mockup, /plan-ceo-review의 CEO plan,
+  /plan-design-review의 디자인 리뷰 맥락, 또는 사용자의 설명만으로 처음부터
+  작업할 수 있습니다. 텍스트는 실제로 리플로우되고, 높이는 계산되며, 레이아웃은
+  동적으로 동작합니다. 30KB 오버헤드, zero deps. 스마트 API 라우팅: 각 디자인
+  유형에 맞는 Pretext 패턴을 선택합니다. 사용 시점: "finalize this design",
+  "turn this into HTML", "build me a page", "implement this design", 또는
+  모든 planning skill 이후. 사용자가 디자인을 승인했거나 plan이 준비되어 있으면
+  선제적으로 제안하세요. (gstack)
 voice-triggers:
   - "build the design"
   - "code the mockup"
@@ -28,12 +29,13 @@ allowed-tools:
 
 {{PREAMBLE}}
 
-# /design-html: Pretext-Native HTML Engine
+# /design-html: Pretext 네이티브 HTML 엔진
 
-You generate production-quality HTML where text actually works correctly. Not CSS
-approximations. Computed layout via Pretext. Text reflows on resize, heights adjust
-to content, cards size themselves, chat bubbles shrinkwrap, editorial spreads flow
-around obstacles.
+텍스트가 실제로 올바르게 동작하는 프로덕션 품질의 HTML을 생성합니다. CSS로
+근사하는 것이 아닙니다. Pretext를 통해 layout을 계산합니다. 크기 변경 시
+텍스트가 리플로우되고, 높이가 콘텐츠에 맞춰 조정되며, card는 스스로 크기를
+정하고, chat bubble은 shrinkwrap되며, editorial spread는 장애물을 따라
+흐릅니다.
 
 {{DESIGN_SETUP}}
 
@@ -41,13 +43,13 @@ around obstacles.
 
 ---
 
-## Step 0: Input Detection
+## Step 0: 입력 감지
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ```
 
-Detect what design context exists for this project. Run all four checks:
+이 프로젝트에 어떤 디자인 맥락이 있는지 감지하세요. 네 가지 검사를 모두 실행합니다:
 
 ```bash
 setopt +o nomatch 2>/dev/null || true
@@ -74,149 +76,149 @@ _FINALIZED=$(ls -t ~/.gstack/projects/$SLUG/designs/*/finalized.html 2>/dev/null
 [ -f DESIGN.md ] && echo "DESIGN_MD: exists" || echo "NO_DESIGN_MD"
 ```
 
-Now route based on what was found. Check these cases in order:
+이제 발견된 내용에 따라 라우팅합니다. 아래 case를 순서대로 확인하세요:
 
-### Case A: approved.json exists (design-shotgun ran)
+### Case A: approved.json이 존재함 (design-shotgun 실행됨)
 
-If `APPROVED` was found, read it. Extract: approved variant PNG path, user feedback,
-screen name. Also read the CEO plan if one exists (it adds strategic context).
+`APPROVED`가 발견되면 읽으세요. 승인된 variant PNG 경로, 사용자 피드백,
+screen name을 추출합니다. CEO plan이 있으면 함께 읽으세요. 전략적 맥락을 더합니다.
 
-Read `DESIGN.md` if it exists in the repo root. These tokens take priority for
-system-level values (fonts, brand colors, spacing scale).
+repo root에 `DESIGN.md`가 있으면 읽으세요. 이 token들은 system-level 값
+(font, brand color, spacing scale)에 대해 우선순위를 가집니다.
 
-Then check for prior finalized.html. If `FINALIZED` was also found, use AskUserQuestion:
-> Found a prior finalized HTML from a previous session. Want to evolve it
-> (apply new changes on top, preserving your custom edits) or start fresh?
-> A) Evolve — iterate on the existing HTML
-> B) Start fresh — regenerate from the approved mockup
+그런 다음 기존 finalized.html이 있는지 확인합니다. `FINALIZED`도 발견되면 AskUserQuestion을 사용하세요:
+> 이전 세션의 기존 finalized HTML을 찾았습니다. 이것을 발전시킬까요
+> (사용자 custom edit을 보존하면서 새 변경사항 적용), 아니면 새로 시작할까요?
+> A) 발전시키기 — 기존 HTML을 기반으로 반복 개선
+> B) 새로 시작 — 승인된 mockup에서 다시 생성
 
-If evolve: read the existing HTML. Apply changes on top during Step 3.
-If fresh or no finalized.html: proceed to Step 1 with the approved PNG as the
-visual reference.
+발전시키는 경우: 기존 HTML을 읽으세요. Step 3에서 그 위에 변경사항을 적용합니다.
+새로 시작하거나 finalized.html이 없는 경우: 승인된 PNG를 visual reference로 사용하여
+Step 1로 진행합니다.
 
-### Case B: CEO plan and/or design variants exist, but no approved.json
+### Case B: CEO plan 및/또는 design variant가 있지만 approved.json은 없음
 
-If `CEO_PLAN` or `VARIANTS` was found but no `APPROVED`:
+`CEO_PLAN` 또는 `VARIANTS`가 발견되었지만 `APPROVED`가 없으면:
 
-Read whichever context exists:
-- If CEO plan found: read it and summarize the product vision and design requirements.
-- If variant PNGs found: show them inline using the Read tool.
-- If DESIGN.md found: read it for design tokens and constraints.
+존재하는 맥락을 읽으세요:
+- CEO plan이 발견되면: 읽고 product vision과 design requirement를 요약합니다.
+- variant PNG가 발견되면: Read tool을 사용해 inline으로 보여줍니다.
+- DESIGN.md가 발견되면: design token과 constraint를 확인하기 위해 읽습니다.
 
-Use AskUserQuestion:
-> Found [CEO plan from /plan-ceo-review | design review variants from /plan-design-review | both]
-> but no approved design mockup.
-> A) Run /design-shotgun — explore design variants based on the existing plan context
-> B) Skip mockups — I'll design the HTML directly from the plan context
-> C) I have a PNG — let me provide the path
+AskUserQuestion을 사용하세요:
+> [CEO plan from /plan-ceo-review | design review variants from /plan-design-review | 둘 다]를 찾았지만
+> 승인된 design mockup은 없습니다.
+> A) /design-shotgun 실행 — 기존 plan context를 바탕으로 design variant 탐색
+> B) mockup 건너뛰기 — plan context에서 직접 HTML을 디자인
+> C) PNG가 있음 — 경로를 제공하겠습니다
 
-If A: tell the user to run /design-shotgun, then come back to /design-html.
-If B: proceed to Step 1 in "plan-driven mode." There is no approved PNG, the plan is
-the source of truth. Ask the user for a screen name to use for the output directory
-(e.g., "landing-page", "dashboard", "pricing").
-If C: accept a PNG file path from the user and proceed with that as the reference.
+A인 경우: 사용자에게 /design-shotgun을 실행한 뒤 /design-html로 돌아오라고 안내합니다.
+B인 경우: "plan-driven mode"로 Step 1을 진행합니다. 승인된 PNG는 없고, plan이
+source of truth입니다. output directory에 사용할 screen name을 사용자에게 물어보세요
+(예: "landing-page", "dashboard", "pricing").
+C인 경우: 사용자에게 PNG 파일 경로를 받아 reference로 사용하여 진행합니다.
 
-### Case C: Nothing found (clean slate)
+### Case C: 아무것도 없음 (clean slate)
 
-If none of the above produced any context:
+위 검사에서 아무 맥락도 나오지 않으면:
 
-Use AskUserQuestion:
-> No design context found for this project. How do you want to start?
-> A) Run /plan-ceo-review first — think through the product strategy before designing
-> B) Run /plan-design-review first — design review with visual mockups
-> C) Run /design-shotgun — jump straight to visual design exploration
-> D) Just describe it — tell me what you want and I'll design the HTML live
+AskUserQuestion을 사용하세요:
+> 이 프로젝트에서 design context를 찾지 못했습니다. 어떻게 시작할까요?
+> A) 먼저 /plan-ceo-review 실행 — 디자인 전에 product strategy 검토
+> B) 먼저 /plan-design-review 실행 — visual mockup을 포함한 design review
+> C) /design-shotgun 실행 — 바로 visual design exploration으로 이동
+> D) 직접 설명하기 — 원하는 내용을 말해주시면 HTML을 즉석에서 디자인하겠습니다
 
-If A, B, or C: tell the user to run that skill, then come back to /design-html.
-If D: proceed to Step 1 in "freeform mode." Ask the user for a screen name.
+A, B, C인 경우: 해당 skill을 실행한 뒤 /design-html로 돌아오라고 안내합니다.
+D인 경우: "freeform mode"로 Step 1을 진행합니다. 사용자에게 screen name을 물어보세요.
 
-### Context summary
+### 맥락 요약
 
-After routing, output a brief context summary:
+라우팅 후 간단한 맥락 요약을 출력하세요:
 - **Mode:** approved-mockup | plan-driven | freeform | evolve
-- **Visual reference:** path to approved PNG, or "none (plan-driven)" or "none (freeform)"
-- **CEO plan:** path or "none"
-- **Design tokens:** "DESIGN.md" or "none"
-- **Screen name:** from approved.json, user-provided, or inferred from CEO plan
+- **Visual reference:** 승인된 PNG 경로, 또는 "none (plan-driven)" 또는 "none (freeform)"
+- **CEO plan:** 경로 또는 "none"
+- **Design tokens:** "DESIGN.md" 또는 "none"
+- **Screen name:** approved.json, 사용자 제공값, 또는 CEO plan에서 추론한 값
 
 ---
 
-## Step 1: Design Analysis
+## Step 1: 디자인 분석
 
-1. If `$D` is available (`DESIGN_READY`), extract a structured implementation spec:
+1. `$D`를 사용할 수 있으면(`DESIGN_READY`), 구조화된 구현 spec을 추출합니다:
 ```bash
 $D prompt --image <approved-variant.png> --output json
 ```
-This returns colors, typography, layout structure, and component inventory via GPT-4o vision.
+이는 GPT-4o vision을 통해 color, typography, layout structure, component inventory를 반환합니다.
 
-2. If `$D` is not available, read the approved PNG inline using the Read tool.
-   Describe the visual layout, colors, typography, and component structure yourself.
+2. `$D`를 사용할 수 없으면, Read tool을 사용해 승인된 PNG를 inline으로 읽습니다.
+   visual layout, color, typography, component structure를 직접 설명합니다.
 
-3. If in plan-driven or freeform mode (no approved PNG), design from context:
-   - **Plan-driven:** read the CEO plan and/or design review notes. Extract the described
-     UI requirements, user flows, target audience, visual feel (dark/light, dense/spacious),
-     content structure (hero, features, pricing, etc.), and design constraints. Build an
-     implementation spec from the plan's prose rather than a visual reference.
-   - **Freeform:** use AskUserQuestion to gather what the user wants to build. Ask about:
-     purpose/audience, visual feel (dark/light, playful/serious, dense/spacious),
-     content structure (hero, features, pricing, etc.), and any reference sites they like.
-   In both cases, describe the intended visual layout, colors, typography, and
-   component structure as your implementation spec. Generate realistic content based
-   on the plan or user description (never lorem ipsum).
+3. plan-driven 또는 freeform mode(승인된 PNG 없음)인 경우, 맥락에서 디자인합니다:
+   - **Plan-driven:** CEO plan 및/또는 design review note를 읽습니다. 설명된
+     UI requirement, user flow, target audience, visual feel(dark/light, dense/spacious),
+     content structure(hero, features, pricing 등), design constraint를 추출합니다. visual reference가 아니라
+     plan의 prose를 바탕으로 implementation spec을 만듭니다.
+   - **Freeform:** AskUserQuestion을 사용해 사용자가 무엇을 만들고 싶은지 수집합니다. 다음을 물어보세요:
+     purpose/audience, visual feel(dark/light, playful/serious, dense/spacious),
+     content structure(hero, features, pricing 등), 좋아하는 reference site.
+   두 경우 모두 의도한 visual layout, color, typography, component structure를
+   implementation spec으로 설명합니다. plan 또는 사용자 설명을 바탕으로 현실적인 콘텐츠를 생성하세요
+   (절대 lorem ipsum을 사용하지 마세요).
 
-4. Read `DESIGN.md` tokens. These override any extracted values for system-level
-   properties (brand colors, font family, spacing scale).
+4. `DESIGN.md` token을 읽습니다. system-level property(brand color, font family,
+   spacing scale)에 대해 추출된 값보다 우선합니다.
 
-5. Output an "Implementation spec" summary: colors (hex), fonts (family + weights),
+5. "Implementation spec" 요약을 출력하세요: color(hex), font(family + weight),
    spacing scale, component list, layout type.
 
 ---
 
-## Step 2: Smart Pretext API Routing
+## Step 2: 스마트 Pretext API 라우팅
 
-Analyze the approved design and classify it into a Pretext tier. Each tier uses
-different Pretext APIs for optimal results:
+승인된 디자인을 분석하고 Pretext tier로 분류합니다. 각 tier는 최적의 결과를 위해
+서로 다른 Pretext API를 사용합니다:
 
 | Design type | Pretext APIs | Use case |
 |-------------|-------------|----------|
-| Simple layout (landing, marketing) | `prepare()` + `layout()` | Resize-aware heights |
-| Card/grid (dashboard, listing) | `prepare()` + `layout()` | Self-sizing cards |
-| Chat/messaging UI | `prepareWithSegments()` + `walkLineRanges()` | Tight-fit bubbles, min-width |
-| Content-heavy (editorial, blog) | `prepareWithSegments()` + `layoutNextLine()` | Text around obstacles |
+| 단순 layout (landing, marketing) | `prepare()` + `layout()` | Resize-aware height |
+| Card/grid (dashboard, listing) | `prepare()` + `layout()` | Self-sizing card |
+| Chat/messaging UI | `prepareWithSegments()` + `walkLineRanges()` | Tight-fit bubble, min-width |
+| Content-heavy (editorial, blog) | `prepareWithSegments()` + `layoutNextLine()` | 장애물 주변으로 흐르는 텍스트 |
 | Complex editorial | Full engine + `layoutWithLines()` | Manual line rendering |
 
-State the chosen tier and why. Reference the specific Pretext APIs that will be used.
+선택한 tier와 이유를 명시하세요. 사용할 구체적인 Pretext API를 언급합니다.
 
 ---
 
-## Step 2.5: Framework Detection
+## Step 2.5: Framework 감지
 
-Check if the user's project uses a frontend framework:
+사용자 프로젝트가 frontend framework를 사용하는지 확인합니다:
 
 ```bash
 [ -f package.json ] && cat package.json | grep -o '"react"\|"svelte"\|"vue"\|"@angular/core"\|"solid-js"\|"preact"' | head -1 || echo "NONE"
 ```
 
-If a framework is detected, use AskUserQuestion:
-> Detected [React/Svelte/Vue] in your project. What format should the output be?
-> A) Vanilla HTML — self-contained preview file (recommended for first pass)
-> B) [React/Svelte/Vue] component — framework-native with Pretext hooks
+framework가 감지되면 AskUserQuestion을 사용하세요:
+> 프로젝트에서 [React/Svelte/Vue]가 감지되었습니다. 어떤 형식으로 출력할까요?
+> A) Vanilla HTML — self-contained preview file (first pass에 권장)
+> B) [React/Svelte/Vue] component — Pretext hook을 사용한 framework-native
 
-If the user chooses framework output, ask one follow-up:
+사용자가 framework output을 선택하면 follow-up 하나를 물어보세요:
 > A) TypeScript
 > B) JavaScript
 
-For vanilla HTML: proceed to Step 3 with vanilla output.
-For framework output: proceed to Step 3 with framework-specific patterns.
-If no framework detected: default to vanilla HTML, no question needed.
+vanilla HTML의 경우: vanilla output으로 Step 3을 진행합니다.
+framework output의 경우: framework-specific pattern으로 Step 3을 진행합니다.
+framework가 감지되지 않으면: 질문 없이 vanilla HTML을 기본값으로 사용합니다.
 
 ---
 
-## Step 3: Generate Pretext-Native HTML
+## Step 3: Pretext 네이티브 HTML 생성
 
 ### Pretext Source Embedding
 
-For **vanilla HTML output**, check for the vendored Pretext bundle:
+**vanilla HTML output**의 경우, vendored Pretext bundle을 확인합니다:
 ```bash
 _PRETEXT_VENDOR=""
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -225,13 +227,13 @@ _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 [ -n "$_PRETEXT_VENDOR" ] && echo "VENDOR: $_PRETEXT_VENDOR" || echo "VENDOR_MISSING"
 ```
 
-- If `VENDOR` found: read the file and inline it in a `<script>` tag. The HTML file
-  is fully self-contained with zero network dependencies.
-- If `VENDOR_MISSING`: use CDN import as fallback:
+- `VENDOR`가 발견되면: 파일을 읽고 `<script>` tag에 inline합니다. HTML file은
+  network dependency가 전혀 없는 완전한 self-contained 파일입니다.
+- `VENDOR_MISSING`이면: fallback으로 CDN import를 사용합니다:
   `<script type="module">import { prepare, layout, prepareWithSegments, walkLineRanges, layoutNextLine, layoutWithLines } from 'https://esm.sh/@chenglou/pretext'</script>`
-  Add a comment: `<!-- FALLBACK: vendor/pretext.js missing, using CDN -->`
+  comment를 추가합니다: `<!-- FALLBACK: vendor/pretext.js missing, using CDN -->`
 
-For **framework output**, add to the project's dependencies instead:
+**framework output**의 경우, 대신 프로젝트 dependency에 추가합니다:
 ```bash
 # Detect package manager
 [ -f bun.lockb ] && echo "bun add @chenglou/pretext" || \
@@ -239,46 +241,46 @@ For **framework output**, add to the project's dependencies instead:
 [ -f yarn.lock ] && echo "yarn add @chenglou/pretext" || \
 echo "npm install @chenglou/pretext"
 ```
-Run the detected install command. Then use standard imports in the component.
+감지된 install command를 실행합니다. 그런 다음 component에서 standard import를 사용합니다.
 
-### HTML Generation
+### HTML 생성
 
-Write a single file using the Write tool. Save to:
+Write tool을 사용해 단일 파일을 작성합니다. 저장 위치:
 `~/.gstack/projects/$SLUG/designs/<screen-name>-YYYYMMDD/finalized.html`
 
-For framework output, save to:
+framework output의 경우 저장 위치:
 `~/.gstack/projects/$SLUG/designs/<screen-name>-YYYYMMDD/finalized.[tsx|svelte|vue]`
 
-**Always include in vanilla HTML:**
-- Pretext source (inlined or CDN, see above)
-- CSS custom properties for design tokens from DESIGN.md / Step 1 extraction
-- Google Fonts via `<link>` tags + `document.fonts.ready` gate before first `prepare()`
+**vanilla HTML에는 항상 포함하세요:**
+- Pretext source(inline 또는 CDN, 위 참고)
+- DESIGN.md / Step 1 추출값에서 온 design token용 CSS custom properties
+- `<link>` tag를 통한 Google Fonts + 첫 `prepare()` 전 `document.fonts.ready` gate
 - Semantic HTML5 (`<header>`, `<nav>`, `<main>`, `<section>`, `<footer>`)
-- Responsive behavior via Pretext relayout (not just media queries)
-- Breakpoint-specific adjustments at 375px, 768px, 1024px, 1440px
-- ARIA attributes, heading hierarchy, focus-visible states
-- `contenteditable` on text elements + MutationObserver to re-prepare + re-layout on edit
-- ResizeObserver on containers to re-layout on resize
-- `prefers-color-scheme` media query for dark mode
-- `prefers-reduced-motion` for animation respect
-- Real content extracted from the mockup (never lorem ipsum)
+- Pretext relayout을 통한 responsive behavior(media query만 사용하지 않음)
+- 375px, 768px, 1024px, 1440px에서 breakpoint-specific adjustment
+- ARIA attribute, heading hierarchy, focus-visible state
+- text element의 `contenteditable` + edit 시 re-prepare + re-layout하는 MutationObserver
+- container resize 시 re-layout하는 ResizeObserver
+- dark mode용 `prefers-color-scheme` media query
+- animation respect를 위한 `prefers-reduced-motion`
+- mockup에서 추출한 실제 콘텐츠(절대 lorem ipsum 사용 금지)
 
-**Never include (AI slop blacklist):**
-- Purple/blue gradients as default
-- Generic 3-column feature grids
-- Center-everything layouts with no visual hierarchy
-- Decorative blobs, waves, or geometric patterns not in the mockup
-- Stock photo placeholder divs
-- "Get Started" / "Learn More" generic CTAs not from the mockup
-- Rounded-corner cards with drop shadows as the default component
-- Emoji as visual elements
-- Generic testimonial sections
-- Cookie-cutter hero sections with left-text right-image
+**절대 포함하지 마세요(AI slop blacklist):**
+- 기본값으로 purple/blue gradient
+- Generic 3-column feature grid
+- visual hierarchy가 없는 center-everything layout
+- mockup에 없는 장식용 blob, wave, geometric pattern
+- Stock photo placeholder div
+- mockup에 없는 "Get Started" / "Learn More" generic CTA
+- 기본 component로 rounded-corner card + drop shadow
+- visual element로서의 emoji
+- Generic testimonial section
+- left-text right-image 구조의 cookie-cutter hero section
 
-### Pretext Wiring Patterns
+### Pretext Wiring Pattern
 
-Use these patterns based on the tier selected in Step 2. These are the correct
-Pretext API usage patterns. Follow them exactly.
+Step 2에서 선택한 tier에 따라 아래 pattern을 사용하세요. 이는 올바른
+Pretext API 사용 pattern입니다. 정확히 따르세요.
 
 **Pattern 1: Basic height computation (Simple layout, Card/grid)**
 ```js
@@ -433,7 +435,7 @@ setLocale(locale?) → void
 
 ## Step 3.5: Live Reload Server
 
-After writing the HTML file, start a simple HTTP server for live preview:
+HTML 파일 작성 후 live preview를 위한 simple HTTP server를 시작합니다:
 
 ```bash
 # Start a simple HTTP server in the output directory
@@ -446,15 +448,15 @@ echo "SERVER: http://localhost:$_PORT/finalized.html"
 echo "PID: $_SERVER_PID"
 ```
 
-If python3 is not available, fall back to:
+python3를 사용할 수 없으면 다음으로 fallback합니다:
 ```bash
 open <path-to-finalized.html>
 ```
 
-Tell the user: "Live preview running at http://localhost:$_PORT/finalized.html.
-After each edit, just refresh the browser (Cmd+R) to see changes."
+사용자에게 알리세요: "Live preview running at http://localhost:$_PORT/finalized.html.
+각 edit 후 browser를 새로고침(Cmd+R)하면 변경사항을 볼 수 있습니다."
 
-When the refinement loop ends (Step 4 exits), kill the server:
+refinement loop가 종료되면(Step 4 종료), server를 kill합니다:
 ```bash
 kill $_SERVER_PID 2>/dev/null || true
 ```
@@ -463,9 +465,9 @@ kill $_SERVER_PID 2>/dev/null || true
 
 ## Step 4: Preview + Refinement Loop
 
-### Verification Screenshots
+### Verification Screenshot
 
-If `$B` is available (browse binary), take verification screenshots at 3 viewports:
+`$B`를 사용할 수 있으면(browse binary), 3개 viewport에서 verification screenshot을 촬영합니다:
 
 ```bash
 $B goto "file://<path-to-finalized.html>"
@@ -474,78 +476,78 @@ $B screenshot /tmp/gstack-verify-tablet.png --width 768
 $B screenshot /tmp/gstack-verify-desktop.png --width 1440
 ```
 
-Show all three screenshots inline using the Read tool. Check for:
-- Text overflow (text cut off or extending beyond containers)
-- Layout collapse (elements overlapping or missing)
-- Responsive breakage (content not adapting to viewport)
+Read tool을 사용해 세 screenshot을 모두 inline으로 보여줍니다. 다음을 확인하세요:
+- Text overflow(text가 잘리거나 container 밖으로 나감)
+- Layout collapse(element가 겹치거나 누락됨)
+- Responsive breakage(content가 viewport에 맞게 적응하지 않음)
 
-If issues are found, note them and fix before presenting to the user.
+문제가 발견되면 사용자에게 제시하기 전에 기록하고 수정합니다.
 
-If `$B` is not available, skip verification and note:
+`$B`를 사용할 수 없으면 verification을 건너뛰고 다음을 기록합니다:
 "Browse binary not available. Skipping automated viewport verification."
 
 ### Refinement Loop
 
 ```
 LOOP:
-  1. If server is running, tell user to open http://localhost:PORT/finalized.html
-     Otherwise: open <path>/finalized.html
+  1. server가 실행 중이면, 사용자에게 http://localhost:PORT/finalized.html을 열라고 안내합니다
+     아니면: open <path>/finalized.html
 
-  2. If an approved mockup PNG exists, show it inline (Read tool) for visual comparison.
-     If in plan-driven or freeform mode, skip this step.
+  2. 승인된 mockup PNG가 있으면 visual comparison을 위해 inline으로 보여줍니다(Read tool).
+     plan-driven 또는 freeform mode이면 이 단계를 건너뜁니다.
 
-  3. AskUserQuestion (adjust wording based on mode):
-     With mockup: "The HTML is live in your browser. Here's the approved mockup for comparison.
-      Try: resize the window (text should reflow dynamically),
-      click any text (it's editable, layout recomputes instantly).
-      What needs to change? Say 'done' when satisfied."
-     Without mockup: "The HTML is live in your browser. Try: resize the window
-      (text should reflow dynamically), click any text (it's editable, layout
-      recomputes instantly). What needs to change? Say 'done' when satisfied."
+  3. AskUserQuestion(mode에 맞게 문구 조정):
+     mockup 있음: "HTML이 browser에서 live 상태입니다. 비교를 위해 승인된 mockup도 함께 보여드립니다.
+      시도해보세요: window resize(텍스트가 동적으로 reflow되어야 함),
+      아무 text 클릭(editable이며 layout이 즉시 다시 계산됨).
+      무엇을 바꿔야 하나요? 만족하면 'done'이라고 말해주세요."
+     mockup 없음: "HTML이 browser에서 live 상태입니다. 시도해보세요: window resize
+      (텍스트가 동적으로 reflow되어야 함), 아무 text 클릭(editable이며 layout이
+      즉시 다시 계산됨). 무엇을 바꿔야 하나요? 만족하면 'done'이라고 말해주세요."
 
-  4. If "done" / "ship it" / "looks good" / "perfect" → exit loop, go to Step 5
+  4. "done" / "ship it" / "looks good" / "perfect" → loop 종료, Step 5로 이동
 
-  5. Apply feedback using targeted Edit tool changes on the HTML file
-     (do NOT regenerate the entire file — surgical edits only)
+  5. HTML file에 targeted Edit tool change로 feedback을 적용합니다
+     (전체 파일을 다시 생성하지 마세요 — surgical edit만 사용)
 
-  6. Brief summary of what changed (2-3 lines max)
+  6. 변경사항에 대한 짧은 요약(최대 2-3줄)
 
-  7. If verification screenshots are available, re-take them to confirm the fix
+  7. verification screenshot을 사용할 수 있으면 다시 촬영해 fix를 확인합니다
 
-  8. Go to LOOP
+  8. LOOP로 돌아갑니다
 ```
 
-Maximum 10 iterations. If the user hasn't said "done" after 10, use AskUserQuestion:
-"We've done 10 rounds of refinement. Want to continue iterating or call it done?"
+최대 10번 반복합니다. 사용자가 10번 이후에도 "done"이라고 말하지 않았다면 AskUserQuestion을 사용하세요:
+"refinement를 10라운드 진행했습니다. 계속 반복할까요, 아니면 여기서 완료할까요?"
 
 ---
 
-## Step 5: Save & Next Steps
+## Step 5: 저장 및 다음 단계
 
-### Design Token Extraction
+### Design Token 추출
 
-If no `DESIGN.md` exists in the repo root, offer to create one from the generated HTML:
+repo root에 `DESIGN.md`가 없으면 생성된 HTML에서 만들 것을 제안합니다:
 
-Extract from the HTML:
-- CSS custom properties (colors, spacing, font sizes)
-- Font families and weights used
-- Color palette (primary, secondary, accent, neutral)
+HTML에서 추출:
+- CSS custom properties(color, spacing, font size)
+- 사용된 Font family 및 weight
+- Color palette(primary, secondary, accent, neutral)
 - Spacing scale
-- Border radius values
-- Shadow values
+- Border radius value
+- Shadow value
 
-Use AskUserQuestion:
-> No DESIGN.md found. I can extract the design tokens from the HTML we just built
-> and create a DESIGN.md for your project. This means future /design-shotgun and
-> /design-html runs will be style-consistent automatically.
-> A) Create DESIGN.md from these tokens
-> B) Skip — I'll handle the design system later
+AskUserQuestion을 사용하세요:
+> DESIGN.md를 찾지 못했습니다. 방금 만든 HTML에서 design token을 추출해
+> 프로젝트용 DESIGN.md를 만들 수 있습니다. 이렇게 하면 이후 /design-shotgun 및
+> /design-html 실행이 자동으로 style-consistent해집니다.
+> A) 이 token들로 DESIGN.md 생성
+> B) 건너뛰기 — design system은 나중에 처리하겠습니다
 
-If A: write `DESIGN.md` to the repo root with the extracted tokens.
+A인 경우: 추출한 token으로 repo root에 `DESIGN.md`를 작성합니다.
 
-### Save Metadata
+### Metadata 저장
 
-Write `finalized.json` alongside the HTML:
+HTML 옆에 `finalized.json`을 작성합니다:
 ```json
 {
   "source_mockup": "<approved variant PNG path or null>",
@@ -561,34 +563,33 @@ Write `finalized.json` alongside the HTML:
 }
 ```
 
-### Next Steps
+### 다음 단계
 
-Use AskUserQuestion:
-> Design finalized with Pretext-native layout. What's next?
-> A) Copy to project — copy the HTML/component into your codebase
-> B) Iterate more — keep refining
-> C) Done — I'll use this as a reference
+AskUserQuestion을 사용하세요:
+> Pretext-native layout으로 디자인이 최종화되었습니다. 다음은 무엇을 할까요?
+> A) 프로젝트에 복사 — HTML/component를 codebase로 복사
+> B) 더 반복 — 계속 다듬기
+> C) 완료 — 이것을 reference로 사용하겠습니다
 
 ---
 
-## Important Rules
+## 중요한 규칙
 
-- **Source of truth fidelity over code elegance.** When an approved mockup exists,
-  pixel-match it. If that requires `width: 312px` instead of a CSS grid class, that's
-  correct. When in plan-driven or freeform mode, the user's feedback during the
-  refinement loop is the source of truth. Code cleanup happens later during
-  component extraction.
+- **Code elegance보다 source of truth 충실도를 우선합니다.** 승인된 mockup이 있으면
+  pixel-match하세요. 이를 위해 CSS grid class 대신 `width: 312px`가 필요하다면 그것이
+  맞습니다. plan-driven 또는 freeform mode에서는 refinement loop 중 사용자의 feedback이
+  source of truth입니다. Code cleanup은 나중에 component extraction 단계에서 수행합니다.
 
-- **Always use Pretext for text layout.** Even if the design looks simple, Pretext
-  ensures correct height computation on resize. The overhead is 30KB. Every page benefits.
+- **텍스트 layout에는 항상 Pretext를 사용하세요.** 디자인이 단순해 보여도 Pretext는
+  resize 시 올바른 height computation을 보장합니다. 오버헤드는 30KB입니다. 모든 page가 이점을 얻습니다.
 
-- **Surgical edits in the refinement loop.** Use the Edit tool to make targeted changes,
-  not the Write tool to regenerate the entire file. The user may have made manual edits
-  via contenteditable that should be preserved.
+- **Refinement loop에서는 surgical edit만 사용하세요.** 전체 파일을 다시 생성하기 위해
+  Write tool을 사용하지 말고, targeted change에는 Edit tool을 사용하세요. 사용자가
+  contenteditable을 통해 수동 edit을 했을 수 있으며, 이는 보존되어야 합니다.
 
-- **Real content only.** When a mockup exists, extract text from it. In plan-driven mode,
-  use content from the plan. In freeform mode, generate realistic content based on the
-  user's description. Never use "Lorem ipsum", "Your text here", or placeholder content.
+- **실제 콘텐츠만 사용하세요.** mockup이 있으면 그 안의 text를 추출합니다. plan-driven mode에서는
+  plan의 콘텐츠를 사용합니다. freeform mode에서는 사용자 설명을 바탕으로 현실적인 콘텐츠를 생성합니다.
+  "Lorem ipsum", "Your text here", placeholder content는 절대 사용하지 마세요.
 
-- **One page per invocation.** For multi-page designs, run /design-html once per page.
-  Each run produces one HTML file.
+- **호출 한 번당 한 page입니다.** multi-page design의 경우 page마다 /design-html을 한 번씩 실행하세요.
+  각 실행은 HTML file 하나를 생성합니다.

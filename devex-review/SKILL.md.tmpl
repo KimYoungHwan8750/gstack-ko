@@ -3,13 +3,14 @@ name: devex-review
 preamble-tier: 3
 version: 1.0.0
 description: |
-  Live developer experience audit. Uses the browse tool to actually TEST the
-  developer experience: navigates docs, tries the getting started flow, times
-  TTHW, screenshots error messages, evaluates CLI help text. Produces a DX
-  scorecard with evidence. Compares against /plan-devex-review scores if they
-  exist (the boomerang: plan said 3 minutes, reality says 8). Use when asked to
-  "test the DX", "DX audit", "developer experience test", or "try the
-  onboarding". Proactively suggest after shipping a developer-facing feature. (gstack)
+  라이브 개발자 경험 감사입니다. browse 도구를 사용해 개발자 경험을 실제로
+  테스트합니다. 문서를 탐색하고, getting started 플로우를 시도하고, TTHW를
+  측정하며, 오류 메시지를 스크린샷으로 남기고, CLI 도움말 텍스트를 평가합니다.
+  증거가 포함된 DX 스코어카드를 생성합니다. /plan-devex-review 점수가 있으면
+  해당 점수와 비교합니다(boomerang: 플랜은 3분이라고 했지만 실제는 8분인 경우).
+  "test the DX", "DX audit", "developer experience test", 또는 "try the
+  onboarding" 요청 시 사용하세요. 개발자 대상 기능을 출시한 뒤 선제적으로
+  제안하세요. (gstack)
 voice-triggers:
   - "dx audit"
   - "test the developer experience"
@@ -31,50 +32,49 @@ allowed-tools:
 
 {{BROWSE_SETUP}}
 
-# /devex-review: Live Developer Experience Audit
+# /devex-review: 라이브 개발자 경험 감사
 
-You are a DX engineer dogfooding a live developer product. Not reviewing a plan.
-Not reading about the experience. TESTING it.
+당신은 라이브 개발자 제품을 직접 사용해 검증하는 DX 엔지니어입니다. 플랜을 리뷰하는 것이 아닙니다.
+경험에 대해 읽는 것도 아닙니다. 직접 테스트하는 것입니다.
 
-Use the browse tool to navigate docs, try the getting started flow, and screenshot
-what developers actually see. Use bash to try CLI commands. Measure, don't guess.
+browse 도구를 사용해 문서를 탐색하고, getting started 플로우를 시도하며, 개발자가 실제로 보는 화면을 스크린샷으로 남기세요. bash를 사용해 CLI 명령을 시도하세요. 추측하지 말고 측정하세요.
 
 {{DX_FRAMEWORK}}
 
-## Scope Declaration
+## 범위 선언
 
-Browse can test web-accessible surfaces: docs pages, API playgrounds, web dashboards,
-signup flows, interactive tutorials, error pages.
+Browse는 웹에서 접근 가능한 표면을 테스트할 수 있습니다: 문서 페이지, API playground, 웹 대시보드,
+가입 플로우, 인터랙티브 튜토리얼, 오류 페이지.
 
-Browse CANNOT test: CLI install friction, terminal output quality, local environment
-setup, email verification flows, auth requiring real credentials, offline behavior,
-build times, IDE integration.
+Browse가 테스트할 수 없는 것: CLI 설치 마찰, 터미널 출력 품질, 로컬 환경
+설정, 이메일 인증 플로우, 실제 자격 증명이 필요한 인증, 오프라인 동작,
+빌드 시간, IDE 통합.
 
-For untestable dimensions, use bash (for CLI --help, README, CHANGELOG) or mark as
-INFERRED from artifacts. Never guess. State your evidence source for every score.
+테스트할 수 없는 차원에는 bash를 사용하거나(CLI --help, README, CHANGELOG) 아티팩트에서
+추론된 것으로 표시하세요. 절대 추측하지 마세요. 모든 점수에 대해 증거 출처를 명시하세요.
 
-## Step 0: Target Discovery
+## Step 0: 대상 찾기
 
-1. Read CLAUDE.md for project URL, docs URL, CLI install command
-2. Read README.md for getting started instructions
-3. Read package.json or equivalent for install commands
+1. CLAUDE.md에서 프로젝트 URL, 문서 URL, CLI 설치 명령을 읽습니다
+2. README.md에서 getting started 지침을 읽습니다
+3. package.json 또는 이에 준하는 파일에서 설치 명령을 읽습니다
 
-If URLs are missing, AskUserQuestion: "What's the URL for the docs/product I should test?"
+URL이 없으면 AskUserQuestion을 사용하세요: "What's the URL for the docs/product I should test?"
 
-### Boomerang Baseline
+### Boomerang 기준선
 
-Check for prior /plan-devex-review scores:
+이전 /plan-devex-review 점수를 확인하세요:
 
 ```bash
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ~/.claude/skills/gstack/bin/gstack-review-read 2>/dev/null | grep plan-devex-review || echo "NO_PRIOR_PLAN_REVIEW"
 ```
 
-If prior scores exist, display them. These are your baseline for the boomerang comparison.
+이전 점수가 있으면 표시하세요. 이것이 boomerang 비교의 기준선입니다.
 
-## Step 1: Getting Started Audit
+## Step 1: Getting Started 감사
 
-Navigate to the docs/landing page via browse. Screenshot it.
+browse로 문서/랜딩 페이지로 이동하세요. 스크린샷을 남기세요.
 
 ```
 GETTING STARTED AUDIT
@@ -85,75 +85,75 @@ Step 2: [what dev does]          Time: [est]  Friction: [low/med/high]  Evidence
 TOTAL: [N steps, M minutes]
 ```
 
-Score 0-10. Load "## Pass 1" from dx-hall-of-fame.md for calibration.
+0-10점으로 평가하세요. 보정 기준으로 dx-hall-of-fame.md의 "## Pass 1"을 불러오세요.
 
-## Step 2: API/CLI/SDK Ergonomics Audit
+## Step 2: API/CLI/SDK 사용성 감사
 
-Test what you can:
-- CLI: Run `--help` via bash. Evaluate output quality, flag design, discoverability.
-- API playground: Navigate via browse if one exists. Screenshot.
-- Naming: Check consistency across the API surface.
+테스트할 수 있는 것을 테스트하세요:
+- CLI: bash로 `--help`를 실행하세요. 출력 품질, 플래그 설계, 발견 가능성을 평가하세요.
+- API playground: 존재하면 browse로 이동하세요. 스크린샷을 남기세요.
+- 네이밍: API 표면 전반의 일관성을 확인하세요.
 
-Score 0-10. Load "## Pass 2" from dx-hall-of-fame.md for calibration.
+0-10점으로 평가하세요. 보정 기준으로 dx-hall-of-fame.md의 "## Pass 2"를 불러오세요.
 
-## Step 3: Error Message Audit
+## Step 3: 오류 메시지 감사
 
-Trigger common error scenarios:
-- Browse: Navigate to 404 pages, submit invalid forms, try unauthenticated access
-- CLI: Run with missing args, invalid flags, bad input
+일반적인 오류 시나리오를 유발하세요:
+- Browse: 404 페이지로 이동하고, 유효하지 않은 폼을 제출하고, 인증되지 않은 접근을 시도하세요
+- CLI: 누락된 인자, 유효하지 않은 플래그, 잘못된 입력으로 실행하세요
 
-Screenshot each error. Score against the Elm/Rust/Stripe three-tier model.
+각 오류를 스크린샷으로 남기세요. Elm/Rust/Stripe 3단계 모델 기준으로 평가하세요.
 
-Score 0-10. Load "## Pass 3" from dx-hall-of-fame.md for calibration.
+0-10점으로 평가하세요. 보정 기준으로 dx-hall-of-fame.md의 "## Pass 3"을 불러오세요.
 
-## Step 4: Documentation Audit
+## Step 4: 문서 감사
 
-Navigate the docs structure via browse:
-- Check search functionality (try 3 common queries)
-- Verify code examples are copy-paste-complete
-- Check language switcher behavior
-- Check information architecture (can you find what you need in <2 min?)
+browse로 문서 구조를 탐색하세요:
+- 검색 기능을 확인하세요(일반적인 쿼리 3개 시도)
+- 코드 예제가 복사-붙여넣기로 완전한지 검증하세요
+- 언어 전환기 동작을 확인하세요
+- 정보 구조를 확인하세요(필요한 정보를 <2분 안에 찾을 수 있나요?)
 
-Screenshot key findings. Score 0-10. Load "## Pass 4" from dx-hall-of-fame.md.
+핵심 발견 사항을 스크린샷으로 남기세요. 0-10점으로 평가하세요. dx-hall-of-fame.md의 "## Pass 4"를 불러오세요.
 
-## Step 5: Upgrade Path Audit
+## Step 5: 업그레이드 경로 감사
 
-Read via bash:
-- CHANGELOG quality (clear? user-facing? migration notes?)
-- Migration guides (exist? step-by-step?)
-- Deprecation warnings in code (grep for deprecated/obsolete)
+bash로 읽으세요:
+- CHANGELOG 품질(명확한가? 사용자 관점인가? 마이그레이션 노트가 있는가?)
+- 마이그레이션 가이드(존재하는가? 단계별인가?)
+- 코드의 deprecation 경고(deprecated/obsolete grep)
 
-Score 0-10. Evidence: INFERRED from files. Load "## Pass 5" from dx-hall-of-fame.md.
+0-10점으로 평가하세요. 증거: 파일에서 추론됨. dx-hall-of-fame.md의 "## Pass 5"를 불러오세요.
 
-## Step 6: Developer Environment Audit
+## Step 6: 개발자 환경 감사
 
-Read via bash:
-- README setup instructions (steps? prerequisites? platform coverage?)
-- CI/CD configuration (exists? documented?)
-- TypeScript types (if applicable)
-- Test utilities / fixtures
+bash로 읽으세요:
+- README 설정 지침(단계? 필수 조건? 플랫폼 커버리지?)
+- CI/CD 설정(존재하는가? 문서화되어 있는가?)
+- TypeScript 타입(해당하는 경우)
+- 테스트 유틸리티 / fixtures
 
-Score 0-10. Evidence: INFERRED from files. Load "## Pass 6" from dx-hall-of-fame.md.
+0-10점으로 평가하세요. 증거: 파일에서 추론됨. dx-hall-of-fame.md의 "## Pass 6"을 불러오세요.
 
-## Step 7: Community & Ecosystem Audit
+## Step 7: 커뮤니티 및 생태계 감사
 
 Browse:
-- Community links (GitHub Discussions, Discord, Stack Overflow)
-- GitHub issues (response time, templates, labels)
-- Contributing guide
+- 커뮤니티 링크(GitHub Discussions, Discord, Stack Overflow)
+- GitHub 이슈(응답 시간, 템플릿, 라벨)
+- 기여 가이드
 
-Score 0-10. Evidence: TESTED where web-accessible, INFERRED otherwise.
+0-10점으로 평가하세요. 증거: 웹에서 접근 가능한 경우 테스트됨, 그 외에는 추론됨.
 
-## Step 8: DX Measurement Audit
+## Step 8: DX 측정 감사
 
-Check for feedback mechanisms:
-- Bug report templates
-- NPS or feedback widgets
-- Analytics on docs
+피드백 메커니즘을 확인하세요:
+- 버그 리포트 템플릿
+- NPS 또는 피드백 위젯
+- 문서의 analytics
 
-Score 0-10. Evidence: INFERRED from files/pages.
+0-10점으로 평가하세요. 증거: 파일/페이지에서 추론됨.
 
-## DX Scorecard with Evidence
+## 증거가 포함된 DX 스코어카드
 
 ```
 +====================================================================+
@@ -175,9 +175,9 @@ Score 0-10. Evidence: INFERRED from files/pages.
 +====================================================================+
 ```
 
-## Boomerang Comparison
+## Boomerang 비교
 
-If /plan-devex-review scores exist from the baseline check:
+기준선 확인에서 /plan-devex-review 점수가 존재하면:
 
 ```
 PLAN vs REALITY
@@ -195,11 +195,11 @@ PLAN vs REALITY
 | TTHW             | __ min    | __ min    | __ min| ⚠/✓   |
 ```
 
-Flag any dimension where live score < plan score - 2 (reality fell short of plan).
+라이브 점수 < 플랜 점수 - 2인 모든 차원을 플래그로 표시하세요(현실이 플랜에 미치지 못함).
 
-## Review Log
+## 리뷰 로그
 
-**PLAN MODE EXCEPTION — ALWAYS RUN:**
+**PLAN MODE 예외 — 항상 실행:**
 
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"devex-review","timestamp":"TIMESTAMP","status":"STATUS","overall_score":N,"product_type":"TYPE","tthw_measured":"TTHW","dimensions_tested":N,"dimensions_inferred":N,"boomerang":"YES_OR_NO","commit":"COMMIT"}'
@@ -211,15 +211,15 @@ Flag any dimension where live score < plan score - 2 (reality fell short of plan
 
 {{LEARNINGS_LOG}}
 
-## Next Steps
+## 다음 단계
 
-After the audit, recommend:
-- Fix the gaps found (specific, actionable fixes)
-- Re-run /devex-review after fixes to verify improvement
-- If boomerang showed significant gaps, re-run /plan-devex-review on the next feature plan
+감사 후 다음을 권장하세요:
+- 발견된 격차를 수정하세요(구체적이고 실행 가능한 수정)
+- 수정 후 /devex-review를 다시 실행해 개선을 검증하세요
+- boomerang에서 큰 격차가 드러났다면 다음 기능 플랜에 /plan-devex-review를 다시 실행하세요
 
-## Formatting Rules
+## 포매팅 규칙
 
-* NUMBER issues (1, 2, 3...) and LETTERS for options (A, B, C...).
-* Rate every dimension with evidence source.
-* Screenshots are the gold standard. File references are acceptable. Guesses are not.
+* 이슈에는 숫자(1, 2, 3...), 옵션에는 문자(A, B, C...)를 사용하세요.
+* 모든 차원을 증거 출처와 함께 평가하세요.
+* 스크린샷이 최선의 증거입니다. 파일 참조도 허용됩니다. 추측은 허용되지 않습니다.
