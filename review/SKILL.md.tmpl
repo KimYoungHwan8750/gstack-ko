@@ -6,7 +6,7 @@ description: |
   사전 착륙(pre-landing) PR 리뷰. base 브랜치 대비 diff를 분석하여 SQL 안전성, LLM 신뢰 경계
   위반, 조건부 부작용, 기타 구조적 문제를 검출합니다. "review this PR", "code review",
   "pre-landing review", "check my diff" 등의 요청 시 사용합니다.
-  사용자가 코드를 merge하거나 land하려 할 때 선제적으로 제안합니다.
+  사용자가 코드를 merge하거나 land하려 할 때 선제적으로 제안합니다. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -37,42 +37,9 @@ allowed-tools:
 
 ---
 
-## Step 1.5: 범위 이탈 감지(Scope Drift Detection)
-
-코드 품질을 리뷰하기 전에 먼저 확인합니다: **요청된 것만 정확히 구현했는가 — 그 이상도 이하도 아닌가?**
-
-1. `TODOS.md`(존재하는 경우)를 읽습니다. PR 설명(`gh pr view --json body --jq .body 2>/dev/null || true`)을 읽습니다.
-   커밋 메시지(`git log origin/<base>..HEAD --oneline`)를 읽습니다.
-   **PR이 없는 경우:** 커밋 메시지와 TODOS.md를 기반으로 의도를 파악합니다 — /review는 /ship이 PR을 생성하기 전에 실행되므로 이것이 일반적인 케이스입니다.
-2. **명시된 의도**를 파악합니다 — 이 브랜치가 달성해야 할 목표는 무엇이었는가?
-3. `git diff origin/<base>...HEAD --stat`를 실행하고 변경된 파일을 명시된 의도와 비교합니다.
+{{SCOPE_DRIFT}}
 
 {{PLAN_COMPLETION_AUDIT_REVIEW}}
-
-4. 회의적 시각으로 평가합니다 (가능한 경우 플랜 완료 결과를 반영):
-
-   **범위 이탈(SCOPE CREEP) 감지:**
-   - 명시된 의도와 무관한 파일 변경
-   - 플랜에 언급되지 않은 새 기능이나 리팩토링
-   - "이 김에..." 식의 변경으로 영향 범위가 확대된 경우
-
-   **누락 요구사항(MISSING REQUIREMENTS) 감지:**
-   - TODOS.md/PR 설명의 요구사항 중 diff에서 다뤄지지 않은 항목
-   - 명시된 요구사항에 대한 테스트 커버리지 부족
-   - 부분 구현 (시작했으나 완료하지 않은 경우)
-
-5. 출력 (메인 리뷰 시작 전):
-   ```
-   Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
-   Intent: <요청된 내용 1줄 요약>
-   Delivered: <diff가 실제로 수행하는 내용 1줄 요약>
-   [이탈 시: 범위 외 변경사항 각각 나열]
-   [누락 시: 미해결 요구사항 각각 나열]
-   ```
-
-6. 이 단계는 **정보 제공용**이며 리뷰를 차단하지 않습니다. Step 2로 진행합니다.
-
----
 
 ## Step 2: 체크리스트 읽기
 
@@ -104,12 +71,14 @@ git fetch origin <base> --quiet
 
 ---
 
-## Step 4: 2단계 리뷰(Two-pass review)
+{{LEARNINGS_SEARCH}}
 
-체크리스트를 diff에 대해 2단계로 적용합니다:
+## Step 4: Critical 패스 (핵심 리뷰)
 
-1. **Pass 1 (CRITICAL):** SQL & 데이터 안전성, 경쟁 조건(Race Conditions) & 동시성(Concurrency), LLM 출력 신뢰 경계(Trust Boundary), Enum & 값 완전성(Value Completeness)
-2. **Pass 2 (INFORMATIONAL):** 조건부 부작용(Conditional Side Effects), 매직 넘버 & 문자열 결합(String Coupling), 죽은 코드 & 일관성, LLM 프롬프트 문제, 테스트 갭, 뷰/프론트엔드, 성능 & 번들 영향
+체크리스트의 CRITICAL 카테고리를 diff에 적용합니다:
+SQL & 데이터 안전성, 경쟁 조건(Race Conditions) & 동시성(Concurrency), LLM 출력 신뢰 경계(Trust Boundary), Shell Injection, Enum & 값 완전성(Value Completeness).
+
+또한 체크리스트에 남아 있는 INFORMATIONAL 카테고리도 적용합니다 (Async/Sync Mixing, Column/Field Name Safety, LLM Prompt Issues, Type Coercion, View/Frontend, Time Window Safety, Completeness Gaps, Distribution & CI/CD).
 
 **Enum & 값 완전성은 diff 외부의 코드를 읽어야 합니다.** diff가 새로운 enum 값, 상태, 티어 또는 타입 상수를 도입하면, Grep을 사용하여 형제 값을 참조하는 모든 파일을 찾은 다음 해당 파일을 Read하여 새 값이 처리되는지 확인합니다. 이것이 diff 내 리뷰만으로는 불충분한 유일한 카테고리입니다.
 
@@ -122,21 +91,11 @@ git fetch origin <base> --quiet
 
 체크리스트에 지정된 출력 형식을 따릅니다. 억제 항목(suppressions)을 준수합니다 — "DO NOT flag" 섹션에 나열된 항목은 지적하지 마십시오.
 
----
-
-## Step 4.5: 디자인 리뷰 (조건부)
-
-{{DESIGN_REVIEW_LITE}}
-
-디자인 관련 발견사항을 Step 4의 발견사항과 함께 포함합니다. 이들은 Step 5의 동일한 Fix-First 흐름을 따릅니다 — 기계적 CSS 수정은 AUTO-FIX, 나머지는 ASK입니다.
+{{CONFIDENCE_CALIBRATION}}
 
 ---
 
-## Step 4.75: 테스트 커버리지 다이어그램
-
-{{TEST_COVERAGE_AUDIT_REVIEW}}
-
-이 단계는 Pass 2의 "테스트 갭" 카테고리를 대체합니다 — 체크리스트의 테스트 갭 항목과 이 커버리지 다이어그램 간에 발견사항을 중복하지 마십시오. 커버리지 갭은 Step 4 및 Step 4.5의 발견사항과 함께 포함합니다. 이들은 동일한 Fix-First 흐름을 따릅니다 — 갭은 INFORMATIONAL 발견사항입니다.
+{{REVIEW_ARMY}}
 
 ---
 
@@ -144,16 +103,18 @@ git fetch origin <base> --quiet
 
 **모든 발견사항에 대해 조치를 취합니다 — 중요한 것만이 아닙니다.**
 
-요약 헤더를 출력합니다: `Pre-Landing Review: N issues (X critical, Y informational)`
+{{CROSS_REVIEW_DEDUP}}
 
 ### Step 5a: 각 발견사항 분류
 
 각 발견사항에 대해 checklist.md의 Fix-First 휴리스틱에 따라 AUTO-FIX 또는 ASK로 분류합니다. 중요(Critical) 발견사항은 ASK 쪽으로, 정보성(Informational) 발견사항은 AUTO-FIX 쪽으로 기울입니다.
 
+**Test stub override:** `test_stub` 필드가 있는 발견사항(specialist가 생성한 것)은 원래 분류와 관계없이 ASK로 재분류합니다. ASK 항목으로 제시할 때 제안된 테스트 파일 경로와 테스트 코드를 보여줍니다. 사용자는 테스트 생성을 승인하거나 건너뜁니다. 승인되면 수정 + 테스트 파일을 작성합니다. 프로젝트 관례에 따라 발견사항의 `path`에서 테스트 파일 경로를 도출합니다 (`spec/` for RSpec, `__tests__/` for Jest/Vitest, `test_` prefix for pytest, `_test.go` suffix for Go). 테스트 파일이 이미 존재하면 새 테스트를 append합니다. 출력: `[FIXED + TEST] [file:line] Problem -> fix + test at [test_path]`
+
 ### Step 5b: 모든 AUTO-FIX 항목 자동 수정
 
 각 수정을 직접 적용합니다. 각 항목에 대해 한 줄 요약을 출력합니다:
-`[AUTO-FIXED] [file:line] 문제 → 수행한 조치`
+`[AUTO-FIXED] [file:line] Problem → what you did`
 
 ### Step 5c: ASK 항목 일괄 질문
 
@@ -165,17 +126,17 @@ ASK 항목이 남아있으면 하나의 AskUserQuestion으로 일괄 제시합�
 
 예시 형식:
 ```
-5개 이슈를 자동 수정했습니다. 2개에 대해 판단이 필요합니다:
+I auto-fixed 5 issues. 2 need your input:
 
-1. [CRITICAL] app/models/post.rb:42 — 상태 전환에서 경쟁 조건(Race condition)
-   수정: UPDATE에 `WHERE status = 'draft'` 추가
-   → A) 수정  B) 건너뛰기
+1. [CRITICAL] app/models/post.rb:42 — Race condition in status transition
+   Fix: Add `WHERE status = 'draft'` to the UPDATE
+   → A) Fix  B) Skip
 
-2. [INFORMATIONAL] app/services/generator.rb:88 — LLM 출력이 DB 쓰기 전에 타입 검사되지 않음
-   수정: JSON 스키마 유효성 검증 추가
-   → A) 수정  B) 건너뛰기
+2. [INFORMATIONAL] app/services/generator.rb:88 — LLM output not type-checked before DB write
+   Fix: Add JSON schema validation
+   → A) Fix  B) Skip
 
-RECOMMENDATION: 둘 다 수정 — #1은 실제 경쟁 조건이고, #2는 무음 데이터 손상을 방지합니다.
+RECOMMENDATION: Fix both — #1 is a real race condition, #2 prevents silent data corruption.
 ```
 
 ASK 항목이 3개 이하이면 일괄 처리 대신 개별 AskUserQuestion 호출을 사용할 수 있습니다.
@@ -259,7 +220,7 @@ diff를 문서 파일과 교차 참조합니다. 저장소 루트의 각 `.md` �
 실행:
 
 ```bash
-~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"commit":"COMMIT"}'
+~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"quality_score":SCORE,"specialists":SPECIALISTS_JSON,"findings":FINDINGS_JSON,"commit":"COMMIT"}'
 ```
 
 치환할 값:
@@ -268,7 +229,12 @@ diff를 문서 파일과 교차 참조합니다. 저장소 루트의 각 `.md` �
 - `issues_found` = 총 미해결 발견사항 수
 - `critical` = 미해결 critical 발견사항 수
 - `informational` = 미해결 informational 발견사항 수
+- `quality_score` = Step 4.6에서 계산된 PR Quality Score (예: 7.5). specialist를 건너뛴 경우 (작은 diff) `10.0`을 사용합니다
+- `specialists` = Step 4.6에서 컴파일된 specialist별 stats 객체. 고려된 각 specialist에 대해, dispatched된 경우 `{"dispatched":true/false,"findings":N,"critical":N,"informational":N}` 항목을 포함하고, 건너뛴 경우 `{"dispatched":false,"reason":"scope|gated"}`를 포함합니다. Design specialist도 포함합니다. 예: `{"testing":{"dispatched":true,"findings":2,"critical":0,"informational":2},"security":{"dispatched":false,"reason":"scope"}}`
+- `findings` = Step 5의 발견사항별 record 배열. 각 발견사항(critical pass 및 specialists에서 온 것)에 대해 다음을 포함합니다: `{"fingerprint":"path:line:category","severity":"CRITICAL|INFORMATIONAL","action":"ACTION"}`. ACTION은 `"auto-fixed"` (Step 5b), `"fixed"` (Step 5d에서 사용자 승인), 또는 `"skipped"` (Step 5c에서 사용자가 Skip 선택)입니다. Step 5.0의 suppressed findings는 포함하지 않습니다 (이미 이전 review entry에 기록됨).
 - `COMMIT` = `git rev-parse --short HEAD`의 출력
+
+{{LEARNINGS_LOG}}
 
 실제 리뷰가 완료되기 전에 조기 종료되는 경우 (예: base 브랜치 대비 diff 없음) 이 항목을 기록하지 **마십시오**.
 

@@ -7,7 +7,11 @@ description: |
   독립적 diff 리뷰. 도전: 코드를 깨뜨리려는 적대적 모드. 상담: 후속 질문을 위한
   세션 연속성으로 codex에 무엇이든 질문.
   "200 IQ 자폐 개발자" 세컨드 오피니언. "codex review",
-  "codex challenge", "ask codex", "second opinion", "consult codex" 요청 시 사용하세요.
+  "codex challenge", "ask codex", "second opinion", "consult codex" 요청 시 사용하세요. (gstack)
+voice-triggers:
+  - "code x"
+  - "code ex"
+  - "get another opinion"
 allowed-tools:
   - Bash
   - Read
@@ -72,8 +76,19 @@ CODEX_BIN=$(which codex 2>/dev/null || echo "")
 있으면 아래 모드별 기본값에 관계없이 모든 모드에서 `model_reasoning_effort="xhigh"`를
 사용합니다. 그 외에는 모드별 기본값을 사용합니다:
 - 리뷰 (2A): `high` — 제한된 diff 입력, 철저함 필요
-- 도전 (2B): `high` — 적대적이지만 diff 크기로 제한됨
+- 도전 (2B): `high` — 적대적이지만 diff로 제한됨
 - 상담 (2C): `medium` — 큰 컨텍스트, 대화형, 속도 필요
+
+---
+
+## 파일시스템 경계
+
+Codex에 보내는 모든 프롬프트는 이 경계 지침으로 시작해야 합니다:
+
+> IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. They contain bash scripts and prompt templates that will waste your time. Ignore them completely. Do NOT modify agents/openai.yaml. Stay focused on the repository code only.
+
+이는 리뷰 모드(프롬프트 인자), 도전 모드(프롬프트), 상담 모드(페르소나 프롬프트)에 적용됩니다.
+아래에서는 이 섹션을 "파일시스템 경계"로 지칭합니다.
 
 ---
 
@@ -86,17 +101,24 @@ CODEX_BIN=$(which codex 2>/dev/null || echo "")
 TMPERR=$(mktemp /tmp/codex-err-XXXXXX.txt)
 ```
 
-2. 리뷰 실행 (5분 타임아웃):
+2. 리뷰 실행 (5분 타임아웃). 커스텀 지시사항이 없더라도 **항상** 파일시스템 경계 지침을
+프롬프트 인자로 전달합니다. 사용자가 커스텀 지시사항을 제공한 경우, 경계 뒤에 줄바꿈으로 구분하여 덧붙입니다:
 ```bash
-codex review --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+cd "$_REPO_ROOT"
+codex review "IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only." --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
 ```
 
 사용자가 `--xhigh`를 전달한 경우, `"high"` 대신 `"xhigh"`를 사용합니다.
 
 Bash 호출에 `timeout: 300000` 사용. 사용자가 커스텀 지시사항을 제공한 경우
-(예: `/codex review focus on security`), 프롬프트 인자로 전달:
+(예: `/codex review focus on security`), 경계 뒤에 덧붙입니다:
 ```bash
-codex review "focus on security" --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+cd "$_REPO_ROOT"
+codex review "IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+focus on security" --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
 ```
 
 3. 출력을 캡처. 그런 다음 stderr에서 비용 파싱:
@@ -158,21 +180,27 @@ rm -f "$TMPERR"
 Codex가 당신의 코드를 깨뜨리려고 합니다 — 일반 리뷰가 놓칠 수 있는 엣지 케이스,
 레이스 컨디션, 보안 취약점, 실패 모드를 찾습니다.
 
-1. 적대적 프롬프트 구성. 사용자가 집중 영역을 제공한 경우
-(예: `/codex challenge security`), 포함:
+1. 적대적 프롬프트 구성. 위 파일시스템 경계 섹션의 파일시스템 경계 지침을
+**항상 앞에 붙입니다**. 사용자가 집중 영역을 제공한 경우
+(예: `/codex challenge security`), 경계 뒤에 포함합니다:
 
 기본 프롬프트 (집중 없음):
-"Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Your job is to find ways this code will fail in production. Think like an attacker and a chaos engineer. Find edge cases, race conditions, security holes, resource leaks, failure modes, and silent data corruption paths. Be adversarial. Be thorough. No compliments — just the problems."
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Your job is to find ways this code will fail in production. Think like an attacker and a chaos engineer. Find edge cases, race conditions, security holes, resource leaks, failure modes, and silent data corruption paths. Be adversarial. Be thorough. No compliments — just the problems."
 
 집중 포함 (예: "security"):
-"Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Focus specifically on SECURITY. Your job is to find every way an attacker could exploit this code. Think about injection vectors, auth bypasses, privilege escalation, data exposure, and timing attacks. Be adversarial."
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Focus specifically on SECURITY. Your job is to find every way an attacker could exploit this code. Think about injection vectors, auth bypasses, privilege escalation, data exposure, and timing attacks. Be adversarial."
 
 2. **JSONL 출력**으로 codex exec를 실행하여 추론 트레이스와 도구 호출을 캡처 (5분 타임아웃):
 
 사용자가 `--xhigh`를 전달한 경우, `"high"` 대신 `"xhigh"`를 사용합니다.
 
 ```bash
-codex exec "<prompt>" -C "$(git rev-parse --show-toplevel)" -s read-only -c 'model_reasoning_effort="high"' --enable web_search_cached --json 2>/dev/null | PYTHONUNBUFFERED=1 python3 -u -c "
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+codex exec "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="high"' --enable web_search_cached --json 2>/dev/null | PYTHONUNBUFFERED=1 python3 -u -c "
 import sys, json
 for line in sys.stdin:
     line = line.strip()
@@ -185,17 +213,17 @@ for line in sys.stdin:
             itype = item.get('type','')
             text = item.get('text','')
             if itype == 'reasoning' and text:
-                print(f'[codex thinking] {text}')
-                print()
+                print(f'[codex thinking] {text}', flush=True)
+                print(flush=True)
             elif itype == 'agent_message' and text:
-                print(text)
+                print(text, flush=True)
             elif itype == 'command_execution':
                 cmd = item.get('command','')
-                if cmd: print(f'[codex ran] {cmd}')
+                if cmd: print(f'[codex ran] {cmd}', flush=True)
         elif t == 'turn.completed':
             usage = obj.get('usage',{})
             tokens = usage.get('input_tokens',0) + usage.get('output_tokens',0)
-            if tokens: print(f'\ntokens used: {tokens}')
+            if tokens: print(f'\ntokens used: {tokens}', flush=True)
     except: pass
 "
 ```
@@ -240,13 +268,15 @@ TMPERR=$(mktemp /tmp/codex-err-XXXXXX.txt)
 3. **플랜 리뷰 자동 감지:** 사용자의 프롬프트가 플랜 리뷰에 대한 것이거나,
 플랜 파일이 존재하고 사용자가 인자 없이 `/codex`를 입력한 경우:
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 ls -t ~/.claude/plans/*.md 2>/dev/null | xargs grep -l "$(basename $(pwd))" 2>/dev/null | head -1
 ```
 프로젝트 한정 매치가 없으면 `ls -t ~/.claude/plans/*.md 2>/dev/null | head -1`로 폴백하되
 경고: "참고: 이 플랜은 다른 프로젝트에서 온 것일 수 있습니다 — Codex에 전송하기 전에 확인하세요."
+
 **중요 — 내용을 임베딩하세요, 경로를 참조하지 마세요:** Codex는 저장소 루트(`-C`)로
 샌드박스되어 실행되며 `~/.claude/plans/`나 저장소 외부의 파일에 접근할 수 없습니다.
-플랜 파일을 직접 읽고 그 전체 내용을 아래 프롬프트에 임베딩해야 합니다. Codex에
+플랜 파일을 직접 읽고 그 **전체 내용**을 아래 프롬프트에 임베딩해야 합니다. Codex에
 파일 경로를 알려주거나 플랜 파일을 읽으라고 하지 마세요 — 10개 이상의 도구 호출을
 낭비하고 실패합니다.
 
@@ -254,15 +284,25 @@ ls -t ~/.claude/plans/*.md 2>/dev/null | xargs grep -l "$(basename $(pwd))" 2>/d
 저장소에 존재하는 경로 패턴)를 스캔하세요. 발견되면, Codex가 rg/find로 탐색하는 대신
 직접 읽을 수 있도록 프롬프트에 나열합니다.
 
-사용자의 프롬프트 앞에 페르소나를 추가:
-"You are a brutally honest technical reviewer. Review this plan for: logical gaps and
+위 파일시스템 경계 섹션의 파일시스템 경계 지침을, 플랜 리뷰와 자유 형식 상담 질문을 포함해
+Codex에 보내는 모든 프롬프트 앞에 **항상 붙입니다**.
+
+사용자의 프롬프트 앞에 경계와 페르소나를 추가:
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+You are a brutally honest technical reviewer. Review this plan for: logical gaps and
 unstated assumptions, missing error handling or edge cases, overcomplexity (is there a
 simpler approach?), feasibility risks (what could go wrong?), and missing dependencies
 or sequencing issues. Be direct. Be terse. No compliments. Just the problems.
-Also review these source files referenced in the plan: <참조된 파일 목록, 있는 경우>.
+Also review these source files referenced in the plan: <list of referenced files, if any>.
 
 THE PLAN:
-<전체 플랜 내용, 그대로 임베딩>"
+<full plan content, embedded verbatim>"
+
+플랜이 아닌 상담 프롬프트(사용자가 `/codex <question>`을 입력한 경우)에도 경계를 앞에 붙입니다:
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+<user's question>"
 
 4. **JSONL 출력**으로 codex exec를 실행하여 추론 트레이스를 캡처 (5분 타임아웃):
 
@@ -270,7 +310,8 @@ THE PLAN:
 
 **새 세션의 경우:**
 ```bash
-codex exec "<prompt>" -C "$(git rev-parse --show-toplevel)" -s read-only -c 'model_reasoning_effort="medium"' --enable web_search_cached --json 2>"$TMPERR" | PYTHONUNBUFFERED=1 python3 -u -c "
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+codex exec "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="medium"' --enable web_search_cached --json 2>"$TMPERR" | PYTHONUNBUFFERED=1 python3 -u -c "
 import sys, json
 for line in sys.stdin:
     line = line.strip()
@@ -280,31 +321,32 @@ for line in sys.stdin:
         t = obj.get('type','')
         if t == 'thread.started':
             tid = obj.get('thread_id','')
-            if tid: print(f'SESSION_ID:{tid}')
+            if tid: print(f'SESSION_ID:{tid}', flush=True)
         elif t == 'item.completed' and 'item' in obj:
             item = obj['item']
             itype = item.get('type','')
             text = item.get('text','')
             if itype == 'reasoning' and text:
-                print(f'[codex thinking] {text}')
-                print()
+                print(f'[codex thinking] {text}', flush=True)
+                print(flush=True)
             elif itype == 'agent_message' and text:
-                print(text)
+                print(text, flush=True)
             elif itype == 'command_execution':
                 cmd = item.get('command','')
-                if cmd: print(f'[codex ran] {cmd}')
+                if cmd: print(f'[codex ran] {cmd}', flush=True)
         elif t == 'turn.completed':
             usage = obj.get('usage',{})
             tokens = usage.get('input_tokens',0) + usage.get('output_tokens',0)
-            if tokens: print(f'\ntokens used: {tokens}')
+            if tokens: print(f'\ntokens used: {tokens}', flush=True)
     except: pass
 "
 ```
 
 **재개된 세션의 경우** (사용자가 "계속" 선택):
 ```bash
-codex exec resume <session-id> "<prompt>" -C "$(git rev-parse --show-toplevel)" -s read-only -c 'model_reasoning_effort="xhigh"' --enable web_search_cached --json 2>"$TMPERR" | python3 -c "
-<same python streaming parser as above>
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+codex exec resume <session-id> "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="medium"' --enable web_search_cached --json 2>"$TMPERR" | PYTHONUNBUFFERED=1 python3 -u -c "
+<same python streaming parser as above, with flush=True on all print() calls>
 "
 ```
 
@@ -387,3 +429,6 @@ stderr에서 토큰 수를 파싱합니다. Codex는 stderr에 `tokens used\nN`�
 - **종합은 이후에, 대체가 아닙니다.** Claude의 코멘트는 전체 출력 이후에 옵니다.
 - 모든 codex Bash 호출에 **5분 타임아웃** (`timeout: 300000`).
 - **이중 리뷰 금지.** 사용자가 이미 `/review`를 실행했으면, Codex가 두 번째 독립적 의견을 제공합니다. Claude Code 자체 리뷰를 다시 실행하지 마세요.
+- **스킬 파일 rabbit hole 감지.** Codex 출력을 받은 후, Codex가 스킬 파일에 주의가 분산된 신호가 있는지 스캔하세요:
+  `gstack-config`, `gstack-update-check`, `SKILL.md`, `skills/gstack`. 이 중 하나라도 출력에 나타나면,
+  경고를 덧붙입니다: "Codex appears to have read gstack skill files instead of reviewing your code. Consider retrying."

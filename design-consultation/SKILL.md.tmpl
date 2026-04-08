@@ -9,7 +9,7 @@ description: |
   진실의 원천으로 생성합니다. 기존 사이트의 경우 /plan-design-review를 사용하여 시스템을 추론하세요.
   "디자인 시스템", "브랜드 가이드라인", "DESIGN.md 생성" 요청 시 사용하세요.
   디자인 시스템이나 DESIGN.md 없이 새 프로젝트의 UI를
-  시작할 때 선제적으로 제안하세요.
+  시작할 때 선제적으로 제안하세요. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -53,8 +53,9 @@ ls src/ app/ pages/ components/ 2>/dev/null | head -30
 office-hours 출력 찾기:
 
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 {{SLUG_EVAL}}
-find ~/.gstack/projects/$SLUG -name '*office-hours*' -type f 2>/dev/null | head -5
+ls ~/.gstack/projects/$SLUG/*office-hours* 2>/dev/null | head -5
 ls .context/*office-hours* .context/attachments/*office-hours* 2>/dev/null | head -5
 ```
 
@@ -68,7 +69,17 @@ office-hours 출력이 있으면 읽으세요 — 제품 컨텍스트가 사전 
 
 browse가 사용 불가해도 괜찮습니다 — 시각적 조사는 선택사항입니다. 이 스킬은 WebSearch와 내장 디자인 지식만으로도 작동합니다.
 
+**gstack 디자이너 찾기 (선택사항 — AI 목업 생성을 활성화):**
+
+{{DESIGN_SETUP}}
+
+`DESIGN_READY`인 경우: 페이즈 5는 단순한 HTML 미리보기 페이지 대신, 제안한 디자인 시스템을 실제 화면에 적용한 AI 목업을 생성합니다. 훨씬 더 강력합니다 — 사용자는 자신의 제품이 실제로 어떻게 보일 수 있는지 봅니다.
+
+`DESIGN_NOT_AVAILABLE`인 경우: 페이즈 5는 HTML 미리보기 페이지로 대체됩니다 (그래도 좋습니다).
+
 ---
+
+{{LEARNINGS_SEARCH}}
 
 ## 페이즈 1: 제품 컨텍스트
 
@@ -236,7 +247,49 @@ Inter, Roboto, Arial, Helvetica, Open Sans, Lato, Montserrat, Poppins
 
 ---
 
-## 페이즈 5: 폰트 & 색상 미리보기 페이지 (기본 활성)
+## 페이즈 5: 디자인 시스템 미리보기 (기본 활성)
+
+이 페이즈는 제안된 디자인 시스템의 시각적 미리보기를 생성합니다. gstack 디자이너 사용 가능 여부에 따라 두 가지 경로가 있습니다.
+
+### 경로 A: AI 목업 (`DESIGN_READY`인 경우)
+
+제안한 디자인 시스템을 이 제품의 사실적인 화면에 적용한 AI 렌더링 목업을 생성하세요. 이것은 HTML 미리보기보다 훨씬 강력합니다 — 사용자는 자신의 제품이 실제로 어떻게 보일 수 있는지 봅니다.
+
+```bash
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
+_DESIGN_DIR=~/.gstack/projects/$SLUG/designs/design-system-$(date +%Y%m%d)
+mkdir -p "$_DESIGN_DIR"
+echo "DESIGN_DIR: $_DESIGN_DIR"
+```
+
+페이즈 3의 제안(미적 방향, 색상, 타이포그래피, 간격, 레이아웃)과 페이즈 1의 제품 컨텍스트로 디자인 브리프를 구성하세요:
+
+```bash
+$D variants --brief "<product name: [name]. Product type: [type]. Aesthetic: [direction]. Colors: primary [hex], secondary [hex], neutrals [range]. Typography: display [font], body [font]. Layout: [approach]. Show a realistic [page type] screen with [specific content for this product].>" --count 3 --output-dir "$_DESIGN_DIR/"
+```
+
+각 variant에 대해 품질 검사를 실행하세요:
+
+```bash
+$D check --image "$_DESIGN_DIR/variant-A.png" --brief "<the original brief>"
+```
+
+즉시 미리볼 수 있도록 각 variant를 인라인으로 표시하세요 (각 PNG에 Read 도구 사용).
+
+사용자에게 말하세요: "디자인 시스템을 사실적인 [제품 유형] 화면에 적용한 3개의 시각적 방향을 생성했습니다. 방금 브라우저에서 열린 비교 보드에서 마음에 드는 것을 선택하세요. 여러 variant의 요소를 섞어도 됩니다."
+
+{{DESIGN_SHOTGUN_LOOP}}
+
+사용자가 방향을 선택한 후:
+
+- 승인된 목업을 분석하고 페이즈 6의 DESIGN.md를 채울 디자인 토큰(색상, 타이포그래피, 간격)을 추출하려면 `$D extract --image "$_DESIGN_DIR/variant-<CHOSEN>.png"`를 사용하세요. 이렇게 하면 디자인 시스템이 텍스트 설명만이 아니라 실제로 시각적으로 승인된 것에 기반합니다.
+- 사용자가 더 반복하고 싶어하면: `$D iterate --feedback "<user's feedback>" --output "$_DESIGN_DIR/refined.png"`
+
+**플랜 모드 vs. 구현 모드:**
+- **플랜 모드인 경우:** 승인된 목업 경로(전체 `$_DESIGN_DIR` 경로)와 추출된 토큰을 플랜 파일의 "## Approved Design Direction" 섹션에 추가하세요. 디자인 시스템은 플랜이 구현될 때 DESIGN.md에 작성됩니다.
+- **플랜 모드가 아닌 경우:** 바로 페이즈 6으로 진행하고 추출된 토큰으로 DESIGN.md를 작성하세요.
+
+### 경로 B: HTML 미리보기 페이지 (`DESIGN_NOT_AVAILABLE`인 경우 대체)
 
 세련된 HTML 미리보기 페이지를 생성하고 사용자의 브라우저에서 여세요. 이 페이지는 스킬이 생성하는 첫 번째 시각적 산출물입니다 — 아름답게 보여야 합니다.
 
@@ -250,7 +303,7 @@ PREVIEW_FILE="/tmp/design-consultation-preview-$(date +%s).html"
 open "$PREVIEW_FILE"
 ```
 
-### 미리보기 페이지 요구사항
+### 미리보기 페이지 요구사항 (경로 B만 해당)
 
 에이전트는 **단일, 자체 완결 HTML 파일** (프레임워크 의존성 없음)을 작성합니다:
 
@@ -285,7 +338,11 @@ open "$PREVIEW_FILE"
 
 ## 페이즈 6: DESIGN.md 작성 & 확인
 
-저장소 루트에 다음 구조로 `DESIGN.md`를 작성하세요:
+페이즈 5(경로 A)에서 `$D extract`를 사용했다면, 추출된 토큰을 DESIGN.md 값의 기본 소스로 사용하세요 — 텍스트 설명만이 아니라 승인된 목업에 기반한 색상, 타이포그래피, 간격입니다. 추출된 토큰을 페이즈 3의 제안과 병합하세요 (제안은 근거와 컨텍스트를 제공하고, 추출은 정확한 값을 제공합니다).
+
+**플랜 모드인 경우:** DESIGN.md 내용을 플랜 파일에 "## Proposed DESIGN.md" 섹션으로 작성하세요. 실제 파일은 작성하지 마세요 — 그것은 구현 시점에 이루어집니다.
+
+**플랜 모드가 아닌 경우:** 저장소 루트에 다음 구조로 `DESIGN.md`를 작성하세요:
 
 ```markdown
 # Design System — [Project Name]
@@ -358,7 +415,12 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 - B) 변경하고 싶은 것이 있습니다 (무엇인지 지정)
 - C) 처음부터 다시
 
+DESIGN.md를 확정한 후, 세션에서 시스템 수준 토큰만이 아니라 화면 수준 목업이나 페이지 레이아웃을 생성했다면 다음을 제안하세요:
+"이 디자인 시스템을 작동하는 Pretext-native HTML로 보고 싶으신가요? /design-html을 실행하세요."
+
 ---
+
+{{LEARNINGS_LOG}}
 
 ## 중요 규칙
 

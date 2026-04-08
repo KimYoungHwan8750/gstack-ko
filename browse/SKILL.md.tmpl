@@ -8,7 +8,7 @@ description: |
   폼 및 업로드 테스트, 다이얼로그 처리, 요소 상태 어설션을 수행합니다.
   명령당 약 100ms. 기능 테스트, 배포 확인, 사용자 플로우 독포딩, 증거가 포함된
   버그 리포트 작성 시 사용합니다. 다음 요청 시 사용: "open in browser", "test the
-  site", "take a screenshot", "dogfood this".
+  site", "take a screenshot", "dogfood this". (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -136,6 +136,30 @@ $B resume
 ## 스냅샷 플래그
 
 {{SNAPSHOT_FLAGS}}
+
+## CSS Inspector 및 스타일 수정
+
+### 요소 CSS 검사
+```bash
+$B inspect .header              # selector의 전체 CSS cascade
+$B inspect                      # 사이드바에서 마지막으로 선택한 요소
+$B inspect --all                # user-agent stylesheet 규칙 포함
+$B inspect --history            # 수정 히스토리 표시
+```
+
+### 스타일 실시간 수정
+```bash
+$B style .header background-color #1a1a1a   # CSS 속성 수정
+$B style --undo                              # 마지막 변경 되돌리기
+$B style --undo 2                            # 특정 변경 되돌리기
+```
+
+### 깔끔한 스크린샷
+```bash
+$B cleanup --all                 # ads, cookies, sticky, social 제거
+$B cleanup --ads --cookies       # 선택적 cleanup
+$B prettyscreenshot --cleanup --scroll-to ".pricing" --width 1440 ~/Desktop/hero.png
+```
 
 ## 전체 명령 목록
 

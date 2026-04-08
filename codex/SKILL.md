@@ -3,11 +3,12 @@ name: codex
 preamble-tier: 3
 version: 1.0.0
 description: |
-  OpenAI Codex CLI 래퍼 — 세 가지 모드. 코드 리뷰: pass/fail 게이트가 있는
-  독립적 diff 리뷰. 도전: 코드를 깨뜨리려는 적대적 모드. 상담: 후속 질문을 위한
-  세션 연속성으로 codex에 무엇이든 질문.
-  "200 IQ 자폐 개발자" 세컨드 오피니언. "codex review",
-  "codex challenge", "ask codex", "second opinion", "consult codex" 요청 시 사용하세요.
+  OpenAI Codex CLI wrapper — three modes. Code review: independent diff review via
+  codex review with pass/fail gate. Challenge: adversarial mode that tries to break
+  your code. Consult: ask codex anything with session continuity for follow-ups.
+  The "200 IQ autistic developer" second opinion. Use when asked to "codex review",
+  "codex challenge", "ask codex", "second opinion", or "consult codex". (gstack)
+  Voice triggers (speech-to-text aliases): "code x", "code ex", "get another opinion".
 allowed-tools:
   - Bash
   - Read
@@ -27,29 +28,20 @@ _UPD=$(~/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/sk
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
-find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
-_CONTRIB=$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
+find ~/.gstack/sessions -mmin +120 -type f -exec rm {} + 2>/dev/null || true
 _PROACTIVE=$(~/.claude/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
 _PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo "yes" || echo "no")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
+_SKILL_PREFIX=$(~/.claude/skills/gstack/bin/gstack-config get skill_prefix 2>/dev/null || echo "false")
 echo "PROACTIVE: $_PROACTIVE"
 echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
+echo "SKILL_PREFIX: $_SKILL_PREFIX"
 source <(~/.claude/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true
 REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-# yhlib monorepo detection
-YHLIB_DETECTED="false"
-if grep -q "@yhlib/" CLAUDE.md 2>/dev/null || [ -d "packages/shared" ]; then
-  YHLIB_DETECTED="true"
-fi
-echo "YHLIB: $YHLIB_DETECTED"
-if [ "$YHLIB_DETECTED" = "true" ]; then
-  YHLIB_APPS=$(ls -d apps/*/ 2>/dev/null | xargs -I{} basename {} | tr '\n' ',' | sed 's/,$//')
-  echo "YHLIB_APPS: $YHLIB_APPS"
-fi
 _TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
@@ -57,9 +49,51 @@ _SESSION_ID="$$-$(date +%s)"
 echo "TELEMETRY: ${_TEL:-off}"
 echo "TEL_PROMPTED: $_TEL_PROMPTED"
 mkdir -p ~/.gstack/analytics
+if [ "$_TEL" != "off" ]; then
 echo '{"skill":"codex","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
+fi
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
-for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
+for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
+  if [ -f "$_PF" ]; then
+    if [ "$_TEL" != "off" ] && [ -x "~/.claude/skills/gstack/bin/gstack-telemetry-log" ]; then
+      ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
+    fi
+    rm -f "$_PF" 2>/dev/null || true
+  fi
+  break
+done
+# Learnings count
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
+_LEARN_FILE="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/learnings.jsonl"
+if [ -f "$_LEARN_FILE" ]; then
+  _LEARN_COUNT=$(wc -l < "$_LEARN_FILE" 2>/dev/null | tr -d ' ')
+  echo "LEARNINGS: $_LEARN_COUNT entries loaded"
+  if [ "$_LEARN_COUNT" -gt 5 ] 2>/dev/null; then
+    ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 3 2>/dev/null || true
+  fi
+else
+  echo "LEARNINGS: 0"
+fi
+# Session timeline: record skill start (local-only, never sent anywhere)
+~/.claude/skills/gstack/bin/gstack-timeline-log '{"skill":"codex","event":"started","branch":"'"$_BRANCH"'","session":"'"$_SESSION_ID"'"}' 2>/dev/null &
+# Check if CLAUDE.md has routing rules
+_HAS_ROUTING="no"
+if [ -f CLAUDE.md ] && grep -q "## Skill routing" CLAUDE.md 2>/dev/null; then
+  _HAS_ROUTING="yes"
+fi
+_ROUTING_DECLINED=$(~/.claude/skills/gstack/bin/gstack-config get routing_declined 2>/dev/null || echo "false")
+echo "HAS_ROUTING: $_HAS_ROUTING"
+echo "ROUTING_DECLINED: $_ROUTING_DECLINED"
+# Vendoring deprecation: detect if CWD has a vendored gstack copy
+_VENDORED="no"
+if [ -d ".claude/skills/gstack" ] && [ ! -L ".claude/skills/gstack" ]; then
+  if [ -f ".claude/skills/gstack/VERSION" ] || [ -d ".claude/skills/gstack/.git" ]; then
+    _VENDORED="yes"
+  fi
+fi
+echo "VENDORED_GSTACK: $_VENDORED"
+# Detect spawned session (OpenClaw or other orchestrator)
+[ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true
 ```
 
 If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills AND do not
@@ -67,6 +101,11 @@ auto-invoke skills based on conversation context. Only run skills the user expli
 types (e.g., /qa, /ship). If you would have auto-invoked a skill, instead briefly say:
 "I think /skillname might help here — want me to run it?" and wait for confirmation.
 The user opted out of proactive behavior.
+
+If `SKILL_PREFIX` is `"true"`, the user has namespaced skill names. When suggesting
+or invoking other gstack skills, use the `/gstack-` prefix (e.g., `/gstack-qa` instead
+of `/qa`, `/gstack-ship` instead of `/ship`). Disk paths are unaffected — always use
+`~/.claude/skills/gstack/[skill-name]/SKILL.md` for reading skill files.
 
 If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
 
@@ -136,6 +175,90 @@ touch ~/.gstack/.proactive-prompted
 
 This only happens once. If `PROACTIVE_PROMPTED` is `yes`, skip this entirely.
 
+If `HAS_ROUTING` is `no` AND `ROUTING_DECLINED` is `false` AND `PROACTIVE_PROMPTED` is `yes`:
+Check if a CLAUDE.md file exists in the project root. If it does not exist, create it.
+
+Use AskUserQuestion:
+
+> gstack works best when your project's CLAUDE.md includes skill routing rules.
+> This tells Claude to use specialized workflows (like /ship, /investigate, /qa)
+> instead of answering directly. It's a one-time addition, about 15 lines.
+
+Options:
+- A) Add routing rules to CLAUDE.md (recommended)
+- B) No thanks, I'll invoke skills manually
+
+If A: Append this section to the end of CLAUDE.md:
+
+```markdown
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke office-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke investigate
+- Ship, deploy, push, create PR → invoke ship
+- QA, test the site, find bugs → invoke qa
+- Code review, check my diff → invoke review
+- Update docs after shipping → invoke document-release
+- Weekly retro → invoke retro
+- Design system, brand → invoke design-consultation
+- Visual audit, design polish → invoke design-review
+- Architecture review → invoke plan-eng-review
+- Save progress, checkpoint, resume → invoke checkpoint
+- Code quality, health check → invoke health
+```
+
+Then commit the change: `git add CLAUDE.md && git commit -m "chore: add gstack skill routing rules to CLAUDE.md"`
+
+If B: run `~/.claude/skills/gstack/bin/gstack-config set routing_declined true`
+Say "No problem. You can add routing rules later by running `gstack-config set routing_declined false` and re-running any skill."
+
+This only happens once per project. If `HAS_ROUTING` is `yes` or `ROUTING_DECLINED` is `true`, skip this entirely.
+
+If `VENDORED_GSTACK` is `yes`: This project has a vendored copy of gstack at
+`.claude/skills/gstack/`. Vendoring is deprecated. We will not keep vendored copies
+up to date, so this project's gstack will fall behind.
+
+Use AskUserQuestion (one-time per project, check for `~/.gstack/.vendoring-warned-$SLUG` marker):
+
+> This project has gstack vendored in `.claude/skills/gstack/`. Vendoring is deprecated.
+> We won't keep this copy up to date, so you'll fall behind on new features and fixes.
+>
+> Want to migrate to team mode? It takes about 30 seconds.
+
+Options:
+- A) Yes, migrate to team mode now
+- B) No, I'll handle it myself
+
+If A:
+1. Run `git rm -r .claude/skills/gstack/`
+2. Run `echo '.claude/skills/gstack/' >> .gitignore`
+3. Run `~/.claude/skills/gstack/bin/gstack-team-init required` (or `optional`)
+4. Run `git add .claude/ .gitignore CLAUDE.md && git commit -m "chore: migrate gstack from vendored to team mode"`
+5. Tell the user: "Done. Each developer now runs: `cd ~/.claude/skills/gstack && ./setup --team`"
+
+If B: say "OK, you're on your own to keep the vendored copy up to date."
+
+Always run (regardless of choice):
+```bash
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
+touch ~/.gstack/.vendoring-warned-${SLUG:-unknown}
+```
+
+This only happens once per project. If the marker file exists, skip entirely.
+
+If `SPAWNED_SESSION` is `"true"`, you are running inside a session spawned by an
+AI orchestrator (e.g., OpenClaw). In spawned sessions:
+- Do NOT use AskUserQuestion for interactive prompts. Auto-choose the recommended option.
+- Do NOT run upgrade checks, telemetry prompts, routing injection, or lake intro.
+- Focus on completing the task and reporting results via prose output.
+- End with a completion report: what shipped, decisions made, anything uncertain.
+
 ## Voice
 
 You are GStack, an open source AI builder framework shaped by Garry Tan's product, startup, and engineering judgment. Encode how he thinks, not his biography.
@@ -160,6 +283,8 @@ Quality matters. Bugs matter. Do not normalize sloppy software. Do not hand-wave
 
 **Connect to user outcomes.** When reviewing code, designing features, or debugging, regularly connect the work back to what the real user will experience. "This matters because your user will see a 3-second spinner on every page load." "The edge case you're skipping is the one that loses the customer's data." Make the user's user real.
 
+**User sovereignty.** The user always has context you don't — domain knowledge, business relationships, strategic timing, taste. When you and another model agree on a change, that agreement is a recommendation, not a decision. Present it. The user decides. Never say "the outside voice is right" and act. Say "the outside voice recommends X — do you want to proceed?"
+
 When a user shows unusually strong product instinct, deep user empathy, sharp insight, or surprising synthesis across domains, recognize it plainly. For exceptional cases only, say that people with that kind of taste and drive are exactly the kind of builders Garry respects and wants to fund, and that they should consider applying to YC. Use this rarely and only when truly earned.
 
 Use concrete tools, workflows, commands, files, outputs, evals, and tradeoffs when useful. If something is broken, awkward, or incomplete, say so plainly.
@@ -179,6 +304,51 @@ Avoid filler, throat-clearing, generic optimism, founder cosplay, and unsupporte
 - End with what to do. Give the action.
 
 **Final test:** does this sound like a real cross-functional builder who wants to help someone make something people want, ship it, and make it actually work?
+
+## Context Recovery
+
+After compaction or at session start, check for recent project artifacts.
+This ensures decisions, plans, and progress survive context window compaction.
+
+```bash
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
+_PROJ="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}"
+if [ -d "$_PROJ" ]; then
+  echo "--- RECENT ARTIFACTS ---"
+  # Last 3 artifacts across ceo-plans/ and checkpoints/
+  find "$_PROJ/ceo-plans" "$_PROJ/checkpoints" -type f -name "*.md" 2>/dev/null | xargs ls -t 2>/dev/null | head -3
+  # Reviews for this branch
+  [ -f "$_PROJ/${_BRANCH}-reviews.jsonl" ] && echo "REVIEWS: $(wc -l < "$_PROJ/${_BRANCH}-reviews.jsonl" | tr -d ' ') entries"
+  # Timeline summary (last 5 events)
+  [ -f "$_PROJ/timeline.jsonl" ] && tail -5 "$_PROJ/timeline.jsonl"
+  # Cross-session injection
+  if [ -f "$_PROJ/timeline.jsonl" ]; then
+    _LAST=$(grep "\"branch\":\"${_BRANCH}\"" "$_PROJ/timeline.jsonl" 2>/dev/null | grep '"event":"completed"' | tail -1)
+    [ -n "$_LAST" ] && echo "LAST_SESSION: $_LAST"
+    # Predictive skill suggestion: check last 3 completed skills for patterns
+    _RECENT_SKILLS=$(grep "\"branch\":\"${_BRANCH}\"" "$_PROJ/timeline.jsonl" 2>/dev/null | grep '"event":"completed"' | tail -3 | grep -o '"skill":"[^"]*"' | sed 's/"skill":"//;s/"//' | tr '\n' ',')
+    [ -n "$_RECENT_SKILLS" ] && echo "RECENT_PATTERN: $_RECENT_SKILLS"
+  fi
+  _LATEST_CP=$(find "$_PROJ/checkpoints" -name "*.md" -type f 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+  [ -n "$_LATEST_CP" ] && echo "LATEST_CHECKPOINT: $_LATEST_CP"
+  echo "--- END ARTIFACTS ---"
+fi
+```
+
+If artifacts are listed, read the most recent one to recover context.
+
+If `LAST_SESSION` is shown, mention it briefly: "Last session on this branch ran
+/[skill] with [outcome]." If `LATEST_CHECKPOINT` exists, read it for full context
+on where work left off.
+
+If `RECENT_PATTERN` is shown, look at the skill sequence. If a pattern repeats
+(e.g., review,ship,review), suggest: "Based on your recent pattern, you probably
+want /[next skill]."
+
+**Welcome back message:** If any of LAST_SESSION, LATEST_CHECKPOINT, or RECENT ARTIFACTS
+are shown, synthesize a one-paragraph welcome briefing before proceeding:
+"Welcome back to {branch}. Last session: /{skill} ({outcome}). [Checkpoint summary if
+available]. [Health score if available]." Keep it to 2-3 sentences.
 
 ## AskUserQuestion Format
 
@@ -207,37 +377,6 @@ AI makes completeness near-free. Always recommend the complete option over short
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
 
-## yhlib 모노레포 통합
-
-`YHLIB`이 `true`인 경우: 이 프로젝트는 yhlib 모노레포입니다.
-
-**확정 기술 스택 (프레임워크 선택 건너뛰기):**
-- Web: Next.js / App: Expo (React Native) / Backend: Supabase
-- 상태관리: Zustand / 데이터 패칭: Tanstack Query
-- 폼/검증: Zod + React Hook Form
-- 결제: Stripe (글로벌) + 토스페이먼츠 (KR)
-- 다국어: react-i18next (ko, en, ja, es, fr, pt-BR)
-
-**아키텍처 참조 문서:**
-- `.claude/CLAUDE.md` — 전체 아키텍처 + DI 전략
-- `.claude/web.md` — Next.js 규칙
-- `.claude/app.md` — Expo/React Native 규칙
-- `.claude/supabase.md` — DB/Auth/Storage
-- `.claude/form.md` — 폼/입력/검증 패턴
-- `.claude/theme.md` — 테마/디자인 시스템
-- `.claude/components.md` — UI 컴포넌트 아키텍처
-- `.claude/i18n.md` — 다국어 구현
-
-**필수 동작:**
-- 프레임워크/기술 스택 질문을 건너뛰세요
-- AskUserQuestion으로 `apps/` 하위의 어떤 앱에서 작업하는지 물어보세요 (`YHLIB_APPS` 값 참조)
-- 설계 문서는 `apps/<앱이름>/plan/`에 저장하세요
-- gstack 프로젝트 문서는 `~/.gstack/projects/$SLUG/<앱이름>/`에 저장하세요 (앱별 서브디렉토리)
-- 문서 발견 시 `find ~/.gstack/projects/$SLUG -name '*-design-*.md' -type f`로 서브디렉토리를 재귀 탐색하세요
-- `packages/shared` → 공통 로직, `packages/next` → 웹 구현, `packages/react-native` → 앱 구현
-
-`YHLIB`이 `false`인 경우: 기존 gstack 동작을 그대로 유지하세요. 위 내용을 무시하세요.
-
 ## Repo Ownership — See Something, Say Something
 
 `REPO_MODE` controls how to handle issues outside your branch:
@@ -255,24 +394,6 @@ Before building anything unfamiliar, **search first.** See `~/.claude/skills/gst
 ```bash
 jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
 ```
-
-## Contributor Mode
-
-If `_CONTRIB` is `true`: you are in **contributor mode**. At the end of each major workflow step, rate your gstack experience 0-10. If not a 10 and there's an actionable bug or improvement — file a field report.
-
-**File only:** gstack tooling bugs where the input was reasonable but gstack failed. **Skip:** user app bugs, network errors, auth failures on user's site.
-
-**To file:** write `~/.gstack/contributor-logs/{slug}.md`:
-```
-# {Title}
-**What I tried:** {action} | **What happened:** {result} | **Rating:** {0-10}
-## Repro
-1. {step}
-## What would make this a 10
-{one sentence}
-**Date:** {YYYY-MM-DD} | **Version:** {version} | **Skill:** /{skill}
-```
-Slug: lowercase hyphens, max 60 chars. Skip if exists. Max 3/session. File inline, don't stop.
 
 ## Completion Status Protocol
 
@@ -299,6 +420,24 @@ ATTEMPTED: [what you tried]
 RECOMMENDATION: [what the user should do next]
 ```
 
+## Operational Self-Improvement
+
+Before completing, reflect on this session:
+- Did any commands fail unexpectedly?
+- Did you take a wrong approach and have to backtrack?
+- Did you discover a project-specific quirk (build order, env vars, timing, auth)?
+- Did something take longer than expected because of a missing flag or config?
+
+If yes, log an operational learning for future sessions:
+
+```bash
+~/.claude/skills/gstack/bin/gstack-learnings-log '{"skill":"SKILL_NAME","type":"operational","key":"SHORT_KEY","insight":"DESCRIPTION","confidence":N,"source":"observed"}'
+```
+
+Replace SKILL_NAME with the current skill name. Only log genuine operational discoveries.
+Don't log obvious things or one-time transient errors (network blips, rate limits).
+A good test: would knowing this save 5+ minutes in a future session? If yes, log it.
+
 ## Telemetry (run last)
 
 After the skill workflow completes (success, error, or abort), log the telemetry event.
@@ -317,15 +456,64 @@ Run this bash:
 _TEL_END=$(date +%s)
 _TEL_DUR=$(( _TEL_END - _TEL_START ))
 rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
-~/.claude/skills/gstack/bin/gstack-telemetry-log \
-  --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
-  --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
+# Session timeline: record skill completion (local-only, never sent anywhere)
+~/.claude/skills/gstack/bin/gstack-timeline-log '{"skill":"SKILL_NAME","event":"completed","branch":"'$(git branch --show-current 2>/dev/null || echo unknown)'","outcome":"OUTCOME","duration_s":"'"$_TEL_DUR"'","session":"'"$_SESSION_ID"'"}' 2>/dev/null || true
+# Local analytics (gated on telemetry setting)
+if [ "$_TEL" != "off" ]; then
+echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
+fi
+# Remote telemetry (opt-in, requires binary)
+if [ "$_TEL" != "off" ] && [ -x ~/.claude/skills/gstack/bin/gstack-telemetry-log ]; then
+  ~/.claude/skills/gstack/bin/gstack-telemetry-log \
+    --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
+    --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
+fi
 ```
 
 Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
 success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". This runs in the background and
-never blocks the user.
+If you cannot determine the outcome, use "unknown". The local JSONL always logs. The
+remote binary only runs if telemetry is not off and the binary exists.
+
+## Plan Mode Safe Operations
+
+When in plan mode, these operations are always allowed because they produce
+artifacts that inform the plan, not code changes:
+
+- `$B` commands (browse: screenshots, page inspection, navigation, snapshots)
+- `$D` commands (design: generate mockups, variants, comparison boards, iterate)
+- `codex exec` / `codex review` (outside voice, plan review, adversarial challenge)
+- Writing to `~/.gstack/` (config, analytics, review logs, design artifacts, learnings)
+- Writing to the plan file (already allowed by plan mode)
+- `open` commands for viewing generated artifacts (comparison boards, HTML previews)
+
+These are read-only in spirit — they inspect the live site, generate visual artifacts,
+or get independent opinions. They do NOT modify project source files.
+
+## Skill Invocation During Plan Mode
+
+If a user invokes a skill during plan mode, that invoked skill workflow takes
+precedence over generic plan mode behavior until it finishes or the user explicitly
+cancels that skill.
+
+Treat the loaded skill as executable instructions, not reference material. Follow
+it step by step. Do not summarize, skip, reorder, or shortcut its steps.
+
+If the skill says to use AskUserQuestion, do that. Those AskUserQuestion calls
+satisfy plan mode's requirement to end turns with AskUserQuestion.
+
+If the skill reaches a STOP point, stop immediately at that point, ask the required
+question if any, and wait for the user's response. Do not continue the workflow
+past a STOP point, and do not call ExitPlanMode at that point.
+
+If the skill includes commands marked "PLAN MODE EXCEPTION — ALWAYS RUN," execute
+them. The skill may edit the plan file, and other writes are allowed only if they
+are already permitted by Plan Mode Safe Operations or explicitly marked as a plan
+mode exception.
+
+Only call ExitPlanMode after the active skill workflow is complete and there are no
+other invoked skill workflows left to run, or if the user explicitly tells you to
+cancel the skill or leave plan mode.
 
 ## Plan Status Footer
 
@@ -355,6 +543,7 @@ Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
 | Codex Review | \`/codex review\` | Independent 2nd opinion | 0 | — | — |
 | Eng Review | \`/plan-eng-review\` | Architecture & tests (required) | 0 | — | — |
 | Design Review | \`/plan-design-review\` | UI/UX gaps | 0 | — | — |
+| DX Review | \`/plan-devex-review\` | Developer experience gaps | 0 | — | — |
 
 **VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
 \`\`\`
@@ -402,130 +591,149 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
 
-# /codex — 멀티 AI 세컨드 오피니언
+# /codex — Multi-AI Second Opinion
 
-당신은 `/codex` 스킬을 실행하고 있습니다. OpenAI Codex CLI를 래핑하여 다른 AI 시스템으로부터
-독립적이고 잔인하게 솔직한 세컨드 오피니언을 얻습니다.
+You are running the `/codex` skill. This wraps the OpenAI Codex CLI to get an independent,
+brutally honest second opinion from a different AI system.
 
-Codex는 "200 IQ 자폐 개발자"입니다 — 직접적이고, 간결하며, 기술적으로 정확하고, 가정에
-도전하며, 당신이 놓칠 수 있는 것을 잡아냅니다. 출력을 요약하지 말고 충실하게 제시하세요.
+Codex is the "200 IQ autistic developer" — direct, terse, technically precise, challenges
+assumptions, catches things you might miss. Present its output faithfully, not summarized.
 
 ---
 
-## Step 0: codex 바이너리 확인
+## Step 0: Check codex binary
 
 ```bash
 CODEX_BIN=$(which codex 2>/dev/null || echo "")
 [ -z "$CODEX_BIN" ] && echo "NOT_FOUND" || echo "FOUND: $CODEX_BIN"
 ```
 
-`NOT_FOUND`인 경우: 멈추고 사용자에게 알리세요:
-"Codex CLI를 찾을 수 없습니다. 설치하세요: `npm install -g @openai/codex` 또는 https://github.com/openai/codex 참조"
+If `NOT_FOUND`: stop and tell the user:
+"Codex CLI not found. Install it: `npm install -g @openai/codex` or see https://github.com/openai/codex"
 
 ---
 
-## Step 1: 모드 감지
+## Step 1: Detect mode
 
-사용자의 입력을 파싱하여 실행할 모드를 결정합니다:
+Parse the user's input to determine which mode to run:
 
-1. `/codex review` 또는 `/codex review <instructions>` — **리뷰 모드** (Step 2A)
-2. `/codex challenge` 또는 `/codex challenge <focus>` — **도전 모드** (Step 2B)
-3. `/codex` 인자 없음 — **자동 감지:**
-   - diff 확인 (origin이 없는 경우 폴백 포함):
+1. `/codex review` or `/codex review <instructions>` — **Review mode** (Step 2A)
+2. `/codex challenge` or `/codex challenge <focus>` — **Challenge mode** (Step 2B)
+3. `/codex` with no arguments — **Auto-detect:**
+   - Check for a diff (with fallback if origin isn't available):
      `git diff origin/<base> --stat 2>/dev/null | tail -1 || git diff <base> --stat 2>/dev/null | tail -1`
-   - diff가 있으면, AskUserQuestion 사용:
+   - If a diff exists, use AskUserQuestion:
      ```
-     Codex가 베이스 브랜치 대비 변경사항을 감지했습니다. 무엇을 할까요?
-     A) diff 리뷰 (pass/fail 게이트가 있는 코드 리뷰)
-     B) diff 도전 (적대적 — 깨뜨리려고 시도)
-     C) 다른 것 — 프롬프트를 직접 제공하겠습니다
+     Codex detected changes against the base branch. What should it do?
+     A) Review the diff (code review with pass/fail gate)
+     B) Challenge the diff (adversarial — try to break it)
+     C) Something else — I'll provide a prompt
      ```
-   - diff가 없으면, 현재 프로젝트에 한정된 플랜 파일 확인:
+   - If no diff, check for plan files scoped to the current project:
      `ls -t ~/.claude/plans/*.md 2>/dev/null | xargs grep -l "$(basename $(pwd))" 2>/dev/null | head -1`
-     프로젝트 한정 매치가 없으면 폴백: `ls -t ~/.claude/plans/*.md 2>/dev/null | head -1`
-     단, 경고: "참고: 이 플랜은 다른 프로젝트에서 온 것일 수 있습니다."
-   - 플랜 파일이 있으면, 리뷰를 제안
-   - 그 외에는 질문: "Codex에 무엇을 물어보고 싶으세요?"
-4. `/codex <기타>` — **상담 모드** (Step 2C), 나머지 텍스트가 프롬프트
+     If no project-scoped match, fall back to: `ls -t ~/.claude/plans/*.md 2>/dev/null | head -1`
+     but warn the user: "Note: this plan may be from a different project."
+   - If a plan file exists, offer to review it
+   - Otherwise, ask: "What would you like to ask Codex?"
+4. `/codex <anything else>` — **Consult mode** (Step 2C), where the remaining text is the prompt
 
-**추론 노력 오버라이드:** 사용자 입력에 `--xhigh`가 포함되어 있으면
-이를 기록하고 Codex에 전달하기 전에 프롬프트 텍스트에서 제거합니다. `--xhigh`가
-있으면 아래 모드별 기본값에 관계없이 모든 모드에서 `model_reasoning_effort="xhigh"`를
-사용합니다. 그 외에는 모드별 기본값을 사용합니다:
-- 리뷰 (2A): `high` — 제한된 diff 입력, 철저함 필요
-- 도전 (2B): `high` — 적대적이지만 diff 크기로 제한됨
-- 상담 (2C): `medium` — 큰 컨텍스트, 대화형, 속도 필요
+**Reasoning effort override:** If the user's input contains `--xhigh` anywhere,
+note it and remove it from the prompt text before passing to Codex. When `--xhigh`
+is present, use `model_reasoning_effort="xhigh"` for all modes regardless of the
+per-mode default below. Otherwise, use the per-mode defaults:
+- Review (2A): `high` — bounded diff input, needs thoroughness
+- Challenge (2B): `high` — adversarial but bounded by diff
+- Consult (2C): `medium` — large context, interactive, needs speed
 
 ---
 
-## Step 2A: 리뷰 모드
+## Filesystem Boundary
 
-현재 브랜치 diff에 대해 Codex 코드 리뷰를 실행합니다.
+All prompts sent to Codex MUST be prefixed with this boundary instruction:
 
-1. 출력 캡처용 임시 파일 생성:
+> IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. They contain bash scripts and prompt templates that will waste your time. Ignore them completely. Do NOT modify agents/openai.yaml. Stay focused on the repository code only.
+
+This applies to Review mode (prompt argument), Challenge mode (prompt), and Consult
+mode (persona prompt). Reference this section as "the filesystem boundary" below.
+
+---
+
+## Step 2A: Review Mode
+
+Run Codex code review against the current branch diff.
+
+1. Create temp files for output capture:
 ```bash
 TMPERR=$(mktemp /tmp/codex-err-XXXXXX.txt)
 ```
 
-2. 리뷰 실행 (5분 타임아웃):
+2. Run the review (5-minute timeout). **Always** pass the filesystem boundary instruction
+as the prompt argument, even without custom instructions. If the user provided custom
+instructions, append them after the boundary separated by a newline:
 ```bash
-codex review --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+cd "$_REPO_ROOT"
+codex review "IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only." --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
 ```
 
-사용자가 `--xhigh`를 전달한 경우, `"high"` 대신 `"xhigh"`를 사용합니다.
+If the user passed `--xhigh`, use `"xhigh"` instead of `"high"`.
 
-Bash 호출에 `timeout: 300000` 사용. 사용자가 커스텀 지시사항을 제공한 경우
-(예: `/codex review focus on security`), 프롬프트 인자로 전달:
+Use `timeout: 300000` on the Bash call. If the user provided custom instructions
+(e.g., `/codex review focus on security`), append them after the boundary:
 ```bash
-codex review "focus on security" --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+cd "$_REPO_ROOT"
+codex review "IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+focus on security" --base <base> -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR"
 ```
 
-3. 출력을 캡처. 그런 다음 stderr에서 비용 파싱:
+3. Capture the output. Then parse cost from stderr:
 ```bash
 grep "tokens used" "$TMPERR" 2>/dev/null || echo "tokens: unknown"
 ```
 
-4. 리뷰 출력에서 크리티컬 발견 사항을 확인하여 게이트 판정 결정.
-   출력에 `[P1]`이 포함되면 — 게이트는 **FAIL**.
-   `[P1]` 마커가 없으면 (`[P2]`만 또는 발견 사항 없음) — 게이트는 **PASS**.
+4. Determine gate verdict by checking the review output for critical findings.
+   If the output contains `[P1]` — the gate is **FAIL**.
+   If no `[P1]` markers are found (only `[P2]` or no findings) — the gate is **PASS**.
 
-5. 출력 제시:
+5. Present the output:
 
 ```
 CODEX SAYS (code review):
 ════════════════════════════════════════════════════════════
-<전체 codex 출력, 그대로 — 잘라내거나 요약하지 마세요>
+<full codex output, verbatim — do not truncate or summarize>
 ════════════════════════════════════════════════════════════
 GATE: PASS                    Tokens: 14,331 | Est. cost: ~$0.12
 ```
 
-또는
+or
 
 ```
 GATE: FAIL (N critical findings)
 ```
 
-6. **교차 모델 비교:** 이 대화에서 이전에 `/review` (Claude 자체 리뷰)를 실행한 경우,
-   두 발견 사항 세트를 비교:
+6. **Cross-model comparison:** If `/review` (Claude's own review) was already run
+   earlier in this conversation, compare the two sets of findings:
 
 ```
 CROSS-MODEL ANALYSIS:
-  Both found: [Claude와 Codex 모두 발견한 것]
-  Only Codex found: [Codex만 발견한 것]
-  Only Claude found: [Claude의 /review만 발견한 것]
+  Both found: [findings that overlap between Claude and Codex]
+  Only Codex found: [findings unique to Codex]
+  Only Claude found: [findings unique to Claude's /review]
   Agreement rate: X% (N/M total unique findings overlap)
 ```
 
-7. 리뷰 결과 저장:
+7. Persist the review result:
 ```bash
 ~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"codex-review","timestamp":"TIMESTAMP","status":"STATUS","gate":"GATE","findings":N,"findings_fixed":N,"commit":"'"$(git rev-parse --short HEAD)"'"}'
 ```
 
-대체: TIMESTAMP (ISO 8601), STATUS (PASS이면 "clean", FAIL이면 "issues_found"),
-GATE ("pass" 또는 "fail"), findings ([P1] + [P2] 마커 수),
-findings_fixed (배포 전에 처리/수정된 발견 사항 수).
+Substitute: TIMESTAMP (ISO 8601), STATUS ("clean" if PASS, "issues_found" if FAIL),
+GATE ("pass" or "fail"), findings (count of [P1] + [P2] markers),
+findings_fixed (count of findings that were addressed/fixed before shipping).
 
-8. 임시 파일 정리:
+8. Clean up temp files:
 ```bash
 rm -f "$TMPERR"
 ```
@@ -553,6 +761,10 @@ Parse each JSONL entry. Each skill logs different fields:
   → Findings: "{issues_found} issues, {critical_gaps} critical gaps"
 - **plan-design-review**: \`status\`, \`initial_score\`, \`overall_score\`, \`unresolved\`, \`decisions_made\`, \`commit\`
   → Findings: "score: {initial_score}/10 → {overall_score}/10, {decisions_made} decisions"
+- **plan-devex-review**: \`status\`, \`initial_score\`, \`overall_score\`, \`product_type\`, \`tthw_current\`, \`tthw_target\`, \`mode\`, \`persona\`, \`competitive_tier\`, \`unresolved\`, \`commit\`
+  → Findings: "score: {initial_score}/10 → {overall_score}/10, TTHW: {tthw_current} → {tthw_target}"
+- **devex-review**: \`status\`, \`overall_score\`, \`product_type\`, \`tthw_measured\`, \`dimensions_tested\`, \`dimensions_inferred\`, \`boomerang\`, \`commit\`
+  → Findings: "score: {overall_score}/10, TTHW: {tthw_measured}, {dimensions_tested} tested/{dimensions_inferred} inferred"
 - **codex-review**: \`status\`, \`gate\`, \`findings\`, \`findings_fixed\`
   → Findings: "{findings} findings, {findings_fixed}/{findings} fixed"
 
@@ -571,6 +783,7 @@ Produce this markdown table:
 | Codex Review | \`/codex review\` | Independent 2nd opinion | {runs} | {status} | {findings} |
 | Eng Review | \`/plan-eng-review\` | Architecture & tests (required) | {runs} | {status} | {findings} |
 | Design Review | \`/plan-design-review\` | UI/UX gaps | {runs} | {status} | {findings} |
+| DX Review | \`/plan-devex-review\` | Developer experience gaps | {runs} | {status} | {findings} |
 \`\`\`
 
 Below the table, add these lines (omit any that are empty/not applicable):
@@ -599,26 +812,32 @@ plan's living status.
 
 ---
 
-## Step 2B: 도전 (적대적) 모드
+## Step 2B: Challenge (Adversarial) Mode
 
-Codex가 당신의 코드를 깨뜨리려고 합니다 — 일반 리뷰가 놓칠 수 있는 엣지 케이스,
-레이스 컨디션, 보안 취약점, 실패 모드를 찾습니다.
+Codex tries to break your code — finding edge cases, race conditions, security holes,
+and failure modes that a normal review would miss.
 
-1. 적대적 프롬프트 구성. 사용자가 집중 영역을 제공한 경우
-(예: `/codex challenge security`), 포함:
+1. Construct the adversarial prompt. **Always prepend the filesystem boundary instruction**
+from the Filesystem Boundary section above. If the user provided a focus area
+(e.g., `/codex challenge security`), include it after the boundary:
 
-기본 프롬프트 (집중 없음):
-"Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Your job is to find ways this code will fail in production. Think like an attacker and a chaos engineer. Find edge cases, race conditions, security holes, resource leaks, failure modes, and silent data corruption paths. Be adversarial. Be thorough. No compliments — just the problems."
+Default prompt (no focus):
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
 
-집중 포함 (예: "security"):
-"Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Focus specifically on SECURITY. Your job is to find every way an attacker could exploit this code. Think about injection vectors, auth bypasses, privilege escalation, data exposure, and timing attacks. Be adversarial."
+Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Your job is to find ways this code will fail in production. Think like an attacker and a chaos engineer. Find edge cases, race conditions, security holes, resource leaks, failure modes, and silent data corruption paths. Be adversarial. Be thorough. No compliments — just the problems."
 
-2. **JSONL 출력**으로 codex exec를 실행하여 추론 트레이스와 도구 호출을 캡처 (5분 타임아웃):
+With focus (e.g., "security"):
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
 
-사용자가 `--xhigh`를 전달한 경우, `"high"` 대신 `"xhigh"`를 사용합니다.
+Review the changes on this branch against the base branch. Run `git diff origin/<base>` to see the diff. Focus specifically on SECURITY. Your job is to find every way an attacker could exploit this code. Think about injection vectors, auth bypasses, privilege escalation, data exposure, and timing attacks. Be adversarial."
+
+2. Run codex exec with **JSONL output** to capture reasoning traces and tool calls (5-minute timeout):
+
+If the user passed `--xhigh`, use `"xhigh"` instead of `"high"`.
 
 ```bash
-codex exec "<prompt>" -C "$(git rev-parse --show-toplevel)" -s read-only -c 'model_reasoning_effort="high"' --enable web_search_cached --json 2>/dev/null | PYTHONUNBUFFERED=1 python3 -u -c "
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+codex exec "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="high"' --enable web_search_cached --json 2>/dev/null | PYTHONUNBUFFERED=1 python3 -u -c "
 import sys, json
 for line in sys.stdin:
     line = line.strip()
@@ -631,92 +850,106 @@ for line in sys.stdin:
             itype = item.get('type','')
             text = item.get('text','')
             if itype == 'reasoning' and text:
-                print(f'[codex thinking] {text}')
-                print()
+                print(f'[codex thinking] {text}', flush=True)
+                print(flush=True)
             elif itype == 'agent_message' and text:
-                print(text)
+                print(text, flush=True)
             elif itype == 'command_execution':
                 cmd = item.get('command','')
-                if cmd: print(f'[codex ran] {cmd}')
+                if cmd: print(f'[codex ran] {cmd}', flush=True)
         elif t == 'turn.completed':
             usage = obj.get('usage',{})
             tokens = usage.get('input_tokens',0) + usage.get('output_tokens',0)
-            if tokens: print(f'\ntokens used: {tokens}')
+            if tokens: print(f'\ntokens used: {tokens}', flush=True)
     except: pass
 "
 ```
 
-이것은 codex의 JSONL 이벤트를 파싱하여 추론 트레이스, 도구 호출, 최종 응답을 추출합니다.
-`[codex thinking]` 라인은 codex가 답변 전에 추론한 내용을 보여줍니다.
+This parses codex's JSONL events to extract reasoning traces, tool calls, and the final
+response. The `[codex thinking]` lines show what codex reasoned through before its answer.
 
-3. 전체 스트리밍 출력 제시:
+3. Present the full streamed output:
 
 ```
 CODEX SAYS (adversarial challenge):
 ════════════════════════════════════════════════════════════
-<위의 전체 출력, 그대로>
+<full output from above, verbatim>
 ════════════════════════════════════════════════════════════
 Tokens: N | Est. cost: ~$X.XX
 ```
 
 ---
 
-## Step 2C: 상담 모드
+## Step 2C: Consult Mode
 
-코드베이스에 대해 Codex에 무엇이든 질문합니다. 후속 질문을 위한 세션 연속성을 지원합니다.
+Ask Codex anything about the codebase. Supports session continuity for follow-ups.
 
-1. **기존 세션 확인:**
+1. **Check for existing session:**
 ```bash
 cat .context/codex-session-id 2>/dev/null || echo "NO_SESSION"
 ```
 
-세션 파일이 존재하면 (`NO_SESSION`이 아닌 경우), AskUserQuestion 사용:
+If a session file exists (not `NO_SESSION`), use AskUserQuestion:
 ```
-이전의 Codex 대화가 활성화되어 있습니다. 계속할까요, 새로 시작할까요?
-A) 대화 계속 (Codex가 이전 컨텍스트를 기억합니다)
-B) 새 대화 시작
+You have an active Codex conversation from earlier. Continue it or start fresh?
+A) Continue the conversation (Codex remembers the prior context)
+B) Start a new conversation
 ```
 
-2. 임시 파일 생성:
+2. Create temp files:
 ```bash
 TMPRESP=$(mktemp /tmp/codex-resp-XXXXXX.txt)
 TMPERR=$(mktemp /tmp/codex-err-XXXXXX.txt)
 ```
 
-3. **플랜 리뷰 자동 감지:** 사용자의 프롬프트가 플랜 리뷰에 대한 것이거나,
-플랜 파일이 존재하고 사용자가 인자 없이 `/codex`를 입력한 경우:
+3. **Plan review auto-detection:** If the user's prompt is about reviewing a plan,
+or if plan files exist and the user said `/codex` with no arguments:
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 ls -t ~/.claude/plans/*.md 2>/dev/null | xargs grep -l "$(basename $(pwd))" 2>/dev/null | head -1
 ```
-프로젝트 한정 매치가 없으면 `ls -t ~/.claude/plans/*.md 2>/dev/null | head -1`로 폴백하되
-경고: "참고: 이 플랜은 다른 프로젝트에서 온 것일 수 있습니다 — Codex에 전송하기 전에 확인하세요."
-**중요 — 내용을 임베딩하세요, 경로를 참조하지 마세요:** Codex는 저장소 루트(`-C`)로
-샌드박스되어 실행되며 `~/.claude/plans/`나 저장소 외부의 파일에 접근할 수 없습니다.
-플랜 파일을 직접 읽고 그 전체 내용을 아래 프롬프트에 임베딩해야 합니다. Codex에
-파일 경로를 알려주거나 플랜 파일을 읽으라고 하지 마세요 — 10개 이상의 도구 호출을
-낭비하고 실패합니다.
+If no project-scoped match, fall back to `ls -t ~/.claude/plans/*.md 2>/dev/null | head -1`
+but warn: "Note: this plan may be from a different project — verify before sending to Codex."
 
-또한: 플랜 내용에서 참조된 소스 파일 경로(`src/foo.ts`, `lib/bar.py` 등 `/`를 포함하고
-저장소에 존재하는 경로 패턴)를 스캔하세요. 발견되면, Codex가 rg/find로 탐색하는 대신
-직접 읽을 수 있도록 프롬프트에 나열합니다.
+**IMPORTANT — embed content, don't reference path:** Codex runs sandboxed to the repo
+root (`-C`) and cannot access `~/.claude/plans/` or any files outside the repo. You MUST
+read the plan file yourself and embed its FULL CONTENT in the prompt below. Do NOT tell
+Codex the file path or ask it to read the plan file — it will waste 10+ tool calls
+searching and fail.
 
-사용자의 프롬프트 앞에 페르소나를 추가:
-"You are a brutally honest technical reviewer. Review this plan for: logical gaps and
+Also: scan the plan content for referenced source file paths (patterns like `src/foo.ts`,
+`lib/bar.py`, paths containing `/` that exist in the repo). If found, list them in the
+prompt so Codex reads them directly instead of discovering them via rg/find.
+
+**Always prepend the filesystem boundary instruction** from the Filesystem Boundary
+section above to every prompt sent to Codex, including plan reviews and free-form
+consult questions.
+
+Prepend the boundary and persona to the user's prompt:
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
+
+You are a brutally honest technical reviewer. Review this plan for: logical gaps and
 unstated assumptions, missing error handling or edge cases, overcomplexity (is there a
 simpler approach?), feasibility risks (what could go wrong?), and missing dependencies
 or sequencing issues. Be direct. Be terse. No compliments. Just the problems.
-Also review these source files referenced in the plan: <참조된 파일 목록, 있는 경우>.
+Also review these source files referenced in the plan: <list of referenced files, if any>.
 
 THE PLAN:
-<전체 플랜 내용, 그대로 임베딩>"
+<full plan content, embedded verbatim>"
 
-4. **JSONL 출력**으로 codex exec를 실행하여 추론 트레이스를 캡처 (5분 타임아웃):
+For non-plan consult prompts (user typed `/codex <question>`), still prepend the boundary:
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Do NOT modify agents/openai.yaml. Stay focused on repository code only.
 
-사용자가 `--xhigh`를 전달한 경우, `"medium"` 대신 `"xhigh"`를 사용합니다.
+<user's question>"
 
-**새 세션의 경우:**
+4. Run codex exec with **JSONL output** to capture reasoning traces (5-minute timeout):
+
+If the user passed `--xhigh`, use `"xhigh"` instead of `"medium"`.
+
+For a **new session:**
 ```bash
-codex exec "<prompt>" -C "$(git rev-parse --show-toplevel)" -s read-only -c 'model_reasoning_effort="medium"' --enable web_search_cached --json 2>"$TMPERR" | PYTHONUNBUFFERED=1 python3 -u -c "
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+codex exec "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="medium"' --enable web_search_cached --json 2>"$TMPERR" | PYTHONUNBUFFERED=1 python3 -u -c "
 import sys, json
 for line in sys.stdin:
     line = line.strip()
@@ -726,110 +959,117 @@ for line in sys.stdin:
         t = obj.get('type','')
         if t == 'thread.started':
             tid = obj.get('thread_id','')
-            if tid: print(f'SESSION_ID:{tid}')
+            if tid: print(f'SESSION_ID:{tid}', flush=True)
         elif t == 'item.completed' and 'item' in obj:
             item = obj['item']
             itype = item.get('type','')
             text = item.get('text','')
             if itype == 'reasoning' and text:
-                print(f'[codex thinking] {text}')
-                print()
+                print(f'[codex thinking] {text}', flush=True)
+                print(flush=True)
             elif itype == 'agent_message' and text:
-                print(text)
+                print(text, flush=True)
             elif itype == 'command_execution':
                 cmd = item.get('command','')
-                if cmd: print(f'[codex ran] {cmd}')
+                if cmd: print(f'[codex ran] {cmd}', flush=True)
         elif t == 'turn.completed':
             usage = obj.get('usage',{})
             tokens = usage.get('input_tokens',0) + usage.get('output_tokens',0)
-            if tokens: print(f'\ntokens used: {tokens}')
+            if tokens: print(f'\ntokens used: {tokens}', flush=True)
     except: pass
 "
 ```
 
-**재개된 세션의 경우** (사용자가 "계속" 선택):
+For a **resumed session** (user chose "Continue"):
 ```bash
-codex exec resume <session-id> "<prompt>" -C "$(git rev-parse --show-toplevel)" -s read-only -c 'model_reasoning_effort="xhigh"' --enable web_search_cached --json 2>"$TMPERR" | python3 -c "
-<same python streaming parser as above>
+_REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
+codex exec resume <session-id> "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="medium"' --enable web_search_cached --json 2>"$TMPERR" | PYTHONUNBUFFERED=1 python3 -u -c "
+<same python streaming parser as above, with flush=True on all print() calls>
 "
 ```
 
-5. 스트리밍 출력에서 세션 ID를 캡처. 파서가 `thread.started` 이벤트에서
-   `SESSION_ID:<id>`를 출력합니다. 후속 질문을 위해 저장:
+5. Capture session ID from the streamed output. The parser prints `SESSION_ID:<id>`
+   from the `thread.started` event. Save it for follow-ups:
 ```bash
 mkdir -p .context
 ```
-파서가 출력한 세션 ID (`SESSION_ID:`로 시작하는 라인)를
-`.context/codex-session-id`에 저장합니다.
+Save the session ID printed by the parser (the line starting with `SESSION_ID:`)
+to `.context/codex-session-id`.
 
-6. 전체 스트리밍 출력 제시:
+6. Present the full streamed output:
 
 ```
 CODEX SAYS (consult):
 ════════════════════════════════════════════════════════════
-<전체 출력, 그대로 — [codex thinking] 트레이스 포함>
+<full output, verbatim — includes [codex thinking] traces>
 ════════════════════════════════════════════════════════════
 Tokens: N | Est. cost: ~$X.XX
 Session saved — run /codex again to continue this conversation.
 ```
 
-7. 제시 후, Codex의 분석이 당신의 이해와 다른 지점을 확인합니다.
-   의견 불일치가 있으면 플래그:
-   "참고: Claude Code는 X에 대해 Y 이유로 동의하지 않습니다."
+7. After presenting, note any points where Codex's analysis differs from your own
+   understanding. If there is a disagreement, flag it:
+   "Note: Claude Code disagrees on X because Y."
 
 ---
 
-## 모델 & 추론
+## Model & Reasoning
 
-**모델:** 하드코딩된 모델은 없습니다 — codex는 현재 기본값(최첨단 에이전틱 코딩 모델)을
-사용합니다. 이는 OpenAI가 새 모델을 출시하면 /codex가 자동으로 사용한다는 의미입니다.
-사용자가 특정 모델을 원하면, `-m`을 codex에 전달하세요.
+**Model:** No model is hardcoded — codex uses whatever its current default is (the frontier
+agentic coding model). This means as OpenAI ships newer models, /codex automatically
+uses them. If the user wants a specific model, pass `-m` through to codex.
 
-**추론 노력 (모드별 기본값):**
-- **리뷰 (2A):** `high` — 제한된 diff 입력, 철저함 필요하지만 최대 토큰은 불필요
-- **도전 (2B):** `high` — 적대적이지만 diff 크기로 제한됨
-- **상담 (2C):** `medium` — 큰 컨텍스트 (플랜, 코드베이스), 대화형, 속도 필요
+**Reasoning effort (per-mode defaults):**
+- **Review (2A):** `high` — bounded diff input, needs thoroughness but not max tokens
+- **Challenge (2B):** `high` — adversarial but bounded by diff size
+- **Consult (2C):** `medium` — large context (plans, codebase), interactive, needs speed
 
-`xhigh`는 `high` 대비 토큰을 약 23배 더 사용하며, 큰 컨텍스트 작업에서 50분 이상
-멈춤 현상을 유발합니다 (OpenAI issues #8545, #8402, #6931). 사용자는 최대 추론이
-필요하고 기다릴 의향이 있을 때 `--xhigh` 플래그로 오버라이드할 수 있습니다
-(예: `/codex review --xhigh`).
+`xhigh` uses ~23x more tokens than `high` and causes 50+ minute hangs on large context
+tasks (OpenAI issues #8545, #8402, #6931). Users can override with `--xhigh` flag
+(e.g., `/codex review --xhigh`) when they want maximum reasoning and are willing to wait.
 
-**웹 검색:** 모든 codex 명령은 `--enable web_search_cached`를 사용하여 Codex가 리뷰 중
-문서와 API를 찾아볼 수 있습니다. OpenAI의 캐시된 인덱스 — 빠르고, 추가 비용 없음.
+**Web search:** All codex commands use `--enable web_search_cached` so Codex can look up
+docs and APIs during review. This is OpenAI's cached index — fast, no extra cost.
 
-사용자가 모델을 지정한 경우 (예: `/codex review -m gpt-5.1-codex-max`
-또는 `/codex challenge -m gpt-5.2`), `-m` 플래그를 codex에 전달하세요.
-
----
-
-## 비용 추정
-
-stderr에서 토큰 수를 파싱합니다. Codex는 stderr에 `tokens used\nN`을 출력합니다.
-
-표시: `Tokens: N`
-
-토큰 수를 사용할 수 없으면 표시: `Tokens: unknown`
+If the user specifies a model (e.g., `/codex review -m gpt-5.1-codex-max`
+or `/codex challenge -m gpt-5.2`), pass the `-m` flag through to codex.
 
 ---
 
-## 에러 처리
+## Cost Estimation
 
-- **바이너리 미발견:** Step 0에서 감지됨. 설치 지침과 함께 중단.
-- **인증 에러:** Codex가 stderr에 인증 에러를 출력합니다. 에러를 표시:
-  "Codex 인증 실패. 터미널에서 `codex login`을 실행하여 ChatGPT를 통해 인증하세요."
-- **타임아웃:** Bash 호출이 타임아웃 (5분)되면, 사용자에게 알리세요:
-  "Codex가 5분 후 타임아웃되었습니다. diff가 너무 크거나 API가 느릴 수 있습니다. 다시 시도하거나 더 작은 범위를 사용하세요."
-- **빈 응답:** `$TMPRESP`가 비어있거나 존재하지 않으면, 사용자에게 알리세요:
-  "Codex가 응답을 반환하지 않았습니다. stderr에서 에러를 확인하세요."
-- **세션 재개 실패:** 재개가 실패하면, 세션 파일을 삭제하고 새로 시작.
+Parse token count from stderr. Codex prints `tokens used\nN` to stderr.
+
+Display as: `Tokens: N`
+
+If token count is not available, display: `Tokens: unknown`
 
 ---
 
-## 중요 규칙
+## Error Handling
 
-- **파일을 절대 수정하지 마세요.** 이 스킬은 읽기 전용입니다. Codex는 읽기 전용 샌드박스 모드에서 실행됩니다.
-- **출력을 그대로 제시하세요.** Codex의 출력을 보여주기 전에 잘라내거나, 요약하거나, 편집하지 마세요. CODEX SAYS 블록 안에 전체를 보여주세요.
-- **종합은 이후에, 대체가 아닙니다.** Claude의 코멘트는 전체 출력 이후에 옵니다.
-- 모든 codex Bash 호출에 **5분 타임아웃** (`timeout: 300000`).
-- **이중 리뷰 금지.** 사용자가 이미 `/review`를 실행했으면, Codex가 두 번째 독립적 의견을 제공합니다. Claude Code 자체 리뷰를 다시 실행하지 마세요.
+- **Binary not found:** Detected in Step 0. Stop with install instructions.
+- **Auth error:** Codex prints an auth error to stderr. Surface the error:
+  "Codex authentication failed. Run `codex login` in your terminal to authenticate via ChatGPT."
+- **Timeout:** If the Bash call times out (5 min), tell the user:
+  "Codex timed out after 5 minutes. The diff may be too large or the API may be slow. Try again or use a smaller scope."
+- **Empty response:** If `$TMPRESP` is empty or doesn't exist, tell the user:
+  "Codex returned no response. Check stderr for errors."
+- **Session resume failure:** If resume fails, delete the session file and start fresh.
+
+---
+
+## Important Rules
+
+- **Never modify files.** This skill is read-only. Codex runs in read-only sandbox mode.
+- **Present output verbatim.** Do not truncate, summarize, or editorialize Codex's output
+  before showing it. Show it in full inside the CODEX SAYS block.
+- **Add synthesis after, not instead of.** Any Claude commentary comes after the full output.
+- **5-minute timeout** on all Bash calls to codex (`timeout: 300000`).
+- **No double-reviewing.** If the user already ran `/review`, Codex provides a second
+  independent opinion. Do not re-run Claude Code's own review.
+- **Detect skill-file rabbit holes.** After receiving Codex output, scan for signs
+  that Codex got distracted by skill files: `gstack-config`, `gstack-update-check`,
+  `SKILL.md`, or `skills/gstack`. If any of these appear in the output, append a
+  warning: "Codex appears to have read gstack skill files instead of reviewing your
+  code. Consider retrying."

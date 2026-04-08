@@ -6,7 +6,7 @@ description: |
   kubectl delete 등 파괴적인 명령어 실행 전 경고를 표시합니다. 사용자가 각 경고를
   재정의할 수 있습니다. 프로덕션 환경 작업, 라이브 시스템 디버깅, 공유 환경에서
   작업할 때 사용하세요. "be careful", "safety mode", "prod mode", "careful mode" 요청 시
-  사용합니다.
+  사용합니다. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -17,6 +17,7 @@ hooks:
         - type: command
           command: "bash ${CLAUDE_SKILL_DIR}/bin/check-careful.sh"
           statusMessage: "Checking for destructive commands..."
+sensitive: true
 ---
 
 # /careful — 파괴적 명령어 가드레일

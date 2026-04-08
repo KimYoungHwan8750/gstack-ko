@@ -9,7 +9,7 @@ description: |
   스크린샷으로 재검증합니다. 구현 전 설계 단계 디자인 리뷰는 /plan-design-review를 사용하세요.
   "디자인 감사", "시각적 QA", "잘 보이는지 확인", "디자인 폴리시" 요청 시 사용하세요.
   사용자가 시각적 불일치를 언급하거나 라이브 사이트의 외관을
-  다듬고 싶어할 때 선제적으로 제안하세요.
+  다듬고 싶어할 때 선제적으로 제안하세요. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -78,14 +78,26 @@ git status --porcelain
 
 {{TEST_BOOTSTRAP}}
 
+**gstack designer 찾기 (선택 사항 — 대상 mockup 생성을 활성화):**
+
+{{DESIGN_SETUP}}
+
+`DESIGN_READY`인 경우: 수정 루프 중에 항목이 수정된 후 어떤 모습이어야 하는지 보여주는 "대상 mockup"을 생성할 수 있습니다. 이렇게 하면 현재 디자인과 의도한 디자인 사이의 간극이 추상적이지 않고 직관적으로 드러납니다.
+
+`DESIGN_NOT_AVAILABLE`인 경우: mockup 생성을 건너뛰세요 — 수정 루프는 이것 없이도 작동합니다.
+
 **출력 디렉토리 생성:**
 
 ```bash
-REPORT_DIR=".gstack/design-reports"
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
+REPORT_DIR=~/.gstack/projects/$SLUG/designs/design-audit-$(date +%Y%m%d)
 mkdir -p "$REPORT_DIR/screenshots"
+echo "REPORT_DIR: $REPORT_DIR"
 ```
 
 ---
+
+{{LEARNINGS_SEARCH}}
 
 ## 페이즈 1-6: 디자인 감사 베이스라인
 
@@ -100,8 +112,8 @@ mkdir -p "$REPORT_DIR/screenshots"
 ## 출력 구조
 
 ```
-.gstack/design-reports/
-├── design-audit-{domain}-{YYYY-MM-DD}.md    # 구조화된 보고서
+~/.gstack/projects/$SLUG/designs/design-audit-{YYYYMMDD}/
+├── design-audit-{domain}.md                  # 구조화된 보고서
 ├── screenshots/
 │   ├── first-impression.png                  # 페이즈 1
 │   ├── {page}-annotated.png                  # 페이지별 주석 포함
@@ -109,6 +121,7 @@ mkdir -p "$REPORT_DIR/screenshots"
 │   ├── {page}-tablet.png
 │   ├── {page}-desktop.png
 │   ├── finding-001-before.png                # 수정 전
+│   ├── finding-001-target.png                # 대상 mockup (생성된 경우)
 │   ├── finding-001-after.png                 # 수정 후
 │   └── ...
 └── design-baseline.json                      # 회귀 모드용
@@ -145,10 +158,23 @@ mkdir -p "$REPORT_DIR/screenshots"
 - 해당 항목과 직접 관련된 파일만 수정하세요
 - 구조적 컴포넌트 변경보다 CSS/스타일링 변경을 선호하세요
 
+### 8a.5. 대상 Mockup (`DESIGN_READY`인 경우)
+
+gstack designer를 사용할 수 있고 해당 항목이 시각적 레이아웃, 계층, 간격과 관련되어 있다면 (잘못된 색상이나 font-size 같은 CSS 값 수정만이 아니라), 수정된 버전이 어떤 모습이어야 하는지 보여주는 대상 mockup을 생성하세요:
+
+```bash
+$D generate --brief "<description of the page/component with the finding fixed, referencing DESIGN.md constraints>" --output "$REPORT_DIR/screenshots/finding-NNN-target.png"
+```
+
+사용자에게 보여주세요: "현재 상태(스크린샷)와 이렇게 보여야 하는 상태(mockup)입니다. 이제 소스를 수정해 이에 맞추겠습니다."
+
+이 단계는 선택 사항입니다 — 사소한 CSS 수정(잘못된 hex 색상, 누락된 padding 값)은 건너뛰세요. 설명만으로 의도한 디자인이 명확하지 않은 항목에 사용하세요.
+
 ### 8b. 수정
 
 - 소스 코드를 읽고 컨텍스트를 파악하세요
 - **최소한의 수정**을 적용하세요 — 디자인 이슈를 해결하는 가장 작은 변경
+- 8a.5에서 대상 mockup이 생성된 경우, 이를 수정을 위한 시각적 참조로 사용하세요
 - CSS만의 변경이 선호됩니다 (더 안전하고, 되돌리기 쉬움)
 - 주변 코드를 리팩토링하거나, 기능을 추가하거나, 관련 없는 것을 "개선"하지 마세요
 
@@ -214,22 +240,23 @@ DESIGN-FIX RISK:
 모든 수정이 적용된 후:
 
 1. 영향받은 모든 페이지에 대해 디자인 감사를 재실행하세요
-2. 최종 디자인 점수와 AI 저급 결과물(AI slop) 점수를 계산하세요
-3. **최종 점수가 베이스라인보다 나빠진 경우:** 눈에 띄게 경고하세요 — 무언가 회귀되었습니다
+2. 수정 루프 중 대상 mockup이 생성되었고 `DESIGN_READY`인 경우: `$D verify --mockup "$REPORT_DIR/screenshots/finding-NNN-target.png" --screenshot "$REPORT_DIR/screenshots/finding-NNN-after.png"`를 실행하여 수정 결과를 대상과 비교하세요. 통과/실패를 보고서에 포함하세요.
+3. 최종 디자인 점수와 AI 저급 결과물(AI slop) 점수를 계산하세요
+4. **최종 점수가 베이스라인보다 나빠진 경우:** 눈에 띄게 경고하세요 — 무언가 회귀되었습니다
 
 ---
 
 ## 페이즈 10: 보고서
 
-보고서를 로컬 및 프로젝트 범위 위치 모두에 작성하세요:
+보고서를 `$REPORT_DIR`에 작성하세요 (셋업 페이즈에서 이미 설정됨):
 
-**로컬:** `.gstack/design-reports/design-audit-{domain}-{YYYY-MM-DD}.md`
+**Primary:** `$REPORT_DIR/design-audit-{domain}.md`
 
-**프로젝트 범위:**
+**프로젝트 인덱스에도 요약 작성:**
 ```bash
 {{SLUG_SETUP}}
 ```
-`~/.gstack/projects/{slug}/{user}-{branch}-design-audit-{datetime}.md`에 작성하세요
+`~/.gstack/projects/{slug}/{user}-{branch}-design-audit-{datetime}.md`에 `$REPORT_DIR`의 전체 보고서를 가리키는 포인터와 함께 한 줄 요약을 작성하세요.
 
 **항목별 추가 사항** (표준 디자인 감사 보고서 외):
 - 수정 상태: verified / best-effort / reverted / deferred
@@ -257,6 +284,8 @@ DESIGN-FIX RISK:
 2. **TODOS.md에 있던 수정된 항목** → "{branch}에서 {date}에 /design-review로 수정됨"으로 주석 처리
 
 ---
+
+{{LEARNINGS_LOG}}
 
 ## 추가 규칙 (design-review 전용)
 

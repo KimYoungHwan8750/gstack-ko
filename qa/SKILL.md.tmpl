@@ -9,7 +9,11 @@ description: |
   요청 시 사용합니다.
   사용자가 기능이 테스트 준비가 되었다고 말하거나 "이거 작동해?"라고 물을 때 사전에 제안합니다.
   세 가지 등급: Quick (심각/높음만), Standard (+ 보통), Exhaustive (+ 외관). 전후 건강 점수,
-  수정 증거, 출시 준비 요약을 생성합니다. 리포트 전용 모드는 /qa-only를 사용하세요.
+  수정 증거, 출시 준비 요약을 생성합니다. 리포트 전용 모드는 /qa-only를 사용하세요. (gstack)
+voice-triggers:
+  - "quality check"
+  - "test the app"
+  - "run QA"
 allowed-tools:
   - Bash
   - Read
@@ -89,14 +93,17 @@ mkdir -p .gstack/qa-reports/screenshots
 
 ---
 
+{{LEARNINGS_SEARCH}}
+
 ## 테스트 계획 컨텍스트
 
 git diff 휴리스틱으로 폴백하기 전에, 더 풍부한 테스트 계획 소스를 확인합니다:
 
 1. **프로젝트 범위 테스트 계획:** `~/.gstack/projects/`에서 이 저장소의 최근 `*-test-plan-*.md` 파일을 확인합니다
    ```bash
+   setopt +o nomatch 2>/dev/null || true  # zsh compat
    {{SLUG_EVAL}}
-   find ~/.gstack/projects/$SLUG -name '*-test-plan-*.md' -type f -exec ls -t {} + 2>/dev/null | head -1
+   ls -t ~/.gstack/projects/$SLUG/*-test-plan-*.md 2>/dev/null | head -1
    ```
 2. **대화 컨텍스트:** 이전 `/plan-eng-review` 또는 `/plan-ceo-review`가 이 대화에서 테스트 계획 출력을 생성했는지 확인합니다
 3. **더 풍부한 소스를 사용합니다.** 두 소스 모두 사용할 수 없는 경우에만 git diff 분석으로 폴백합니다.
@@ -149,8 +156,8 @@ git diff 휴리스틱으로 폴백하기 전에, 더 풍부한 테스트 계획 
 ### 8a. 소스 위치 파악
 
 ```bash
-# 에러 메시지, 컴포넌트 이름, 라우트 정의를 검색
-# 영향 받는 페이지와 일치하는 파일 패턴을 Glob으로 검색
+# Grep for error messages, component names, route definitions
+# Glob for file patterns matching the affected page
 ```
 
 - 버그의 원인이 되는 소스 파일을 찾습니다
@@ -312,6 +319,8 @@ WTF-LIKELIHOOD:
 2. **TODOS.md에 있었던 수정된 버그** → "Fixed by /qa on {branch}, {date}"로 주석 추가
 
 ---
+
+{{LEARNINGS_LOG}}
 
 ## 추가 규칙 (qa 전용)
 

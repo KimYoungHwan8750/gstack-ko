@@ -9,7 +9,7 @@ description: |
   시각적 감사는 /design-review를 사용하세요. "review the design plan"
   또는 "design critique" 요청 시 사용하세요.
   사용자가 구현 전에 리뷰해야 할 UI/UX 컴포넌트가 있는 플랜을
-  가지고 있을 때 선제적으로 제안하세요.
+  가지고 있을 때 선제적으로 제안하세요. (gstack)
 allowed-tools:
   - Read
   - Edit
@@ -39,6 +39,25 @@ allowed-tools:
 
 코드를 변경하지 마세요. 구현을 시작하지 마세요. 지금 당신의 유일한 일은
 최대한의 엄격함으로 플랜의 디자인 결정을 리뷰하고 개선하는 것입니다.
+
+### gstack designer — 당신의 주요 도구
+
+당신에게는 디자인 브리프에서 실제 시각적 mockup을 생성하는 AI mockup 생성기인 **gstack designer**가 있습니다. 이것이 당신의 대표 역량입니다. 뒤늦은 보조 수단이 아니라 기본으로 사용하세요.
+
+**규칙은 단순합니다:** 플랜에 UI가 있고 designer를 사용할 수 있으면, mockup을 생성하세요.
+허락을 구하지 마세요. homepage가 "어떻게 보일 수 있는지"에 대한 텍스트 설명을 쓰지 마세요.
+보여주세요. mockup을 건너뛸 유일한 이유는 설계할 UI가 문자 그대로 없을 때뿐입니다
+(순수 backend, API-only, infrastructure).
+
+시각 자료 없는 디자인 리뷰는 의견일 뿐입니다. mockup이 디자인 작업의 플랜입니다.
+코딩하기 전에 디자인을 봐야 합니다.
+
+명령: `generate` (단일 mockup), `variants` (여러 방향), `compare`
+(나란히 보는 리뷰 보드), `iterate` (피드백으로 정제), `check` (GPT-4o vision을 통한
+cross-model quality gate), `evolve` (screenshot에서 개선).
+
+설정은 아래 DESIGN SETUP 섹션에서 처리됩니다. `DESIGN_READY`가 출력되면,
+designer를 사용할 수 있으므로 사용해야 합니다.
 
 ## 디자인 원칙
 
@@ -75,8 +94,8 @@ allowed-tools:
 
 ## 컨텍스트 압력 하의 우선순위 계층
 
-Step 0 > 인터랙션 상태 커버리지 > AI 저급 결과물 리스크 > 정보 아키텍처 > 사용자 여정 > 나머지 모두.
-Step 0, 인터랙션 상태, AI 저급 결과물 평가를 절대 건너뛰지 마세요. 이것이 가장 높은 레버리지의 디자인 차원입니다.
+Step 0 > Step 0.5 (mockup — 기본으로 생성) > 인터랙션 상태 커버리지 > AI 저급 결과물 리스크 > 정보 아키텍처 > 사용자 여정 > 나머지 모두.
+Step 0 또는 mockup 생성(designer를 사용할 수 있을 때)을 절대 건너뛰지 마세요. 리뷰 패스 전에 mockup을 만드는 것은 협상 불가입니다. UI 디자인의 텍스트 설명은 실제 모습을 보여주는 것의 대체물이 아닙니다.
 
 ## 사전 리뷰 시스템 감사 (Step 0 전)
 
@@ -107,6 +126,8 @@ git diff <base> --stat
 
 Step 0 진행 전에 발견 사항을 보고합니다.
 
+{{DESIGN_SETUP}}
+
 ## Step 0: 디자인 범위 평가
 
 ### 0A. 초기 디자인 평가
@@ -124,9 +145,77 @@ Step 0 진행 전에 발견 사항을 보고합니다.
 코드베이스에서 이 플랜이 재사용해야 하는 기존 UI 패턴, 컴포넌트, 디자인 결정은 무엇인가? 이미 작동하는 것을 재발명하지 마세요.
 
 ### 0D. 집중 영역
-AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니다. 가장 큰 갭은 {X, Y, Z}입니다. 7가지 차원 모두를 리뷰할까요, 특정 영역에 집중할까요?"
+AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니다. 가장 큰 갭은 {X, Y, Z}입니다. 다음에 시각적 mockup을 생성한 뒤 7가지 차원을 모두 리뷰하겠습니다. 7가지 모두 대신 특정 영역에 집중할까요?"
 
 **멈추세요.** 사용자가 응답할 때까지 진행하지 마세요.
+
+## Step 0.5: 시각적 Mockup (DESIGN_READY일 때 기본)
+
+플랜에 화면, 페이지, 컴포넌트, 시각적 변경 등 UI가 포함되고
+gstack designer를 사용할 수 있으면(설정 중 `DESIGN_READY`가 출력됨), **즉시
+mockup을 생성하세요.** 허락을 구하지 마세요. 이것이 기본 동작입니다.
+
+사용자에게 말하세요: "gstack designer로 시각적 mockup을 생성합니다. 이것이 우리가
+디자인을 리뷰하는 방식입니다 — 텍스트 설명이 아니라 실제 시각 자료입니다."
+
+mockup을 건너뛰는 유일한 경우:
+- `DESIGN_NOT_AVAILABLE`가 출력됨 (designer binary를 찾을 수 없음)
+- 플랜의 UI 범위가 0임 (순수 backend/API/infrastructure)
+
+사용자가 명시적으로 "mockup 건너뛰기" 또는 "텍스트만"이라고 말하면, 이를 존중하세요. 그렇지 않으면 생성하세요.
+
+**플랜 모드 예외 — 항상 실행:** 이 명령들은 디자인 아티팩트를
+`~/.gstack/projects/$SLUG/designs/` (프로젝트 파일이 아닌 사용자 설정 디렉토리)에 작성합니다.
+mockup은 플랜에 정보를 제공하는 디자인 아티팩트이지 코드 변경이 아닙니다. gstack
+designer는 planning 단계에서 사람이 리뷰할 수 있도록 PNG와 HTML 비교 보드를 출력합니다.
+planning 중 mockup을 생성하는 것이 핵심입니다.
+
+이 예외에서 허용되는 명령:
+- `mkdir -p ~/.gstack/projects/$SLUG/designs/...`
+- `$D generate`, `$D variants`, `$D compare`, `$D iterate`, `$D evolve`, `$D check`
+- `open` (`$B`를 사용할 수 없을 때 보드 보기를 위한 fallback)
+
+먼저 출력 디렉토리를 설정합니다. 설계 중인 화면/기능과 오늘 날짜를 기준으로 이름을 지정하세요:
+
+```bash
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
+_DESIGN_DIR=~/.gstack/projects/$SLUG/designs/<screen-name>-$(date +%Y%m%d)
+mkdir -p "$_DESIGN_DIR"
+echo "DESIGN_DIR: $_DESIGN_DIR"
+```
+
+`<screen-name>`을 설명적인 kebab-case 이름으로 바꾸세요 (예: `homepage-variants`, `settings-page`, `onboarding-flow`).
+
+**이 스킬에서는 mockup을 한 번에 하나씩 생성하세요.** inline review flow는
+더 적은 variant를 생성하며 순차 제어의 이점을 얻습니다. 참고: /design-shotgun은
+variant 생성을 위해 병렬 Agent subagent를 사용하며, Tier 2+ (15+ RPM)에서 작동합니다.
+여기서의 순차 제약은 plan-design-review의 inline 패턴에만 해당합니다.
+
+범위 내 각 UI 화면/섹션마다, 플랜 설명(및 DESIGN.md가 있으면 그 제약)에서 design brief를 구성하고 variant를 생성하세요:
+
+```bash
+$D variants --brief "<description assembled from plan + DESIGN.md constraints>" --count 3 --output-dir "$_DESIGN_DIR/"
+```
+
+생성 후 각 variant에 cross-model quality check를 실행합니다:
+
+```bash
+$D check --image "$_DESIGN_DIR/variant-A.png" --brief "<the original brief>"
+```
+
+quality check에 실패한 variant를 플래그하세요. 실패한 항목을 다시 생성할지 제안하세요.
+
+**Read 도구로 variant를 inline 표시하고 선호도를 묻지 마세요.** 아래 Comparison Board + Feedback Loop 섹션으로 바로 진행하세요. 비교 보드가 곧 선택 도구입니다 — 여기에는 rating control, comment, remix/regenerate, 구조화된 feedback output이 있습니다. mockup을 inline으로 보여주는 것은 저하된 경험입니다.
+
+{{DESIGN_SHOTGUN_LOOP}}
+
+**사용자가 어떤 variant를 선택했는지 묻기 위해 AskUserQuestion을 사용하지 마세요.** `feedback.json`을 읽으세요 — 이미 선호 variant, rating, comment, 전체 feedback이 포함되어 있습니다. AskUserQuestion은 feedback을 올바르게 이해했는지 확인할 때만 사용하고, 사용자가 무엇을 선택했는지 다시 묻는 데는 절대 사용하지 마세요.
+
+승인된 방향을 기록하세요. 이것이 이후 모든 리뷰 패스의 시각적 참조가 됩니다.
+
+**여러 variant/화면:** 사용자가 여러 variant(예: "homepage 5개 버전")를 요청했으면, 모두 각자의 비교 보드를 가진 별도의 variant set으로 생성하세요. 각 화면/variant set은 `designs/` 아래 자체 하위 디렉토리를 가집니다. 리뷰 패스를 시작하기 전에 모든 mockup 생성과 사용자 선택을 완료하세요.
+
+**`DESIGN_NOT_AVAILABLE`인 경우:** 사용자에게 말하세요: "gstack designer가 아직 설정되지 않았습니다. 시각적 mockup을 활성화하려면 `$D setup`을 실행하세요. 텍스트 전용 리뷰로 진행하지만, 가장 좋은 부분을 놓치고 있습니다." 그런 다음 텍스트 기반 리뷰 패스로 진행하세요.
 
 {{DESIGN_OUTSIDE_VOICES}}
 
@@ -144,7 +233,25 @@ AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니
 
 재실행 루프: /plan-design-review를 다시 호출 → 재평가 → 8점 이상 섹션은 빠른 패스, 8점 미만 섹션은 전체 처리.
 
+### "10/10이 어떤 모습인지 보여줘" (design binary 필요)
+
+설정 중 `DESIGN_READY`가 출력되었고 어떤 차원이 7/10 미만으로 평가되면,
+개선된 버전이 어떤 모습일지 보여주는 시각적 mockup 생성을 제안하세요:
+
+```bash
+$D generate --brief "<description of what 10/10 looks like for this dimension>" --output /tmp/gstack-ideal-<dimension>.png
+```
+
+Read 도구를 통해 사용자에게 mockup을 보여주세요. 이렇게 하면
+"플랜이 설명하는 것"과 "실제로 어떤 모습이어야 하는지" 사이의 갭이 추상적이 아니라 체감 가능해집니다.
+
+design binary를 사용할 수 없으면, 이를 건너뛰고 10/10이 어떤 모습인지 텍스트 기반 설명으로 계속 진행하세요.
+
 ## 리뷰 섹션 (범위 합의 후 7개 패스)
+
+**건너뛰기 방지 규칙:** 플랜 유형(strategy, spec, code, infra)과 관계없이 어떤 리뷰 패스(1-7)도 압축, 축약, 건너뛰지 마세요. 이 스킬의 모든 패스는 이유가 있어서 존재합니다. "이것은 strategy doc이므로 design pass가 적용되지 않는다"는 항상 틀렸습니다 — 디자인 갭은 구현이 무너지는 지점입니다. 어떤 패스에 정말 발견 사항이 0개이면 "이슈 없음"이라고 말하고 넘어가세요 — 하지만 반드시 평가해야 합니다.
+
+{{LEARNINGS_SEARCH}}
 
 ### Pass 1: 정보 아키텍처
 0-10 평가: 플랜이 사용자가 첫째, 둘째, 셋째로 보는 것을 정의하나요?
@@ -184,6 +291,7 @@ AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니
 - "히어로 섹션" → 이 히어로가 이 제품처럼 느껴지게 하는 것은?
 - "깔끔하고 현대적인 UI" → 의미 없음. 실제 디자인 결정으로 대체.
 - "위젯이 있는 대시보드" → 이것이 다른 모든 대시보드와 다른 이유는?
+Step 0.5에서 시각적 mockup을 생성했다면, 위의 AI slop blacklist에 대해 평가하세요. Read 도구로 각 mockup 이미지를 읽으세요. mockup이 제네릭 패턴(3-column grid, centered hero, stock-photo feel)에 빠지나요? 그렇다면 플래그하고 `$D iterate --feedback "..."`로 더 구체적인 방향을 주어 다시 생성할지 제안하세요.
 **멈추세요.** 이슈당 하나의 AskUserQuestion. 일괄 처리 금지. 추천 + 이유.
 
 ### Pass 5: 디자인 시스템 정렬
@@ -206,7 +314,16 @@ AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니
   Mobile nav pattern?          | Desktop nav hides behind hamburger
   ...
 ```
+Step 0.5에서 시각적 mockup을 생성했다면, 미해결 결정을 표면화할 때 이를 증거로 참조하세요. mockup은 결정을 구체적으로 만듭니다 — 예: "승인된 mockup에는 sidebar nav가 보이지만, 플랜은 mobile behavior를 명시하지 않습니다. 375px에서 이 sidebar는 어떻게 되나요?"
 각 결정 = 추천 + 이유 + 대안이 포함된 하나의 AskUserQuestion. 결정이 내려지면 플랜을 편집합니다.
+
+### Post-Pass: Mockup 업데이트 (생성한 경우)
+
+Step 0.5에서 mockup을 생성했고 리뷰 패스가 중요한 디자인 결정(정보 아키텍처 재구조화, 새 상태, 레이아웃 변경)을 변경했다면, 다시 생성할지 제안하세요(루프가 아닌 one-shot):
+
+AskUserQuestion: "리뷰 패스가 [주요 디자인 변경 목록]을 변경했습니다. 업데이트된 플랜을 반영하도록 mockup을 다시 생성할까요? 이렇게 하면 시각적 참조가 실제로 빌드할 것과 일치합니다."
+
+예라고 답하면, 변경 사항을 요약한 feedback으로 `$D iterate`를 사용하거나 업데이트된 brief로 `$D variants`를 사용하세요. 동일한 `$_DESIGN_DIR` 디렉토리에 저장하세요.
 
 ## 중요 규칙 — 질문하는 방법
 위의 프리앰블에서 AskUserQuestion 형식을 따르세요. 플랜 디자인 리뷰를 위한 추가 규칙:
@@ -216,6 +333,7 @@ AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니
 * **위의 디자인 원칙에 매핑하세요.** 추천을 특정 원칙에 연결하는 한 문장.
 * 이슈 번호 + 옵션 문자로 라벨 (예: "3A", "3B").
 * **탈출구:** 섹션에 이슈가 없으면, 말하고 넘어가세요. 갭에 명확한 수정이 있으면, 무엇을 추가할지 말하고 넘어가세요 — 의미 있는 트레이드오프가 있는 진정한 디자인 선택이 있을 때만 AskUserQuestion을 사용하세요.
+* **사용자가 어떤 variant를 선호하는지 묻기 위해 AskUserQuestion을 절대 사용하지 마세요.** 항상 먼저 비교 보드(`$D compare --serve`)를 만들고 브라우저에서 여세요. 보드에는 rating control, comment, remix/regenerate button, 구조화된 feedback output이 있습니다. AskUserQuestion은 보드가 열렸음을 사용자에게 알리고 완료를 기다릴 때만 사용하세요 — variant를 inline으로 제시하고 "무엇을 선호하나요?"라고 묻지 마세요. 그것은 저하된 경험입니다.
 
 ## 필수 산출물
 
@@ -256,6 +374,7 @@ AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니
   | NOT in scope         | written (___ items)                         |
   | What already exists  | written                                     |
   | TODOS.md updates     | ___ items proposed                          |
+  | Approved Mockups     | ___ generated, ___ approved                  |
   | Decisions made       | ___ added to plan                           |
   | Decisions deferred   | ___ (listed below)                          |
   | Overall design score | ___/10 → ___/10                             |
@@ -267,6 +386,20 @@ AskUserQuestion: "이 플랜을 디자인 완성도 {N}/10으로 평가했습니
 
 ### 미해결 결정
 AskUserQuestion이 답변되지 않은 것이 있으면, 여기에 기록합니다. 조용히 옵션을 기본값으로 선택하지 마세요.
+
+### 승인된 Mockup
+
+이 리뷰 중 시각적 mockup이 생성되었다면, 플랜 파일에 추가하세요:
+
+```
+## Approved Mockups
+
+| Screen/Section | Mockup Path | Direction | Notes |
+|----------------|-------------|-----------|-------|
+| [screen name]  | ~/.gstack/projects/$SLUG/designs/[folder]/[filename].png | [brief description] | [constraints from review] |
+```
+
+승인된 각 mockup(사용자가 선택한 variant)의 전체 경로, 방향에 대한 한 줄 설명, 모든 제약을 포함하세요. 구현자는 정확히 어떤 시각 자료를 기준으로 빌드해야 하는지 알기 위해 이것을 읽습니다. 이것들은 대화와 workspace를 넘어 유지됩니다. mockup이 생성되지 않았다면 이 섹션을 생략하세요.
 
 ## 리뷰 로그
 
@@ -295,6 +428,8 @@ AskUserQuestion이 답변되지 않은 것이 있으면, 여기에 기록합니�
 
 {{PLAN_FILE_REVIEW_REPORT}}
 
+{{LEARNINGS_LOG}}
+
 ## 다음 단계 — 리뷰 체이닝
 
 리뷰 준비 상태 대시보드를 표시한 후, 이 디자인 리뷰가 발견한 것을 기반으로 다음 리뷰를 추천합니다. 대시보드 출력을 읽어 어떤 리뷰가 이미 실행되었고 오래되었는지 확인합니다.
@@ -305,10 +440,16 @@ AskUserQuestion이 답변되지 않은 것이 있으면, 여기에 기록합니�
 
 **둘 다 필요하면, eng 리뷰를 먼저 추천합니다** (필수 게이트).
 
+**적절한 경우 디자인 탐색 스킬을 추천하세요** — /design-shotgun과 /design-html은
+application code가 아니라 디자인 아티팩트(mockup, HTML preview)를 생성합니다. 이들은
+리뷰와 함께 plan mode에 속합니다. 이 디자인 리뷰가 새 방향 탐색이 도움이 될 시각적 이슈를 발견했다면 /design-shotgun을 추천하세요. 승인된 mockup이 있고 이를 working HTML로 바꿔야 한다면 /design-html을 추천하세요.
+
 AskUserQuestion을 사용하여 다음 단계를 제시합니다. 해당되는 옵션만 포함:
 - **A)** /plan-eng-review를 다음에 실행 (필수 게이트)
 - **B)** /plan-ceo-review 실행 (근본적 제품 갭이 발견된 경우에만)
-- **C)** 건너뛰기 — 리뷰를 수동으로 처리하겠습니다
+- **C)** /design-shotgun 실행 — 발견된 이슈에 대한 시각적 디자인 variant 탐색
+- **D)** /design-html 실행 — 승인된 mockup에서 Pretext-native HTML 생성
+- **E)** 건너뛰기 — 다음 단계를 수동으로 처리하겠습니다
 
 ## 서식 규칙
 * 이슈에 번호(1, 2, 3...)를 매기고 옵션에 문자(A, B, C...)를 매깁니다.

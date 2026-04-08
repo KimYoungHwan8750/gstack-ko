@@ -7,8 +7,9 @@ description: |
   철칙: 근본 원인 없이 수정하지 않는다.
   다음 요청 시 사용: "debug this", "fix this bug", "why is this broken",
   "investigate this error", "root cause analysis".
-  사용자가 에러, 예상치 못한 동작을 보고하거나 무언가가 작동하지 않는 이유를
-  해결하려 할 때 사전에 제안합니다.
+  사용자가 에러, 500 errors, stack traces, 예상치 못한 동작,
+  "it was working yesterday"를 보고하거나 무언가가 작동하지 않는 이유를
+  해결하려 할 때 이 스킬을 사전에 호출합니다 (직접 디버깅하지 마세요). (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -59,6 +60,8 @@ hooks:
    이전에는 작동했나요? 무엇이 변경되었나요? 회귀라면 근본 원인은 diff에 있습니다.
 
 4. **재현:** 버그를 결정적으로 트리거할 수 있나요? 그렇지 않다면 진행하기 전에 더 많은 증거를 수집하세요.
+
+{{LEARNINGS_SEARCH}}
 
 출력: **"근본 원인 가설: ..."** — 무엇이 잘못되었고 왜 그런지에 대한 구체적이고 검증 가능한 주장.
 
@@ -182,6 +185,8 @@ Related:         [TODOS.md 항목, 같은 영역의 이전 버그, 아키텍처 
 Status:          DONE | DONE_WITH_CONCERNS | BLOCKED
 ════════════════════════════════════════
 ```
+
+{{LEARNINGS_LOG}}
 
 ---
 

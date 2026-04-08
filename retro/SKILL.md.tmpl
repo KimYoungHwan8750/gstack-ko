@@ -7,7 +7,7 @@ description: |
   영속적 히스토리와 트렌드 추적으로 분석합니다.
   팀 인식: 기여자별 기여도를 칭찬과 성장 영역으로 분석합니다.
   "weekly retro", "what did we ship", "engineering retrospective" 요청 시 사용하세요.
-  작업 주간이나 스프린트 마무리 시 선제적으로 제안하세요.
+  작업 주간이나 스프린트 마무리 시 선제적으로 제안하세요. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -57,6 +57,8 @@ Usage: /retro [window | compare | global]
 ```
 
 **첫 번째 인자가 `global`이면:** 일반 저장소 범위 회고 (Steps 1-14)를 건너뜁니다. 대신 이 문서 끝의 **글로벌 회고** 플로우를 따르세요. 선택적 두 번째 인자가 시간 윈도우 (기본 7d). 이 모드는 git 저장소 안에 있을 필요가 없습니다.
+
+{{LEARNINGS_SEARCH}}
 
 ### Step 1: 원시 데이터 수집
 
@@ -277,6 +279,8 @@ fix 비율이 50%를 초과하면 플래그 — "빠르게 배포하고, 빠르�
 
 **Co-Authored-By 트레일러가 있으면:** 커밋 메시지의 `Co-Authored-By:` 라인을 파싱합니다. 해당 작성자를 주 작성자와 함께 커밋에 크레딧합니다. AI 공동 작성자 (예: `noreply@anthropic.com`)는 기록하되 팀원으로 포함하지 마세요 — 대신 "AI 지원 커밋"을 별도 메트릭으로 추적합니다.
 
+{{LEARNINGS_LOG}}
+
 ### Step 10: 주별 트렌드 (윈도우 >= 14일인 경우)
 
 시간 윈도우가 14일 이상이면, 주별 버킷으로 나누고 트렌드를 표시합니다:
@@ -307,6 +311,7 @@ git log origin/<default> --author="<user_name>" --format="%ad" --date=format:"%Y
 새 스냅샷을 저장하기 전에, 이전 회고 히스토리를 확인합니다:
 
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 ls -t .context/retros/*.json 2>/dev/null
 ```
 
@@ -333,6 +338,7 @@ mkdir -p .context/retros
 
 오늘의 다음 시퀀스 번호를 결정합니다 (실제 날짜를 `$(date +%Y-%m-%d)` 대신 대입):
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 # 오늘 기존 회고 수를 세어 다음 시퀀스 번호 획득
 today=$(date +%Y-%m-%d)
 existing=$(ls .context/retros/${today}-*.json 2>/dev/null | wc -l | tr -d ' ')
@@ -456,8 +462,9 @@ Week of Mar 1: 47 commits (3 contributors), 3.2k LOC, 38% tests, 12 PRs, peak: 1
 이 기간의 /ship 실행에서 플랜 완성도 데이터를 리뷰 JSONL 로그에서 확인합니다:
 
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
-find ~/.gstack/projects/$SLUG -name '*-reviews.jsonl' -type f -exec cat {} + 2>/dev/null | grep '"skill":"ship"' | grep '"plan_items_total"' || echo "NO_PLAN_DATA"
+cat ~/.gstack/projects/$SLUG/*-reviews.jsonl 2>/dev/null | grep '"skill":"ship"' | grep '"plan_items_total"' || echo "NO_PLAN_DATA"
 ```
 
 플랜 완성도 데이터가 회고 시간 윈도우 내에 존재하면:
@@ -756,6 +763,7 @@ Week of Mar 14: 5 projects, 138 commits, 250k LOC across 5 repos | 48 AI session
 ### 글로벌 Step 8: 히스토리 로드 & 비교
 
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 ls -t ~/.gstack/retros/global-*.json 2>/dev/null | head -5
 ```
 
@@ -773,6 +781,7 @@ mkdir -p ~/.gstack/retros
 
 오늘의 다음 시퀀스 번호 결정:
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 today=$(date +%Y-%m-%d)
 existing=$(ls ~/.gstack/retros/global-${today}-*.json 2>/dev/null | wc -l | tr -d ' ')
 next=$((existing + 1))

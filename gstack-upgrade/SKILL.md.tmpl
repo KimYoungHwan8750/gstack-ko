@@ -5,6 +5,11 @@ description: |
   gstack을 최신 버전으로 업그레이드합니다. 전역 또는 벤더 설치를 감지하고,
   업그레이드를 실행한 뒤 변경 사항을 표시합니다. "upgrade gstack",
   "update gstack", "get latest version" 요청 시 사용합니다.
+voice-triggers:
+  - "upgrade the tools"
+  - "update the tools"
+  - "gee stack upgrade"
+  - "g stack upgrade"
 allowed-tools:
   - Bash
   - Read
@@ -213,9 +218,9 @@ cd "$INSTALL_DIR" && ./setup
 rm -rf "$INSTALL_DIR.bak" "$TMP_DIR"
 ```
 
-### Step 4.5: 로컬 벤더 복사본 동기화
+### Step 4.5: 로컬 벤더 복사본 처리
 
-Step 2의 설치 디렉토리를 사용합니다. 업데이트가 필요한 로컬 벤더 복사본이 있는지 확인합니다:
+Step 2의 설치 디렉토리를 사용합니다. 로컬 벤더 복사본도 있는지, 그리고 team mode가 활성화되어 있는지 확인합니다:
 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -227,10 +232,24 @@ if [ -n "$_ROOT" ] && [ -d "$_ROOT/.claude/skills/gstack" ]; then
     LOCAL_GSTACK="$_ROOT/.claude/skills/gstack"
   fi
 fi
+_TEAM_MODE=$(~/.claude/skills/gstack/bin/gstack-config get team_mode 2>/dev/null || echo "false")
 echo "LOCAL_GSTACK=$LOCAL_GSTACK"
+echo "TEAM_MODE=$_TEAM_MODE"
 ```
 
-`LOCAL_GSTACK`가 비어 있지 않으면, 방금 업그레이드한 기본 설치에서 복사하여 업데이트합니다 (README 벤더 설치와 동일한 방식):
+**`LOCAL_GSTACK`가 비어 있지 않고 `TEAM_MODE`가 `true`인 경우:** 벤더 복사본을 제거합니다. team mode는 전역 설치를 단일 진실 공급원으로 사용합니다.
+
+```bash
+cd "$_ROOT"
+git rm -r --cached .claude/skills/gstack/ 2>/dev/null || true
+if ! grep -qF '.claude/skills/gstack/' .gitignore 2>/dev/null; then
+  echo '.claude/skills/gstack/' >> .gitignore
+fi
+rm -rf "$LOCAL_GSTACK"
+```
+사용자에게 전달합니다: "`$LOCAL_GSTACK`의 벤더 복사본을 제거했습니다 (team mode 활성화 — 전역 설치가 진실 공급원입니다). 준비되면 `.gitignore` 변경 사항을 커밋하세요."
+
+**`LOCAL_GSTACK`가 비어 있지 않고 `TEAM_MODE`가 `true`가 아닌 경우:** 방금 업그레이드한 기본 설치에서 복사하여 업데이트합니다 (README 벤더 설치와 동일한 방식):
 ```bash
 mv "$LOCAL_GSTACK" "$LOCAL_GSTACK.bak"
 cp -Rf "$INSTALL_DIR" "$LOCAL_GSTACK"
@@ -246,6 +265,28 @@ rm -rf "$LOCAL_GSTACK"
 mv "$LOCAL_GSTACK.bak" "$LOCAL_GSTACK"
 ```
 사용자에게 전달합니다: "동기화 실패 — `$LOCAL_GSTACK`의 이전 버전을 복원했습니다. `/gstack-upgrade`를 수동으로 실행하여 재시도하세요."
+
+### Step 4.75: 버전 마이그레이션 실행
+
+`./setup`이 완료된 후, 이전 버전과 새 버전 사이의 마이그레이션 스크립트를 실행합니다. 마이그레이션은 `./setup`만으로 처리할 수 없는 상태 수정(오래된 config, 고아 파일, 디렉토리 구조 변경)을 처리합니다.
+
+```bash
+MIGRATIONS_DIR="$INSTALL_DIR/gstack-upgrade/migrations"
+if [ -d "$MIGRATIONS_DIR" ]; then
+  for migration in $(find "$MIGRATIONS_DIR" -maxdepth 1 -name 'v*.sh' -type f 2>/dev/null | sort -V); do
+    # Extract version from filename: v0.15.2.0.sh → 0.15.2.0
+    m_ver="$(basename "$migration" .sh | sed 's/^v//')"
+    # Run if this migration version is newer than old version
+    # (simple string compare works for dotted versions with same segment count)
+    if [ "$OLD_VERSION" != "unknown" ] && [ "$(printf '%s\n%s' "$OLD_VERSION" "$m_ver" | sort -V | head -1)" = "$OLD_VERSION" ] && [ "$OLD_VERSION" != "$m_ver" ]; then
+      echo "Running migration $m_ver..."
+      bash "$migration" || echo "  Warning: migration $m_ver had errors (non-fatal)"
+    fi
+  done
+fi
+```
+
+마이그레이션은 `gstack-upgrade/migrations/`에 있는 idempotent bash 스크립트입니다. 각 파일은 `v{VERSION}.sh`로 이름이 지정되며, 더 오래된 버전에서 업그레이드할 때만 실행됩니다. 새 마이그레이션을 추가하는 방법은 CONTRIBUTING.md를 참고하세요.
 
 ### Step 5: 마커 기록 + 캐시 삭제
 
@@ -293,11 +334,13 @@ Happy shipping!
 
 3. 출력이 없는 경우 (기본 설치가 최신인 경우): 오래된 로컬 벤더 복사본이 있는지 확인합니다.
 
-위의 Step 2 bash 블록을 실행하여 기본 설치 유형과 디렉토리(`INSTALL_TYPE` 및 `INSTALL_DIR`)를 감지합니다. 그런 다음 위의 Step 4.5 감지 bash 블록을 실행하여 로컬 벤더 복사본(`LOCAL_GSTACK`)을 확인합니다.
+위의 Step 2 bash 블록을 실행하여 기본 설치 유형과 디렉토리(`INSTALL_TYPE` 및 `INSTALL_DIR`)를 감지합니다. 그런 다음 위의 Step 4.5 감지 bash 블록을 실행하여 로컬 벤더 복사본(`LOCAL_GSTACK`)과 team mode 상태(`TEAM_MODE`)를 확인합니다.
 
 **`LOCAL_GSTACK`가 비어 있는 경우** (로컬 벤더 복사본 없음): 사용자에게 "이미 최신 버전(v{version})입니다."라고 전달합니다.
 
-**`LOCAL_GSTACK`가 비어 있지 않은 경우**, 버전을 비교합니다:
+**`LOCAL_GSTACK`가 비어 있지 않고 `TEAM_MODE`가 `true`인 경우:** 위의 Step 4.5 team-mode 제거 bash 블록을 사용하여 벤더 복사본을 제거합니다. 사용자에게 전달합니다: "전역 v{version}은 최신입니다. 오래된 벤더 복사본을 제거했습니다 (team mode 활성화). 준비되면 `.gitignore` 변경 사항을 커밋하세요."
+
+**`LOCAL_GSTACK`가 비어 있지 않고 `TEAM_MODE`가 `true`가 아닌 경우**, 버전을 비교합니다:
 ```bash
 PRIMARY_VER=$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo "unknown")
 LOCAL_VER=$(cat "$LOCAL_GSTACK/VERSION" 2>/dev/null || echo "unknown")

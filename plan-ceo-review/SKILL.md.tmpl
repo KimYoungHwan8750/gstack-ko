@@ -10,7 +10,7 @@ description: |
   "더 크게 생각해", "범위 확장해", "전략 리뷰", "다시 생각해",
   "충분히 야심찬가?" 등의 요청 시 사용.
   사용자가 플랜의 범위나 야심에 대해 의문을 품거나,
-  플랜이 더 크게 생각할 수 있을 것 같을 때 능동적으로 제안.
+  플랜이 더 크게 생각할 수 있을 것 같을 때 능동적으로 제안. (gstack)
 benefits-from: [office-hours]
 allowed-tools:
   - Read
@@ -105,6 +105,7 @@ git log --since=30.days --name-only --format="" | sort | uniq -c | sort -rn | he
 
 **디자인 문서 확인:**
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 SLUG=$(~/.claude/skills/gstack/browse/bin/remote-slug 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' || echo 'no-branch')
 DESIGN=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-design-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
@@ -115,6 +116,7 @@ DESIGN=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-design-*.md" -type f -ex
 
 **핸드오프 노트 확인** (위의 디자인 문서 확인에서 $SLUG와 $BRANCH를 재사용):
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 HANDOFF=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-ceo-handoff-*.md" -type f -exec ls -t {} + 2>/dev/null | head -1)
 [ -n "$HANDOFF" ] && echo "HANDOFF_FOUND: $HANDOFF" || echo "NO_HANDOFF"
 ```
@@ -134,12 +136,9 @@ HANDOFF=$(find ~/.gstack/projects/$SLUG -name "*-$BRANCH-ceo-handoff-*.md" -type
 옵션: A) 네, 지금 /office-hours를 실행합니다. B) 아니요, 계속 진행합니다.
 계속 진행하면 정상적으로 계속하세요 — 죄책감 없이, 다시 묻지 않고.
 
-A를 선택하면: 디스크에서 office-hours 스킬 파일을 읽으세요:
-`~/.claude/skills/gstack/office-hours/SKILL.md`
+A를 선택하면:
 
-인라인으로 따르되, 다음 섹션은 건너뛰세요 (상위 스킬에서 이미 처리됨):
-Preamble, AskUserQuestion Format, Completeness Principle, Search Before Building,
-Contributor Mode, Completion Status Protocol, Telemetry.
+{{INVOKE_SKILL:office-hours}}
 
 현재 Step 0A 진행 상태를 메모하여 이미 답변된 질문을 다시 묻지 않도록 하세요.
 완료 후 디자인 문서 확인을 다시 실행하고 리뷰를 재개하세요.
@@ -181,6 +180,8 @@ WebSearch를 사용할 수 없으면 이 확인을 건너뛰고 메모하세요:
 - **[계층 3]** 제1원칙 추론 — 기존 통념이 틀릴 수 있는 부분은 어디인가?
 
 전제 도전(0A)과 꿈의 상태 매핑(0C)에 반영하세요. 유레카 순간을 발견하면 확장 동의 세레모니 중에 차별화 기회로 표면화하세요. 기록하세요 (프리앰블 참조).
+
+{{LEARNINGS_SEARCH}}
 
 ## Step 0: 핵심 범위 도전 + 모드 선택
 
@@ -345,7 +346,9 @@ CEO 플랜 작성 후 사양 리뷰 루프를 실행하세요:
 선택되면 완전히 전념하세요. 자동으로 전환하지 마세요.
 **중지.** 이슈당 AskUserQuestion 한 번. 묶지 마세요. 권장 + 이유. 이슈가 없거나 수정이 명백하면 할 것을 진술하고 계속하세요 — 질문을 낭비하지 마세요. 사용자가 응답할 때까지 진행하지 마세요.
 
-## 리뷰 섹션 (범위와 모드 합의 후 10개 섹션)
+## 리뷰 섹션 (범위와 모드 합의 후 11개 섹션)
+
+**건너뛰기 방지 규칙:** 플랜 유형(전략, 사양, 코드, 인프라)과 관계없이 어떤 리뷰 섹션(1-11)도 압축, 축약, 또는 건너뛰지 마세요. 이 스킬의 모든 섹션은 이유가 있어 존재합니다. "이것은 전략 문서이므로 구현 섹션은 적용되지 않는다"는 항상 틀렸습니다 — 구현 세부사항에서 전략이 무너집니다. 어떤 섹션에 정말로 발견 사항이 0개라면 "No issues found"라고 말하고 계속하세요 — 하지만 반드시 평가해야 합니다.
 
 ### Section 1: 아키텍처 리뷰
 평가 및 다이어그램:
@@ -585,6 +588,13 @@ LLM/프롬프트 변경의 경우: CLAUDE.md에서 "Prompt/LLM changes" 파일 �
 
 {{CODEX_PLAN_REVIEW}}
 
+### 외부 의견 통합 규칙
+
+외부 의견 발견 사항은 사용자가 각 항목을 명시적으로 승인하기 전까지 정보 제공용입니다.
+외부 의견의 권장 사항을 AskUserQuestion으로 각각 제시하고 명시적 승인을 받기 전에는
+플랜에 반영하지 마세요. 이는 당신이 외부 의견에 동의할 때도 적용됩니다.
+모델 간 합의는 강한 신호입니다 — 그렇게 제시하세요 — 하지만 결정은 사용자가 내립니다.
+
 ## 구현 후 디자인 감사 (UI 범위가 감지된 경우)
 구현 후, 렌더링된 출력에서만 평가할 수 있는 시각적 이슈를 잡기 위해 라이브 사이트에서 `/design-review`를 실행하세요.
 
@@ -696,6 +706,7 @@ AskUserQuestion에 답변이 없으면 여기에 메모하세요. 자동으로 �
 리뷰가 완료되었으며 컨텍스트가 더 이상 필요하지 않습니다.
 
 ```bash
+setopt +o nomatch 2>/dev/null || true  # zsh compat
 {{SLUG_EVAL}}
 find ~/.gstack/projects/$SLUG -name "*-$BRANCH-ceo-handoff-*.md" -type f -delete 2>/dev/null || true
 ```
@@ -761,6 +772,8 @@ AskUserQuestion을 사용하여 다음 단계를 제시하세요. 해당하는 �
 * 옵션당 최대 한 문장.
 * 각 섹션 후 일시 정지하고 피드백을 기다리세요.
 * 가독성을 위해 **치명적 격차** / **경고** / **양호**를 사용하세요.
+
+{{LEARNINGS_LOG}}
 
 ## 모드 빠른 참조
 ```

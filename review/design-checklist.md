@@ -58,6 +58,8 @@ Design Review: N issues (X auto-fixable, Y need input, Z possible)
 - [file:line] 가능성 있는 문제 — /design-review로 확인
 ```
 
+선택 사항: `test_stub` — 프로젝트의 테스트 프레임워크를 사용한 이 발견 사항의 스켈레톤 테스트 코드.
+
 문제가 없으면: `Design Review: No issues found.`
 
 프론트엔드 파일 변경이 없으면: 조용히 건너뛰기, 출력 없음.

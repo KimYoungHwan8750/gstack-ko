@@ -7,7 +7,14 @@ description: |
   CI/CD 파이프라인 보안, LLM/AI 보안, 스킬 공급망 스캐닝, OWASP Top 10, STRIDE 위협 모델링,
   능동적 검증. 두 가지 모드: 일일(노이즈 제로, 신뢰도 8/10 기준)과 종합(월간 정밀 스캔,
   신뢰도 2/10 기준). 감사 실행 간 추세 추적.
-  사용 시점: "보안 감사", "위협 모델", "침투 테스트 리뷰", "OWASP", "CSO 리뷰".
+  사용 시점: "보안 감사", "위협 모델", "침투 테스트 리뷰", "OWASP", "CSO 리뷰". (gstack)
+voice-triggers:
+  - "see-so"
+  - "see so"
+  - "security review"
+  - "security check"
+  - "vulnerability scan"
+  - "run security"
 allowed-tools:
   - Bash
   - Read
@@ -72,7 +79,7 @@ ls go.mod 2>/dev/null && echo "STACK: Go"
 ls Cargo.toml 2>/dev/null && echo "STACK: Rust"
 ls pom.xml build.gradle 2>/dev/null && echo "STACK: JVM"
 ls composer.json 2>/dev/null && echo "STACK: PHP"
-ls *.csproj *.sln 2>/dev/null && echo "STACK: .NET"
+find . -maxdepth 1 \( -name '*.csproj' -o -name '*.sln' \) 2>/dev/null | grep -q . && echo "STACK: .NET"
 ```
 
 **프레임워크 감지:**
@@ -101,6 +108,8 @@ grep -q "laravel" composer.json 2>/dev/null && echo "FRAMEWORK: Laravel"
 
 이것은 체크리스트가 아닙니다 — 추론 단계입니다. 결과물은 이해이지 발견 사항이 아닙니다.
 
+{{LEARNINGS_SEARCH}}
+
 ### 1단계: 공격 표면 조사(Attack Surface Census)
 
 공격자가 보는 것을 매핑합니다 — 코드 표면과 인프라 표면 모두.
@@ -109,7 +118,8 @@ grep -q "laravel" composer.json 2>/dev/null && echo "FRAMEWORK: Laravel"
 
 **인프라 표면:**
 ```bash
-ls .github/workflows/*.yml .github/workflows/*.yaml .gitlab-ci.yml 2>/dev/null | wc -l
+setopt +o nomatch 2>/dev/null || true  # zsh compat
+{ find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null; [ -f .gitlab-ci.yml ] && echo .gitlab-ci.yml; } | wc -l
 find . -maxdepth 4 -name "Dockerfile*" -o -name "docker-compose*.yml" 2>/dev/null
 find . -maxdepth 4 -name "*.tf" -o -name "*.tfvars" -o -name "kustomization.yaml" 2>/dev/null
 ls .env .env.* 2>/dev/null
@@ -159,7 +169,7 @@ grep -q "^\.env$\|^\.env\.\*" .gitignore 2>/dev/null && echo ".env IS gitignored
 
 **인라인 시크릿이 있는 CI 설정 (시크릿 저장소 미사용):**
 ```bash
-for f in .github/workflows/*.yml .github/workflows/*.yaml .gitlab-ci.yml .circleci/config.yml; do
+for f in $(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null) .gitlab-ci.yml .circleci/config.yml; do
   [ -f "$f" ] && grep -n "password:\|token:\|secret:\|api_key:" "$f" | grep -v '\${{' | grep -v 'secrets\.'
 done 2>/dev/null
 ```
@@ -485,6 +495,8 @@ Agent 도구를 사용할 수 없는 경우 회의적인 시선으로 코드를 
 4   HIGH   9/10   UNVERIFIED  Integrations     서명 검증 없는 웹훅              P6      api/webhooks.ts:24
 ```
 
+{{CONFIDENCE_CALIBRATION}}
+
 각 발견 사항에 대해:
 ```
 ## 발견 사항 N: [제목] — [파일:라인]
@@ -593,6 +605,8 @@ mkdir -p .gstack/security-reports
 ```
 
 `.gstack/`가 `.gitignore`에 없으면 발견 사항에 표시 — 보안 보고서는 로컬에 유지해야 합니다.
+
+{{LEARNINGS_LOG}}
 
 ## 중요 규칙
 

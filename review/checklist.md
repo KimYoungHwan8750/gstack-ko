@@ -5,8 +5,9 @@
 `git diff origin/main` 출력을 아래 나열된 항목에 대해 리뷰합니다. 구체적으로 — `file:line`을 인용하고 수정 방안을 제안하세요. 문제없는 항목은 건너뛰세요. 실제 문제만 지적하세요.
 
 **2단계 리뷰:**
-- **1단계 (치명적):** SQL 및 데이터 안전성과 LLM 출력 신뢰 경계를 먼저 수행합니다. 가장 높은 심각도입니다.
-- **2단계 (참고):** 나머지 모든 카테고리를 수행합니다. 심각도는 낮지만 여전히 조치 대상입니다.
+- **1단계 (치명적):** SQL 및 데이터 안전성, 경쟁 조건, LLM 출력 신뢰 경계, Shell Injection, 열거형 완전성을 먼저 수행합니다. 가장 높은 심각도입니다.
+- **2단계 (참고):** 아래 나머지 카테고리를 수행합니다. 심각도는 낮지만 여전히 조치 대상입니다.
+- **전문가 카테고리(병렬 subagent가 처리하며, 이 체크리스트에서는 처리하지 않음):** 테스트 공백, 죽은 코드, 매직 넘버, 조건부 부수 효과, 성능 및 번들 영향, 암호화 및 엔트로피. 자세한 내용은 `review/specialists/`를 참고하세요.
 
 모든 발견 사항은 선조치 리뷰(Fix-First Review)를 통해 처리됩니다: 명백한 기계적 수정은 자동 적용되고,
 진정으로 모호한 문제는 하나의 사용자 질문으로 묶어 처리합니다.
@@ -49,6 +50,13 @@ Pre-Landing Review: N issues (X critical, Y informational)
 #### LLM 출력 신뢰 경계(Trust Boundary)
 - LLM이 생성한 값(이메일, URL, 이름)이 형식 검증 없이 DB에 쓰이거나 메일러에 전달됨. 저장 전에 경량 가드(`EMAIL_REGEXP`, `URI.parse`, `.strip`) 추가 필요.
 - 구조화된 도구 출력(배열, 해시)이 데이터베이스 쓰기 전 타입/형태 검사 없이 수용됨.
+- LLM이 생성한 URL을 허용 목록 없이 fetch함 — URL이 내부 네트워크를 가리킬 경우 SSRF 위험 (Python: `urllib.parse.urlparse` → `requests.get`/`httpx.get` 전에 hostname을 blocklist와 대조)
+- LLM 출력을 sanitization 없이 지식 베이스 또는 vector DB에 저장함 — 저장형 prompt injection 위험
+
+#### Shell Injection (Python-specific)
+- 명령 문자열에 `shell=True`와 f-string/`.format()` 보간을 함께 사용하는 `subprocess.run()` / `subprocess.call()` / `subprocess.Popen()` — 대신 인자 배열 사용
+- 변수 보간이 포함된 `os.system()` — 인자 배열을 사용하는 `subprocess.run()`으로 교체
+- sandboxing 없이 LLM이 생성한 코드에 `eval()` / `exec()` 사용
 
 #### 열거형(Enum) 및 값 완전성
 열거형 값, 상태 문자열, 티어 이름 또는 타입 상수가 diff에 새로 추가될 때:
@@ -59,41 +67,30 @@ Pre-Landing Review: N issues (X critical, Y informational)
 
 ### 2단계 — 참고(INFORMATIONAL)
 
-#### 조건부 부수 효과(Side Effects)
-- 조건에 따라 분기하지만 한 분기에서 부수 효과 적용을 잊은 코드 경로. 예: 항목이 verified로 승격되었지만 URL은 보조 조건이 참일 때만 첨부됨 — 다른 분기는 URL 없이 승격하여 불일치 레코드 생성.
-- 동작이 수행되었다고 주장하지만 실제로는 조건부로 건너뛴 로그 메시지. 로그는 실제 발생한 내용을 반영해야 합니다.
+#### Async/Sync 혼용(Python-specific)
+- `async def` endpoint 안의 동기식 `subprocess.run()`, `open()`, `requests.get()` — event loop를 block합니다. 대신 `asyncio.to_thread()`, `aiofiles`, 또는 `httpx.AsyncClient`를 사용하세요.
+- async 함수 안의 `time.sleep()` — `asyncio.sleep()` 사용
+- `run_in_executor()` 래핑 없이 async context에서 sync DB 호출
 
-#### 매직 넘버(Magic Numbers) 및 문자열 결합(String Coupling)
-- 여러 파일에서 사용되는 단순 숫자 리터럴 — 함께 문서화된 명명된 상수여야 함
-- 다른 곳에서 쿼리 필터로 사용되는 오류 메시지 문자열 (문자열을 grep하세요 — 이를 매칭하는 코드가 있나요?)
+#### 컬럼/필드 이름 안전성
+- ORM 쿼리(`.select()`, `.eq()`, `.gte()`, `.order()`)의 컬럼 이름을 실제 DB schema와 대조하세요 — 잘못된 컬럼 이름은 조용히 빈 결과를 반환하거나 삼켜진 오류를 던질 수 있음
+- 쿼리 결과의 `.get()` 호출이 실제로 select된 컬럼 이름을 사용하는지 확인
+- 사용 가능한 경우 schema 문서와 교차 확인
 
-#### 죽은 코드(Dead Code) 및 일관성
-- 할당되었지만 읽히지 않는 변수
+#### 죽은 코드(Dead Code) 및 일관성(버전/changelog만 — 다른 항목은 maintainability specialist가 처리)
 - PR 제목과 VERSION/CHANGELOG 파일 간 버전 불일치
 - 변경사항을 부정확하게 설명하는 CHANGELOG 항목 (예: X가 존재한 적 없는데 "X에서 Y로 변경")
-- 코드 변경 후 이전 동작을 설명하는 주석/문서 문자열
 
 #### LLM 프롬프트 문제
 - 프롬프트의 0-인덱스 목록 (LLM은 1-인덱스를 안정적으로 반환)
 - `tool_classes`/`tools` 배열에 실제로 연결된 것과 일치하지 않는 가용 도구/기능을 나열하는 프롬프트 텍스트
 - 여러 곳에 명시된 단어/토큰 제한이 서로 다를 수 있음
 
-#### 테스트 공백(Test Gaps)
-- 타입/상태는 검증하지만 부수 효과(URL 첨부됨? 필드 채워짐? 콜백 실행됨?)는 검증하지 않는 부정 경로(negative-path) 테스트
-- 형식 확인 없이 문자열 내용만 검증하는 어설션 (예: 제목 존재 여부는 검증하지만 URL 형식은 미확인)
-- 코드 경로가 외부 서비스를 명시적으로 호출하지 않아야 할 때 누락된 `.expects(:something).never`
-- 엔드투엔드 적용 경로 작동을 검증하는 통합 테스트 없는 보안 강제 기능(차단, 속도 제한, 인증)
-
 #### 완전성 공백(Completeness Gaps)
 - 완전한 버전이 CC 시간 30분 미만으로 구현 가능한 축약 구현 (예: 부분적 열거형 처리, 불완전한 오류 경로, 추가가 간단한 누락된 엣지 케이스)
 - 인력 투입 추정치만 제시된 옵션 — 인력 시간과 CC+gstack 시간 모두 표시해야 함
 - 누락된 테스트 추가가 "호수" 규모이지 "바다" 규모가 아닌 테스트 커버리지 공백 (예: 누락된 부정 경로 테스트, 해피 경로 구조를 미러링하는 누락된 엣지 케이스 테스트)
 - 적절한 추가 코드로 100% 달성 가능한데 80-90%로 구현된 기능
-
-#### 암호화 및 엔트로피(Crypto & Entropy)
-- 해싱 대신 데이터 잘라내기(truncation) (SHA-256 대신 마지막 N자) — 엔트로피 감소, 충돌 용이
-- 보안에 민감한 값에 `rand()` / `Random.rand` 사용 — 대신 `SecureRandom` 사용
-- 시크릿 또는 토큰에 대한 상수 시간이 아닌 비교(`==`) — 타이밍 공격(timing attack)에 취약
 
 #### 시간 윈도우 안전성(Time Window Safety)
 - "오늘"이 24시간을 커버한다고 가정하는 날짜 키 조회 — 오전 8시 PT 리포트는 오늘 키 아래 자정→오전 8시만 조회
@@ -107,23 +104,6 @@ Pre-Landing Review: N issues (X critical, Y informational)
 - 파셜의 인라인 `<style>` 블록 (렌더링마다 재파싱)
 - 뷰에서의 O(n*m) 조회 (루프 내 `Array#find` 대신 `index_by` 해시 사용)
 - DB 결과에 대한 Ruby 측 `.select{}` 필터링으로 `WHERE` 절이 될 수 있는 것 (의도적으로 선행 와일드카드 `LIKE`를 피하는 경우 제외)
-
-#### 성능 및 번들 영향(Performance & Bundle Impact)
-- 무거운 것으로 알려진 package.json의 새 `dependencies` 항목: moment.js (→ date-fns, 330KB→22KB), lodash 전체 (→ lodash-es 또는 함수별 임포트), jquery, core-js 전체 폴리필
-- 상당한 lockfile 증가 (단일 추가로 인한 많은 전이적(transitive) 의존성)
-- `loading="lazy"` 또는 명시적 width/height 속성 없이 추가된 이미지 (레이아웃 이동 / CLS 유발)
-- 저장소에 커밋된 대형 정적 자산 (파일당 >500KB)
-- async/defer 없는 동기 `<script>` 태그
-- 스타일시트의 CSS `@import` (병렬 로딩 차단 — 대신 번들러 임포트 사용)
-- 다른 fetch 결과에 의존하는 `useEffect` 내 fetch (요청 워터폴(waterfall) — 결합 또는 병렬화)
-- 트리 셰이킹 가능한 라이브러리에서 named → default import 전환 (트리 셰이킹 무력화)
-- ESM 코드베이스에서의 새 `require()` 호출
-
-**지적하지 마세요:**
-- devDependencies 추가 (프로덕션 번들에 영향 없음)
-- 동적 `import()` 호출 (코드 스플리팅 — 이는 좋은 패턴)
-- 소형 유틸리티 추가 (gzip 기준 <5KB)
-- 서버 측 전용 의존성
 
 #### 배포 및 CI/CD 파이프라인(Distribution & CI/CD Pipeline)
 - CI/CD 워크플로우 변경 (`.github/workflows/`): 빌드 도구 버전이 프로젝트 요구사항과 일치하는지, 아티팩트 이름/경로가 올바른지, 시크릿이 하드코딩된 값이 아닌 `${{ secrets.X }}`를 사용하는지 확인
@@ -142,18 +122,15 @@ Pre-Landing Review: N issues (X critical, Y informational)
 ## 심각도 분류
 
 ```
-치명적(CRITICAL, 가장 높은 심각도):   참고(INFORMATIONAL, 낮은 심각도):
-├─ SQL 및 데이터 안전성               ├─ 조건부 부수 효과
-├─ 경쟁 조건 및 동시성                ├─ 매직 넘버 및 문자열 결합
-├─ LLM 출력 신뢰 경계                ├─ 죽은 코드 및 일관성
-└─ 열거형 및 값 완전성                ├─ LLM 프롬프트 문제
-                                      ├─ 테스트 공백
-                                      ├─ 완전성 공백
-                                      ├─ 암호화 및 엔트로피
-                                      ├─ 시간 윈도우 안전성
-                                      ├─ 경계에서의 타입 강제 변환
+치명적(CRITICAL, 가장 높은 심각도):   참고(INFORMATIONAL, main agent):   전문가(SPECIALIST, parallel subagents):
+├─ SQL 및 데이터 안전성               ├─ Async/Sync 혼용                  ├─ Testing specialist
+├─ 경쟁 조건 및 동시성                ├─ 컬럼/필드 이름 안전성             ├─ Maintainability specialist
+├─ LLM 출력 신뢰 경계                ├─ 죽은 코드(version only)          ├─ Security specialist
+├─ Shell Injection                    ├─ LLM 프롬프트 문제                ├─ Performance specialist
+└─ 열거형 및 값 완전성                ├─ 완전성 공백                      ├─ Data Migration specialist
+                                      ├─ 시간 윈도우 안전성               ├─ API Contract specialist
+                                      ├─ 경계에서의 타입 강제 변환         └─ Red Team (conditional)
                                       ├─ 뷰/프론트엔드
-                                      ├─ 성능 및 번들 영향
                                       └─ 배포 및 CI/CD 파이프라인
 
 모든 발견 사항은 선조치 리뷰(Fix-First Review)를 통해 처리됩니다.

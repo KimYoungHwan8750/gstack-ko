@@ -6,7 +6,7 @@ description: |
   /careful(rm -rf, DROP TABLE, force-push 등에 대한 경고)과
   /freeze(지정된 디렉토리 외부 편집 차단)를 결합합니다. 프로덕션 환경 작업이나
   라이브 시스템 디버깅 시 최대 안전을 위해 사용하세요. "guard mode",
-  "full safety", "lock it down", "maximum safety" 요청 시 사용합니다.
+  "full safety", "lock it down", "maximum safety" 요청 시 사용합니다. (gstack)
 allowed-tools:
   - Bash
   - Read
@@ -28,6 +28,7 @@ hooks:
         - type: command
           command: "bash ${CLAUDE_SKILL_DIR}/../freeze/bin/check-freeze.sh"
           statusMessage: "Checking freeze boundary..."
+sensitive: true
 ---
 
 # /guard — 전체 안전 모드
